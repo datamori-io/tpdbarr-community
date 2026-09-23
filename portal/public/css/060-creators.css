@@ -1,0 +1,100 @@
+/* ==========================================================================
+   The acquisition sections — scenes, movies, creators.
+
+   A strip under the toolbar rather than three more entries in the top nav:
+   Library and Queue are other places you go, these are three views of one
+   question. So they sit inside the page, not above it.
+   ========================================================================== */
+
+.sections {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.section {
+  padding: 9px 15px 11px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+.section:hover { color: var(--text-2); }
+.section.on { color: var(--text); border-bottom-color: var(--accent-hi); }
+
+/* ---------------------------------------------------------------- creators
+ *
+ * Three hundred faces, so the tile is as small as a name can be read at and
+ * the grid takes the wide column the library uses.
+ */
+
+main:has(.creators) { max-width: 1560px; }
+
+.creators {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-sm), 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.creator {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.creator:hover { border-color: var(--accent-hi); transform: translateY(-2px); }
+
+.creatorart {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: var(--panel-2);
+}
+.creatorart img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.creatorart .fav {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--amber);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.creatorbody { padding: 8px 10px 10px; }
+.creatorbody .title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  /* One line: a wrapped name makes a wall of tiles ragged. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.creatorbody .meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+/* The name filter, sized like a chip rather than like the topbar search. */
+.filter {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+  min-width: 220px;
+}
+.filter:focus { border-color: var(--accent-hi); }
+
+@media (max-width: 640px) {
+  .sections { overflow-x: auto; }
+  .section { white-space: nowrap; }
+  .filter { min-width: 0; flex: 1; }
+}
+

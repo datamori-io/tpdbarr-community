@@ -1,0 +1,108 @@
+/* ------------------------------------------------- the top bar, narrow */
+
+/*
+ * The site header on a phone.
+ *
+ * Three things compete for one row — the brand, the search, and the nav —
+ * and at 375px the nav was pushed off the right-hand edge entirely.
+ * So below 760px the search drops to its own line and the nav scrolls
+ * sideways rather than being cut off, and below 520px the brand keeps only
+ * its mark.
+ */
+@media (max-width: 760px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 8px 12px;
+  }
+
+  /* Second row, full width: a search box you cannot type a title into is
+     not worth the room it saves. */
+  .search {
+    order: 3;
+    flex: 1 0 100%;
+    max-width: none;
+  }
+
+  .topnav {
+    order: 2;
+    gap: 2px;
+    /* Scrolls rather than wraps: a nav that reflows moves the thing you were
+       reaching for between one glance and the next. */
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topnav::-webkit-scrollbar { display: none; }
+
+  .topnav a, .topnav button {
+    padding: 7px 9px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  /* The status line scrolls too, rather than stacking four lines deep. */
+  .statusbar {
+    gap: 10px;
+    padding: 0 12px;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .statusbar::-webkit-scrollbar { display: none; }
+  .statusbar span { flex: 0 0 auto; }
+
+  /* Section strips are the same shape of problem. */
+  .sections {
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .sections::-webkit-scrollbar { display: none; }
+  .sections .section { flex: 0 0 auto; }
+
+  main { padding: 16px 12px 48px; }
+  .toolbar { flex-wrap: wrap; }
+}
+
+/*
+ * Two rows, not three.
+ *
+ * The wordmark is 132px of fixed-size sprite — .brandmark is a window with
+ * overflow hidden and the image is positioned inside it — so it will not
+ * shrink, and with it in place the nav could not fit beside it. The header
+ * came out brand / nav / search stacked, tall enough on a 375px screen that
+ * the brand scrolled off the top and you got a header with no name on it.
+ *
+ * Below 620 the brand goes instead. It is a link home, and the nav has one of
+ * those anyway; what you actually need at this width is the destinations
+ * and somewhere to type.
+ *
+ * Do not try to scale the image to fix this: the negative top and left in
+ * .brandmark img are cropping a wordmark out of a larger picture, and any
+ * max-width on it slices a letter off.
+ */
+@media (max-width: 620px) {
+  /*
+   * The wordmark goes, the Feed stays. It is no longer in the nav to fall
+   * back on, and it is a destination rather than decoration.
+   */
+  .brand { display: none; }
+}
+
+@media (max-width: 760px) {
+  /* The name goes and the pill keeps only the Feed. */
+  .brandtag { display: none; }
+  .brandblock { gap: 8px; }
+}
+
+/* The one setting here that is a yes/no rather than an amount. */
+.reelsetplay { cursor: pointer; }
+.reelsetplay input[type="checkbox"] { width: 17px; height: 17px; margin: 0 0 0 auto; accent-color: var(--accent); }
+
+/* The clip renderer's own row: a status line and the way to prod it. */
+.reelsetclips { grid-template-columns: 34px 1fr auto; }
+.reelsetclips button { white-space: nowrap; }
+.reelsetclips .reelsetname { line-height: 1.35; }
+.reelsetnote { font-size: 12px; color: var(--muted); margin-top: 2px; }
+

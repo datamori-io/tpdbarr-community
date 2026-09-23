@@ -1,0 +1,115 @@
+/*
+ * Datamori palette. Five swatch colours are the spine:
+ * #c8c9c9 light grey, #7e7e7e mid grey, #3a3839 dark grey, #1a1a1a near black,
+ * #a01527 crimson. Crimson is dark enough that it only works as a fill, so the
+ * coral the logo network is drawn in does the job wherever the accent has to
+ * read as text or a border on a dark panel.
+ */
+:root {
+  --bg: #141314;
+  --panel: #1c1b1c;
+  --panel-2: #262425;
+  --line: #3a3839;
+  --line-hi: #4d4a4b;
+
+  --text: #e9e9e9;
+  --text-2: #c8c9c9;
+  --muted: #8b8b8b;
+
+  --accent: #a01527;
+  --accent-hi: #e0505f;
+  --accent-wash: rgba(224, 80, 95, 0.18);
+
+  --green: #2ea043;
+  --blue: #2f81f7;
+  --amber: #d29922;
+  --red: #da3633;
+  /*
+   * Crimson is a fill, not a colour to read: at 14px on a dark panel #da3633
+   * is barely brighter than the panel. So red pairs the way the accent does —
+   * --red fills, --red-hi is the one that goes on text and borders. It
+   * replaces the hand-typed near-misses of itself that had accumulated —
+   * #ff9492, #ff8f8c, and a bare #da3633 on a one-character button.
+   */
+  --red-hi: #ff8f8c;
+  --radius: 10px;
+
+  /* Native controls — select menus, scrollbars, checkboxes — follow these. */
+  color-scheme: dark;
+  accent-color: var(--accent);
+
+  /*
+   * Thumbnail track sizes. Every artwork grid picks one of these three steps
+   * rather than inventing its own minimum, so a card on one page is the same
+   * width as a card on the next. Aspect ratio still varies by subject — 16:9
+   * stills, 2:3 posters, 1:1 people — only the track width is shared.
+   */
+  --tile-sm-base: 140px;
+  --tile-md-base: 180px;
+  --tile-lg-base: 240px;
+
+  /*
+   * The per-page size control moves this one number; the three steps follow.
+   * The bases still shrink on narrow screens, so a chosen size stays relative
+   * to the screen rather than overriding it.
+   */
+  --tile-mult: 1;
+
+  --tile-sm: calc(var(--tile-sm-base) * var(--tile-mult));
+  --tile-md: calc(var(--tile-md-base) * var(--tile-mult));
+  --tile-lg: calc(var(--tile-lg-base) * var(--tile-mult));
+}
+
+@media (max-width: 900px) {
+  :root { --tile-sm-base: 118px; --tile-md-base: 150px; --tile-lg-base: 190px; }
+}
+@media (max-width: 640px) {
+  :root { --tile-sm-base: 104px; --tile-md-base: 132px; --tile-lg-base: 150px; }
+}
+
+/* ------------------------------------------------------ thumbnail size pick */
+
+.sizepick { display: flex; align-items: center; gap: 3px; margin-left: auto; align-self: center; }
+.sizepick button {
+  min-width: 27px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sizepick button:hover { border-color: var(--accent-hi); color: var(--text); }
+.sizepick button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+/* The toolbar already pushes its own trailing controls right. */
+.toolbar .spacer + .sizepick { margin-left: 0; }
+
+/*
+ * One focus ring everywhere, in the brand coral, instead of the browser gold.
+ * Scoped to things you can actually operate — a bare :focus-visible also rings
+ * the <dialog>, which takes focus the moment it opens.
+ */
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 1px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+a { color: inherit; text-decoration: none; }
+.muted { color: var(--muted); font-weight: 400; }
+

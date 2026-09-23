@@ -1,0 +1,322 @@
+/* ============================================================= the film wall
+   Portrait everywhere on this page. Group box art and the posters now sitting
+   on the features are both 2:3, and a poster wall is what a film library looks
+   like — the 16:9 still belongs on Scenes, where the subject is a moment
+   rather than a release. .facetart is already 3/4, so this only forces the
+   image to fill it. */
+.facets.posters .facetart { aspect-ratio: 2 / 3; }
+.facets.posters .facetart img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Which kind of film this is. Top left, because it is the one thing you cannot
+   read off the picture and it changes what a click does. */
+.kindmark {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  background: rgba(20, 19, 20, 0.78);
+  border: 1px solid var(--line-hi);
+  backdrop-filter: blur(3px);
+}
+.kindmark.group { color: var(--amber); }
+.kindmark.film { color: var(--blue); }
+
+/* The per-card actions, for working along a shelf rather than stopping on one
+   film. Hidden until the card is under the pointer so the wall stays a wall. */
+.cardacts {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px 9px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.facet.film:hover .cardacts,
+.facet.film:focus-within .cardacts { opacity: 1; }
+
+.cardact {
+  flex: 1;
+  padding: 3px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cardact:hover { border-color: var(--accent-hi); color: var(--text); }
+
+/* The filter bar. Wraps rather than scrolls: on a narrow window a hidden
+   filter is a filter nobody knows is set. */
+.shelfbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.shelfbar .filter { flex: 1 1 200px; min-width: 0; max-width: 300px; }
+.shelfpick {
+  padding: 5px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  max-width: 190px;
+}
+
+
+/* The wall pages in at 120. A button rather than an endless scroll: the shelf
+   has an end and it is worth being able to reach it. */
+.showmore { display: block; margin: 2px auto 26px; }
+.filmedit { max-width: 620px; }
+.filmedrow { display: flex; gap: 16px; align-items: flex-start; }
+.filmedrow h3 { margin: 0 0 8px; font-size: 13px; }
+.filmedrow > div { flex: 1; min-width: 0; }
+.filmposter {
+  flex: none;
+  width: 150px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.coverpick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.coverthumb { width: 54px; border-radius: 4px; border: 1px solid var(--line); }
+
+/*
+ * How much of a film you hold, on the poster's corner.
+ *
+ * Two states, and the difference is the point: a solid badge counted a real
+ * scene list, a hollow one matched a name and could be a re-cut of the same
+ * title. The hollow one is deliberately quieter — it is a hint, not a fact.
+ */
+.holdbadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(3px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.holdbadge.exact {
+  background: var(--green);
+  color: #08140b;
+  text-shadow: none;
+}
+/* Stash's own count — solid like the exact one, because it is a fact rather
+   than a guess, but its own colour: it answers "how much of this is out of the
+   import pipeline", not "how much of the film". */
+.holdbadge.stash {
+  background: var(--blue);
+  color: #05101f;
+  text-shadow: none;
+}
+/* How much of a tracked catalogue you hold. Its own colour, because it is a
+   different number from the green one: that says how much of a film is here,
+   this says how much of what you decided you want is. */
+.holdbadge.coverage {
+  background: var(--amber);
+  color: #1a1204;
+  text-shadow: none;
+}
+.holdbadge.probable {
+  background: rgba(20, 19, 20, 0.72);
+  border: 1px dashed var(--line-hi);
+  color: var(--text-2);
+}
+.facetart img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Stash has no picture for this one. */
+.facetblank {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--line-hi);
+  background: var(--panel-2);
+  user-select: none;
+}
+
+.facetart .fav {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--amber);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.facetbody { padding: 8px 10px 10px; }
+.facetbody .title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  /* One line: a wrapped name makes a wall of tiles ragged. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.facetbody .meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+/* The meta line wraps to two on a poster this narrow — year, studio, runtime
+   and a scene count do not fit on one — so where a blurb follows it, it holds
+   both lines whether it needs them or not and the row starts its prose
+   together. Tiles with no blurb keep the height they had. */
+.facetbody:has(.facetdesc) .meta { min-height: 2.4em; }
+
+/* What it is about, on the tiles that have something to say — a film does, a
+   performer does not. Two clamped lines, like the scene tile's. The name above
+   is already one line, so the title needs no such reserve. */
+.facetbody .facetdesc {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------- the missing rail */
+
+.rail.missing { margin-top: 34px; }
+.rail.missing .railtitle { font-size: 15px; font-weight: 600; color: var(--text-2); }
+
+/* -------------------------------------------------------- the monitored rail
+ *
+ * The missing rail closes a page, so it is drawn quietly. This one opens one,
+ * and what is in it is what you chose — so it is a panel with the accent down
+ * its edge, and the shelf underneath stays flat. The two are the same object in
+ * the markup; only this bit of paint separates them.
+ */
+.rail.monitored {
+  margin: 0 0 26px;
+  padding: 14px 16px 4px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-hi);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.rail.monitored .railtitle { font-size: 15px; font-weight: 650; color: var(--accent-hi); }
+
+/* A facet is a third the width of a scene tile, so the track follows it. */
+.railtrack:has(.facet) { grid-auto-columns: var(--tile-sm); }
+
+/* Except a scene in one, which is 16/9 and unreadable at a portrait's width. */
+.rail.monitored .railtrack:has(.facetart.wide) { grid-auto-columns: var(--tile-lg); }
+
+@media (max-width: 640px) {
+  .tally b { font-size: 21px; }
+}
+
+/* ========================================================== a movie's page
+   The scene page's two columns, playing a whole group. What is new is the
+   chapter list under the player: the parts of the film, in the order they
+   play, with the one you are on lit. */
+
+.filmpage .chapterblock { margin-bottom: 18px; }
+.filmpage .chapterhead { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+
+.chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.chapter {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 64px 20px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: left;
+  font: inherit;
+  color: var(--text-2);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.chapter:hover { border-color: var(--accent-hi); color: var(--text); }
+
+/* The part you are watching. A left edge rather than a fill: this list sits
+   directly under the picture and a lit row is a bright band across it. */
+.chapter.on {
+  border-color: var(--accent-hi);
+  border-left-width: 3px;
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.chapterno {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.chapter.on .chapterno { color: var(--accent-hi); border-color: var(--accent-hi); }
+
+.chaptertext { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.chaptertitle {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chapterfacts { font-size: 11.5px; color: var(--muted); }
+
+/* How far through that part you are, from Stash's own resume time. */
+.chapterbar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.chapterbarfill { display: block; height: 100%; background: var(--accent-hi); }
+
+.chapteraway {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.chapteraway:hover { color: var(--accent-hi); }
+
+/* The box art in the rail takes the column, unlike the 150px one in the
+   editor dialog this class was written for. */
+.sceneside .filmposter { width: 100%; margin-bottom: 12px; }
+
+@media (max-width: 720px) {
+  .chapter { grid-template-columns: 24px minmax(0, 1fr) 20px; }
+  .chapter .chapterbar { display: none; }
+}

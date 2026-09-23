@@ -1,0 +1,114 @@
+services:
+  tpdbarr:
+    build: .
+    image: tpdbarr-portal:latest
+    container_name: tpdbarr
+
+    # As root, because a Stash scenes volume is usually root-owned and the image
+    # otherwise runs as uid 1000. That matters for exactly one thing —
+    # downscale.mjs replacing a file in /organized_scenes. Drop this line if you
+    # never scale files down, or if your scenes volume is owned by uid 1000.
+    user: "0:0"
+
+    ports:
+      - "6980:6980"
+
+    # Every host path below is a placeholder. Copy .env.example to .env and set
+    # them to match your own Stash, Whisparr and NAS layout. The container-side
+    # paths on the right must match the paths Stash reports for its files, so
+    # the portal can resolve them without translation.
+    volumes:
+      - ./config:/config
+
+      # The movie library (Emby-style folders with .nfo and artwork).
+      - movies:/movies
+
+      # A folder inside Stash's own media bind, so a gallery written here at
+      # /galleries is visible to Stash under its /data mount. Stash's library
+      # paths need a path for it with images turned on — the Galleries page
+      # offers to add it.
+      - ${STASH_MEDIA_DIR}/galleries:/galleries
+
+      # The scenes. Same volume Stash mounts, at the same path. Writable only
+      # for downscale.mjs, which refuses everything outside this folder and
+      # only replaces a file after the new one has been measured against the
+      # old.
+      - ${ORGANIZED_SCENES_DIR}:/organized_scenes
+
+      # Where a scene waits on FileFlows before it is filed. Read-only.
+      - "${IMPORT_FOLDER_DIR}:/Import Folder:ro"
+
+      # NZBGet's Manual category — releases grabbed by hand from the Indexers
+      # band. Writable because manualdrop.mjs empties it into the Import
+      # Folder once a download finishes.
+      - ${NZBGET_MANUAL_DIR}:/nzbget-manual
+
+      # Each Whisparr's download folder, read-only.
+      - ${WHISPARR_V3_SCENES_DIR}:/Whisparr-v3:ro
+      - ${WHISPARR_V2_DATA_DIR}:/Whisparr-v2:ro
+
+      # A staging folder you drop things into yourself. Writable: the match page
+      # renames files here once they have been matched, and the renamer
+      # refuses any path outside this mount.
+      - ${PC_IMPORT_DIR}:/pc-import
+
+      # The whole media share, mounted once, so a file can be *moved* between
+      # /Import Folder, /organized_scenes and /movies with a single SMB rename
+      # instead of being copied across three separate mounts (EXDEV).
+      # share.mjs maps a path onto this mount only when something moves a file.
+      - "media:/media4"
+
+      # Marker clips. Inside Stash's media bind but NOT inside any of its
+      # library paths, so Stash never reads the clips back in as scenes.
+      - ${STASH_MEDIA_DIR}/markerclips:/markerclips
+
+      # Dated copies of everything in /config.
+      - ./backups:/backups
+
+      # The same sets on a NAS, best effort. Remove this line and the
+      # portal-backups volume below if you do not want an off-machine copy.
+      - portal-backups:/nas-backup
+    restart: unless-stopped
+
+  # If you don't already run a Whisparr v2, uncomment this. Keep its root folder
+  # separate from your v3 instance's so the two never fight over a file.
+  #
+  # whisparr-v2:
+  #   image: ghcr.io/hotio/whisparr:v2
+  #   container_name: whisparr-v2
+  #   ports:
+  #     - "6970:6969"
+  #   volumes:
+  #     - ./whisparr-v2:/config
+  #     - /data/adult/tpdb:/data
+  #   restart: unless-stopped
+
+volumes:
+  # Off-machine backups of the portal's own state.
+  portal-backups:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//${NAS_HOST}/${NAS_BACKUP_SHARE}"
+      o: "addr=${NAS_HOST},username=${MEDIA_SMB_USER},password=${MEDIA_SMB_PASS},vers=3.0,uid=1000,gid=1000,file_mode=0644,dir_mode=0755"
+
+  # The whole media share. uid/gid 0 because the container runs as root.
+  media:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//${NAS_HOST}/${NAS_MEDIA_SHARE}"
+      o: "addr=${NAS_HOST},username=${MEDIA_SMB_USER},password=${MEDIA_SMB_PASS},vers=3.0,uid=0,gid=0"
+
+  # The movie library, a subfolder of the media share.
+  #
+  # Writable, but only just: the gap-filler puts a .nfo and a poster into a
+  # folder Emby never matched, refuses to overwrite an existing file, and only
+  # runs after someone has chosen a candidate. Set file_mode/dir_mode to
+  # 0444/0555 and add `ro` to make that impossible.
+  movies:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//${NAS_HOST}/${NAS_MEDIA_SHARE}/${NAS_MOVIES_SUBFOLDER}"
+      o: "addr=${NAS_HOST},username=${MEDIA_SMB_USER},password=${MEDIA_SMB_PASS},vers=3.0,uid=1000,gid=1000,file_mode=0644,dir_mode=0755"

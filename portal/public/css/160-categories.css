@@ -1,0 +1,346 @@
+/* ------------------------------------------------------------- categories
+ *
+ * Two pages and an editor. The index reuses .facets and .facet wholesale — a
+ * category is a picture with a name under it, which is the same object the
+ * studios and performers shelves already draw — so everything here is either
+ * the banner at the top of one category, or the editor behind it.
+ */
+
+/* ------------------------------------------------------------- the banner
+ *
+ * A wide still with the name over it. The picture is one of the category's own
+ * scenes, so it is a frame from something in there rather than a decoration:
+ * the gradient exists to keep the name readable over whatever that frame turns
+ * out to be, and nothing is layered over the middle of it.
+ */
+
+.catbanner {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+  margin-bottom: 18px;
+  min-height: 160px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.catcover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Dimmed rather than blurred: a blur costs a repaint on every scroll of a
+   * page that is mostly a wall of moving thumbnails. */
+  opacity: 0.45;
+}
+
+.catbannerbody {
+  position: relative;
+  padding: 22px 20px 18px;
+  max-width: 760px;
+  background: linear-gradient(to top, rgba(20, 19, 20, 0.92), rgba(20, 19, 20, 0));
+  width: 100%;
+}
+
+.catbanner.bare .catbannerbody { background: none; }
+
+.catbannerbody h1 { margin: 0 0 4px; font-size: 26px; }
+.catbannerbody p { margin: 0; }
+
+.catblurb {
+  margin-top: 8px !important;
+  color: var(--text-2);
+  max-width: 62ch;
+}
+
+/* The Edit button sits in the corner of the band, away from the words. */
+.catbanner > .act {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+}
+
+/* --------------------------------------------------------------- the editor
+ *
+ * Four boxes in a column, each one whole question. Not tabs: the answers argue
+ * with each other — a rule that catches two hundred scenes changes what the
+ * hand-picked list is for — and you should be able to see both at once.
+ */
+
+.catedit {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.catedit[hidden] { display: none; }
+
+.catbox {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.catbox h3 { margin: 0; font-size: 15px; }
+.catbox p.small { margin: 0; max-width: 72ch; }
+.catbox .filter { width: 100%; }
+.catbox textarea.filter { resize: vertical; min-height: 64px; font: inherit; }
+
+/*
+ * The rule, which is a stack of lines rather than one row of boxes.
+ *
+ * Every line is the same five slots wide, so the joining word, the field and
+ * the operator all line up down the page and the shape of the rule can be read
+ * without reading the words. The first line shows "Where" in the slot the
+ * others put "and" or "or" in — same width, so nothing shifts when a line is
+ * deleted and the second becomes the first.
+ */
+.catrules {
+  display: grid;
+  gap: 6px;
+}
+
+.catruleline {
+  display: grid;
+  grid-template-columns: 62px 116px 92px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+/* The word in front of a line, and the label standing in for it on the first
+ * one. One slot holding both, so hiding either keeps the columns where they
+ * are. Right-aligned, so both sit against the field they belong to. */
+.catjoin { min-width: 0; }
+.catjoin .shelfpick { width: 100%; }
+
+/* `:not([hidden])` because a bare `display: block` beats the browser's own
+ * rule for the attribute, and the label would then sit under the word it is
+ * standing in for. */
+.catlead:not([hidden]) {
+  display: block;
+}
+
+.catlead {
+  text-align: right;
+  padding-right: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* One character wide, and it should stay square. */
+.catruleline > .act:last-child { padding: 6px 10px; }
+
+/*
+ * Narrow: the line becomes three short rows — the joining word, then what it
+ * looks at and how, then the words themselves with the × beside them. Same
+ * reading order as the wide version, just folded.
+ */
+@media (max-width: 760px) {
+  .catruleline { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .catjoin { grid-column: 1 / -1; }
+  .catjoin .shelfpick { width: auto; }
+  .catjoin .shelfpick,
+  .catlead { text-align: left; padding-right: 0; }
+  .catruleline > .filter { grid-column: 1 / 3; }
+}
+
+/*
+ * The cover picker: the category's own scenes, small, in a strip you scroll.
+ *
+ * Small on purpose. This is "which of these", not "look at these" — the wall
+ * below the editor is where the scenes are actually looked at, and a picker
+ * built at tile size would push everything else off the screen.
+ */
+/*
+ * Uploaded artwork, shown at the size it will actually be seen at. A cover you
+ * cannot see is a cover you will upload twice.
+ */
+.catart {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+
+.catart img {
+  width: 200px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg);
+  flex: none;
+}
+
+.catart span { max-width: 48ch; }
+
+@media (max-width: 620px) {
+  .catart { flex-direction: column; align-items: flex-start; }
+  .catart img { width: 100%; }
+}
+
+.catshots {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 132px;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+
+.catshot {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--text-2);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+}
+
+.catshot img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--bg);
+  display: block;
+}
+
+.catshotname {
+  font-size: 11px;
+  padding: 0 6px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catshot:hover { border-color: var(--line); color: var(--text); }
+
+/* The one leading the page. Not a tick in a corner: the whole card is the
+ * answer to "which one", so the whole card is what is marked. */
+.catshot.on {
+  border-color: var(--accent-hi);
+  color: var(--accent-hi);
+  cursor: default;
+}
+
+.catshot:disabled { opacity: 0.45; cursor: default; }
+.catshot:disabled:hover { border-color: transparent; color: var(--text-2); }
+
+/* ------------------------------------------------------- the two scene lists
+ *
+ * Search results and the hand-picked order are the same row: a small still,
+ * what it is, and the buttons for it. One shape, because they are the same
+ * decision seen from either side.
+ */
+
+.catfinds,
+.catpicks {
+  display: grid;
+  gap: 6px;
+}
+
+.catfind {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+
+.catfind img {
+  width: 104px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg);
+  flex: none;
+}
+
+.catfindbody { flex: 1; min-width: 0; }
+
+.catfindbody .title {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catfindbody .meta { font-size: 12px; color: var(--muted); }
+
+.catacts {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* The two nudges are one character wide and should stay square. */
+.catacts .act[title^="Move"] { padding: 6px 10px; }
+
+@media (max-width: 700px) {
+  .catfind { flex-wrap: wrap; }
+  .catacts { width: 100%; justify-content: flex-end; }
+}
+
+/* ------------------------------------------ send a missing one to v3
+ *
+ * The same button as a StashDB card's Add, under the words of a faded tile.
+ * Disabled once v3 has it rather than hidden, so "already sent" reads as an
+ * answer and not as a button that went missing.
+ */
+.facetbody button.filmsend {
+  margin-top: 8px;
+  padding: 5px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.facetbody button.filmsend:hover { border-color: var(--accent-hi); }
+.facetbody button.filmsend:disabled { opacity: 0.5; cursor: default; }
+
+@media (pointer: coarse) {
+  .facetbody button.filmsend { min-height: 40px; padding: 8px 14px; }
+}
+
+/* ------------------------------------------------- the picker on a scene
+ *
+ * Every category as a chip, on if the scene is in it. A list rather than a
+ * dropdown because there will never be many, and the whole point is to see
+ * where this one already sits without opening anything.
+ */
+
+.catpicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.catpicker .chip { cursor: pointer; }
+.catpicker .chip.on { border-color: var(--accent-hi); color: var(--accent-hi); }
+.catpicker .chip:disabled { opacity: 0.5; cursor: default; }
+
+/* A category's films fade further than the shared 0.55: on a wall of wide
+   stills the owned and unowned ones were too close to tell apart at a glance.
+   Hover still brings the artwork back to full. */
+.facet.faded.filmtile .facetart { opacity: 0.25; }
+.facet.faded.filmtile:hover .facetart { opacity: 1; }

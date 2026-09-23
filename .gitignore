@@ -1,0 +1,9 @@
+.env
+portal/config/
+portal/backups/
+node_modules/
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

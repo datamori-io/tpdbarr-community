@@ -1,0 +1,99 @@
+/* ==========================================================================
+   The library sections — overview, scenes, movies, performers, studios.
+
+   Each page is the same shape: a grid of what you hold, then a thin rail of
+   what you do not. The rail is quieter than the grid on purpose — it is the
+   smaller half of the question, and six hundred people you own nothing of
+   would otherwise bury the two hundred you do.
+   ========================================================================== */
+
+/* Faces and covers want the width the rails already take. */
+main:has(.facets), main:has(.tallies) { max-width: 1560px; }
+
+/* ------------------------------------------------------------- the tallies */
+
+.tallies {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--tile-md), 1fr));
+  gap: 10px;
+  margin: 0 0 30px;
+}
+
+.tally {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 14px 16px 15px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.12s ease;
+}
+.tally:hover { border-color: var(--accent-hi); }
+
+.tally b {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.tallylabel { font-size: 13px; color: var(--text-2); }
+.tallyrest { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+
+/* --------------------------------------------------------------- the facets
+ *
+ * One tile for a person, a studio and a movie. They differ only in the shape
+ * of the artwork and where a click goes; three slightly different cards on
+ * three sibling pages would read worse than one.
+ */
+
+.facets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-sm), 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+/* A category leads with a 16:9 frame — the same picture the Scenes shelf puts
+   on a tile — so it takes the same width the Scenes shelf gives one. --tile-sm
+   is sized for a face or a poster, and a wide still at that width came out so
+   small that XL on the Categories page was narrower than M on Scenes. */
+.facets:has(.facetart.wide) {
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-lg), 1fr));
+}
+
+.facet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+.facet:hover { border-color: var(--accent-hi); transform: translateY(-2px); }
+
+/* Nothing to click through to — usually a scene TPDB has no page for. */
+.facet.inert { cursor: default; }
+.facet.inert:hover { border-color: var(--line); transform: none; }
+
+/* You hold nothing of this one. Dimmed rather than greyed, so the artwork is
+   still recognisable — the point of the rail is that you spot a name. */
+.facet.faded .facetart { opacity: 0.55; }
+.facet.faded:hover .facetart { opacity: 1; }
+
+.facetart {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: var(--panel-2);
+  transition: opacity 0.15s ease;
+}
+/*
+ * A studio is a logo, not a portrait. Landscape and contained rather than
+ * cropped — a logo cropped to a poster loses the half with the name on it.
+ */
+.facetart.logo { aspect-ratio: 16 / 9; background: var(--panel-2); }
+.facetart.logo img { object-fit: contain; padding: 12px; }
+.facetart.wide { aspect-ratio: 16 / 9; }
+

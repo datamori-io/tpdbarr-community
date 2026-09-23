@@ -1,0 +1,280 @@
+/* ----------------------------------------------------------------- player */
+
+.stage {
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+}
+.player { display: block; width: 100%; max-height: 76vh; background: #000; }
+
+/* ---------------------------------------------------------- player chrome
+ *
+ * The browser's own bar is replaced by player.js, mostly so the seek track can
+ * be something a thumb can hit. Everything below the wrapper is drawn rather
+ * than native, so the sizes here are the ones that decide whether this is
+ * usable on a phone: a 40px scrub row and 44px buttons under a coarse pointer.
+ */
+
+.vplayer {
+  position: relative;
+  background: #000;
+  line-height: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.vplayer:focus { outline: none; }
+.vplayer:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: -2px; }
+.vplayer [hidden] { display: none !important; }
+
+/* iOS puts its own controls back on a video it decides is playing inline. */
+.vplayer video::-webkit-media-controls { display: none !important; }
+.vplayer video::-webkit-media-controls-enclosure { display: none !important; }
+
+.vplayer.fullscreen { display: flex; align-items: center; justify-content: center; }
+.vplayer.fullscreen .player { max-height: 100vh; height: 100vh; object-fit: contain; }
+
+/*
+ * The layer that makes the whole picture a seek bar. pan-y so a vertical swipe
+ * over the video is still the page scrolling; the horizontal one is ours.
+ */
+.vsurface { position: absolute; inset: 0; touch-action: pan-y; }
+.vplayer.scrubbing .vsurface { cursor: ew-resize; }
+
+/* -------------------------------------------------------------- the bar */
+
+.vbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 30px 10px 8px;
+  line-height: 1.2;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.86), rgba(0, 0, 0, 0.5) 58%, transparent);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.vplayer.idle { cursor: none; }
+.vplayer.idle .vbar { opacity: 0; transform: translateY(10px); pointer-events: none; }
+
+.vbuttons { display: flex; align-items: center; gap: 3px; margin-top: 2px; }
+.vgap { flex: 1; }
+
+.vbtn {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.vbtn svg { width: 22px; height: 22px; }
+.vbtn:hover { background: rgba(255, 255, 255, 0.15); }
+.vspeed { width: auto; min-width: 40px; padding: 0 9px; color: var(--text-2); }
+.vspeed.on { color: var(--accent-hi); }
+.vwide.on { color: var(--accent-hi); }
+
+/* Mark this moment. Tinted rather than plain because it is the one button on
+   the bar that writes something down — everything else beside it only changes
+   how the scene is being watched.
+
+   Not `.vmark`: that is already the marker drawn on the track, further down,
+   and it is absolutely positioned — a button wearing it lands on top of the
+   scrub bar. */
+.vmarkbtn { color: var(--accent-hi); }
+.vmarkbtn:disabled { opacity: 0.45; cursor: default; }
+
+.vtime {
+  margin-left: 5px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Slides out under the mute button rather than sitting there taking width. */
+.vsound { display: flex; align-items: center; }
+.vvolume {
+  width: 0;
+  opacity: 0;
+  margin: 0;
+  accent-color: var(--accent-hi);
+  transition: width 0.16s ease, opacity 0.16s ease;
+}
+.vsound:hover .vvolume, .vvolume:focus { width: 76px; opacity: 1; margin: 0 6px 0 2px; }
+
+/* ------------------------------------------------------------ the scrub */
+
+.vscrub {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 26px;
+  cursor: pointer;
+  /* Without this the browser takes a drag along the bar as a page scroll. */
+  touch-action: none;
+}
+.vtrack {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.vbuffered, .vplayed {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  border-radius: 99px;
+}
+.vbuffered { background: rgba(255, 255, 255, 0.3); }
+.vplayed { background: var(--accent-hi); }
+
+.vhandle {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 13px;
+  height: 13px;
+  margin: -6.5px 0 0 -6.5px;
+  border-radius: 50%;
+  background: var(--accent-hi);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+  transition: transform 0.12s ease;
+}
+.vscrub:hover .vhandle, .vplayer.scrubbing .vhandle { transform: scale(1.4); }
+
+/* The markers, drawn on the track so you can see what you are dragging past. */
+.vmarks { position: absolute; inset: 0; pointer-events: none; }
+.vmark {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 11px;
+  margin: -5.5px 0 0 -1.5px;
+  border-radius: 2px;
+  background: var(--amber);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* --------------------------------------------------- the thumbnail card */
+
+.vpreview {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line-hi);
+  border-radius: 9px;
+  background: rgba(10, 10, 10, 0.94);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  line-height: 1.2;
+}
+/* The window; .vshottile is the sprite tile scaled up inside it. */
+.vshot { overflow: hidden; border-radius: 5px; background: #000; }
+.vshottile {
+  transform-origin: top left;
+  background-repeat: no-repeat;
+  background-color: #000;
+}
+.vshotlabel {
+  max-width: 210px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--amber);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vshottime { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------- centre, spinner, flash */
+
+.vbig {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  transition: opacity 0.18s ease;
+}
+.vbig svg { width: 34px; height: 34px; }
+.vbig:hover { background: rgba(0, 0, 0, 0.68); }
+.vplayer.playing .vbig { opacity: 0; pointer-events: none; }
+
+.vspinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  border-top-color: var(--accent-hi);
+  border-radius: 50%;
+  animation: vspin 0.8s linear infinite;
+  pointer-events: none;
+}
+@keyframes vspin { to { transform: rotate(360deg); } }
+
+/* What says a double-tap landed when the bar is hidden. */
+.vflash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 9px 15px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.66);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/*
+ * A thumb is not a mouse pointer: the row it has to land on gets taller, the
+ * handle it drags gets bigger, and the volume slider goes away entirely — the
+ * phone's own volume keys are the control there.
+ */
+@media (pointer: coarse) {
+  .vbar { padding: 34px 8px 12px; }
+  .vscrub { height: 40px; }
+  .vtrack { height: 7px; }
+  .vhandle { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
+  .vmark { width: 4px; height: 15px; margin: -7.5px 0 0 -2px; }
+  .vbtn { width: 44px; height: 44px; }
+  .vbtn svg { width: 24px; height: 24px; }
+  .vbtn:hover { background: transparent; }
+  .vsound { display: none; }
+  .vscrub:hover .vhandle { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vbar, .vhandle, .vbig, .vvolume { transition: none; }
+  .vspinner { animation-duration: 2s; }
+}
+

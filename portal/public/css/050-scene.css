@@ -1,0 +1,370 @@
+/* -------------------------------------------------------------- the scene
+ *
+ * Two columns: the player and what you do with it, then a rail of what you
+ * read. Under 1080 it becomes the single stack it used to be, which is the
+ * right shape on a narrow screen and the wrong one on a wide monitor.
+ */
+
+.scenepage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 26px;
+  align-items: start;
+  margin-bottom: 26px;
+}
+.scenemain { min-width: 0; }
+.sceneside { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.scenepage h1 { margin: 0 0 8px; font-size: 27px; letter-spacing: -0.02em; line-height: 1.2; }
+
+/*
+ * The head row. What identifies the scene on the left, who is in it on the
+ * right. The faces are a fixed size and the row has a floor taller than one of
+ * them, so the cast can never be what decides the height — the title, the
+ * studio line and the buttons do. Sideways it is capped too: past about five
+ * faces the strip scrolls rather than eating the title's width.
+ */
+.scenehead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  gap: 22px;
+  align-items: start;
+  min-height: 106px;
+  margin-bottom: 16px;
+}
+.headtext { min-width: 0; }
+.scenehead .scenefacts { margin-bottom: 14px; }
+.scenehead .sceneactionbar { margin-bottom: 0; }
+
+/* justify-self is what makes the column shrink to the faces rather than the
+   faces spread across the column. */
+.headcast { justify-self: end; min-width: 0; max-width: 420px; }
+.castfaces {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+.castfaces::-webkit-scrollbar { display: none; }
+.castfaces .castling { flex: 0 0 auto; width: 68px; scroll-snap-align: start; }
+.castfaces .castname {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidecard {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 14px 15px;
+}
+.sidehead {
+  margin: 0 0 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sidecard .tagrow { margin-bottom: 0; }
+.sidelinks { display: flex; flex-direction: column; gap: 8px; }
+.sidelinks .act { justify-content: center; text-align: center; }
+
+/* The cast as faces. A round crop sits high because that is where a face is. */
+.castgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px 10px; }
+.castling { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text); }
+.castart {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.castart img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; }
+.castblank { display: grid; place-items: center; width: 100%; height: 100%; font-size: 21px; color: var(--muted); }
+.castart .fav {
+  position: absolute;
+  bottom: 3px;
+  right: 8px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--amber);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.castling:hover .castart { border-color: var(--accent-hi); }
+.castname { font-size: 12px; line-height: 1.25; text-align: center; }
+
+/* A codec is something you look up, not something you read every time. */
+.spec { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; font-size: 12.5px; }
+.spec dt { color: var(--muted); }
+.spec dd { margin: 0; text-align: right; color: var(--text-2); }
+.sidecard .filepath { margin: 12px 0 0; }
+
+/* A card whose heading carries its own pair of arrows. */
+.sidetop { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; }
+.sidetop .sidehead { margin: 0; }
+.sidecount { font-size: 12px; color: var(--muted); }
+.sidesteps { margin-left: auto; display: flex; gap: 5px; }
+.sidestep {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sidestep:hover:not(:disabled) { border-color: var(--accent-hi); color: var(--text); }
+.sidestep:disabled { opacity: 0.35; cursor: default; }
+
+/* One gallery to a view. The arrows push; the snap points do the arriving. */
+.sidetrack {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.sidetrack::-webkit-scrollbar { display: none; }
+.sidetrack > .facet { flex: 0 0 100%; scroll-snap-align: start; }
+
+/*
+ * The switch in the player bar: the column of things you read folds away and
+ * the picture takes the width it was leaving for it.
+ */
+.scenepage.wide { grid-template-columns: minmax(0, 1fr); }
+.scenepage.wide .sceneside { display: none; }
+
+/*
+ * And the rest of the page steps back. Everything that is not the scene — the
+ * top bar, the status line, the section strip, the gallery panel and the rails
+ * underneath — fades rather than goes, and comes back the moment you point at
+ * it. Nothing is hidden and nothing moves: a control that vanished would have
+ * to be found again, and a page that reflowed would lose your place in it.
+ */
+body.videowide .topbar,
+body.videowide .statusbar,
+body.videowide #view > *:not(.scenepage) {
+  opacity: 0.22;
+  transition: opacity 0.25s ease;
+}
+body.videowide .topbar:hover,
+body.videowide .topbar:focus-within,
+body.videowide .statusbar:hover,
+body.videowide #view > *:not(.scenepage):hover,
+body.videowide #view > *:not(.scenepage):focus-within {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.videowide .topbar,
+  body.videowide .statusbar,
+  body.videowide #view > *:not(.scenepage) { transition: none; }
+}
+
+/* The button that unfolds the rest of the tags wears the same chip. */
+.tagchip.more { font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.tagchip.more:hover { border-color: var(--accent-hi); color: var(--text); }
+
+@media (max-width: 1080px) {
+  .scenepage { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .vwide { display: none; }
+  .scenepage.wide .sceneside { display: flex; }
+  .castgrid { grid-template-columns: repeat(6, 1fr); }
+  .sidelinks { flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 720px) {
+  .castgrid { grid-template-columns: repeat(4, 1fr); }
+
+  /* No column to sit beside, so the strip goes under the title and reads left
+     to right like everything else on a phone. */
+  .scenehead { grid-template-columns: minmax(0, 1fr); gap: 16px; min-height: 0; }
+  .headcast { justify-self: stretch; max-width: none; }
+}
+
+.scenefacts { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+.scenefacts span + span::before, .scenefacts a + span::before { content: "· "; }
+.scenefacts .link { color: var(--text); font-weight: 600; }
+.scenefacts .link:hover { color: var(--accent-hi); }
+
+.sceneactionbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 18px; }
+.sceneactions { display: flex; align-items: center; gap: 8px; }
+/* On a gallery the same row sits inside the header block. */
+.listhead .sceneactions { margin: 12px 0 4px; }
+
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.act:hover { border-color: var(--accent-hi); }
+.act.on { border-color: var(--green); color: #7ee787; }
+.act.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.act.primary:hover { filter: brightness(1.1); }
+.act.muted { cursor: default; color: var(--muted); }
+.act.muted:hover { border-color: var(--line); }
+.act:disabled { opacity: 0.5; cursor: default; }
+/* display: inline-flex above would otherwise beat the browser's own [hidden]. */
+.act[hidden] { display: none; }
+
+.stars { display: flex; gap: 1px; }
+.star {
+  border: 0;
+  background: none;
+  color: var(--line);
+  font-size: 19px;
+  line-height: 1;
+  padding: 2px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+.star.on { color: var(--amber); }
+.stars:hover .star { color: var(--muted); }
+.star:hover, .star:hover ~ .star { color: var(--line); }
+.stars:hover .star:hover { color: var(--amber); }
+
+.markers { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.marker {
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.marker:hover { border-color: var(--accent-hi); color: var(--text); }
+
+.castrow, .tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.tagchip {
+  padding: 5px 11px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 12.5px;
+}
+.castrow .tagchip { font-weight: 600; }
+.tagrow .tagchip { color: var(--muted); font-size: 12px; }
+a.tagchip:hover { border-color: var(--accent-hi); color: var(--text); }
+/* A tag has no page to go to, so it is not dressed as something you can click. */
+.tagchip.flat { cursor: default; }
+
+.scenedetails { margin: 0 0 16px; max-width: 78ch; color: var(--text-2); }
+.filepath { font-size: 11.5px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; margin: 0 0 24px; }
+
+@media (max-width: 720px) {
+  .railnav { display: none; }
+  .listhead.with-portrait { flex-direction: column; }
+  .listhead.person .portrait { width: 168px; }
+}
+
+
+/*
+ * Scale down — the one control in the library that destroys something, sitting
+ * in the card that states what it is about to change.
+ *
+ * Set apart from the spec list above it by a rule rather than by colour: it is
+ * not a warning, it is a different kind of thing from the facts it follows.
+ */
+.shrink {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.shrink .bad { color: var(--red-hi); }
+
+.shrinkbuttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shrinkbuttons .chip { padding: 4px 11px; }
+
+/* The choice in force — or, mid press-twice, the one about to be. */
+.shrinkbuttons .chip.on { border-color: var(--accent-hi); color: var(--accent-hi); }
+.shrinkbuttons .chip:disabled { opacity: 0.45; cursor: default; }
+
+/* 720p is what FileFlows does anyway; said quietly, beside the number. */
+.shrinkbuttons .chipnote { font-size: 10.5px; opacity: 0.65; }
+
+/* The sentence under the chips takes its own line. */
+.shrinkbuttons > .muted.small:last-child { flex-basis: 100%; }
+
+@media (pointer: coarse) {
+  /* Room around them, because the press cannot be taken back. */
+  .shrinkbuttons { gap: 14px; }
+  .shrinkbuttons .chip { min-height: 40px; padding: 8px 14px; }
+}
+
+/*
+ * The scene index — twenty-four frames, four across, in the rail. See
+ * indexCard() in library/scene.js.
+ *
+ * Square-ish cells rather than 16:9 ones: at a quarter of the rail's width a
+ * 16:9 frame is 78px by 44px, which is too short to read. The crop is scaled
+ * to the cell's width and the overflow is taken off the top and bottom, which
+ * is where the letterboxing is anyway.
+ */
+.sceneindex {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.indexcell {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: var(--panel-2);
+  background-repeat: no-repeat;
+  cursor: pointer;
+  overflow: hidden;
+}
+.indexcell:hover { border-color: var(--accent-hi); }
+.indexcell:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 1px; }
+
+/* The time, small and only where it does not fight the picture. */
+.indexat {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 0 3px;
+  background: rgba(0, 0, 0, 0.66);
+  color: #fff;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  line-height: 1.5;
+  border-radius: 0 3px 0 3px;
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  /* A fingertip per cell: four across a 340px rail is 80px, which is already
+     a comfortable target — it is the gap between them that needs the room. */
+  .sceneindex { gap: 6px; }
+  .indexat { font-size: 11px; }
+}

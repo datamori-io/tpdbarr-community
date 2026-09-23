@@ -1,0 +1,13 @@
+{
+  "name": "tpdbarr-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browse ThePornDB and send scenes to Whisparr v2, checked against Stash.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.mjs"
+  }
+}

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tpdbarr</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="icon" href="/brand/datamori-full.jpg" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brandblock">
+        <a class="brand" href="#/" aria-label="tpdbarr home">
+          <span class="brandmark"><img src="/brand/datamori-text.jpg" alt="Datamori" /></span>
+        </a>
+        <div class="brandpill">
+          <a class="brandtag" href="#/">tpdbarr</a>
+          <a class="feedlink" href="#/binge" id="nav-binge">Feed</a>
+        </div>
+      </div>
+      <form class="search" id="search-form">
+        <input
+          id="search-input"
+          type="search"
+          placeholder="Search your library, or StashDB for what it is missing…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </form>
+      <nav class="topnav">
+        <a href="#/" id="nav-library">Library</a>
+        <a href="#/stats" id="nav-stats">Stats</a>
+        <a href="#/import" id="nav-import">Find</a>
+        <a href="#/catalogue" id="nav-catalogue">Catalogue</a>
+        <a href="#/parameters" id="nav-settings">Manage</a>
+      </nav>
+    </header>
+
+    <div class="statusbar" id="statusbar"></div>
+
+    <main id="view"><div class="empty">Loading…</div></main>
+
+    <div id="settings-holder" hidden>
+      <form id="settings-form">
+        <fieldset>
+          <legend>Stash <span class="muted">the library — what you actually have</span></legend>
+          <label>URL<input type="text" name="stashUrl" placeholder="http://localhost:9999" /></label>
+          <label>API key <span class="muted">only if Stash has one set</span><input type="password" name="stashApiKey" placeholder="unchanged" /></label>
+          <label class="check"><input type="checkbox" name="cutThumbs" /> Cut a frame for scenes with no cover</label>
+          <p class="muted small">Only where Stash has nothing. A scene that already has a cover is never touched, and nothing cut here is written back to Stash — it is a picture to work by. Off gives you Stash's own answer everywhere, placeholder included.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Whisparr v2 <span class="muted">downloader — ThePornDB scenes</span></legend>
+          <label>URL<input type="text" name="whisparrUrl" placeholder="http://localhost:6970" /></label>
+          <label>API key<input type="password" name="apiKey" placeholder="unchanged" /></label>
+          <div class="two">
+            <label>Quality profile<select name="qualityProfileId"></select></label>
+            <label>Root folder<select name="rootFolderPath"></select></label>
+          </div>
+          <label class="check"><input type="checkbox" name="searchOnAdd" /> Search immediately after adding</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Whisparr v3 <span class="muted">downloader, optional — StashDB scenes</span></legend>
+          <label>URL<input type="text" name="whisparr3Url" placeholder="http://localhost:6969" /></label>
+          <label>API key<input type="password" name="whisparr3ApiKey" placeholder="unchanged" /></label>
+          <div class="two">
+            <label>Quality profile<select name="whisparr3QualityProfileId"></select></label>
+            <label>Root folder<select name="whisparr3RootFolderPath"></select></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>ThePornDB &amp; TMDB <span class="muted">movie metadata</span></legend>
+          <label>TMDB API key <span class="muted">optional — second source when ThePornDB has no match</span><input type="password" name="tmdbApiKey" placeholder="unchanged" /></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>FileFlows <span class="muted">optional — the encoder in the middle of the pipeline</span></legend>
+          <label>URL<input type="text" name="fileflowsUrl" placeholder="http://localhost:19200" /></label>
+          <label>API key <span class="muted">only if your FileFlows has one set</span><input type="password" name="fileflowsApiKey" placeholder="unchanged" /></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Prowlarr <span class="muted">optional — search the indexers by hand from Import › Video</span></legend>
+          <label>URL<input type="text" name="prowlarrUrl" placeholder="http://localhost:9696" /></label>
+          <label>API key<input type="password" name="prowlarrApiKey" placeholder="unchanged" /></label>
+          <label>NZBGet URL <span class="muted">usenet grabs go here rather than to Prowlarr's client</span><input type="text" name="nzbgetUrl" placeholder="http://localhost:6789" /></label>
+          <div class="two">
+            <label>NZBGet username<input type="text" name="nzbgetUsername" autocomplete="off" /></label>
+            <label>NZBGet password<input type="password" name="nzbgetPassword" placeholder="unchanged" autocomplete="new-password" /></label>
+          </div>
+          <label>NZBGet category <span class="muted">not WhisparrV2/V3 — Whisparr would try to import it</span><input type="text" name="nzbgetCategory" placeholder="Manual" /></label>
+        </fieldset>
+
+        <p class="note" id="settings-note"></p>
+
+        <menu>
+          <button type="button" id="settings-test">Test connections</button>
+          <button type="button" id="settings-save" class="primary">Save</button>
+        </menu>
+      </form>
+
+      <!--
+        The gallery folder pair. Out of the form's own markup because Settings
+        › Galleries borrows it and stands it on a different page, and read by
+        reference rather than through the form: these two ids are how
+        connections.js finds them.
+
+        It did carry form="settings-form", which reads better and does not
+        work. That association only holds while both nodes are in the same
+        document tree, and these two spend their lives being moved into and out
+        of the view independently — so the moment the form was the detached
+        one, the name lookup through it was undefined and the Connections page
+        threw on the way in. See settings/connections.js.
+      -->
+      <fieldset id="gallery-fields">
+        <legend>Galleries <span class="muted">where a built one lands</span></legend>
+        <div class="two">
+          <label>Folder, as the portal sees it<input type="text" id="gallery-path" name="galleryPath" placeholder="/galleries" /></label>
+          <label>The same folder, as Stash sees it<input type="text" id="gallery-stash-path" name="galleryStashPath" placeholder="/data/galleries" /></label>
+        </div>
+      </fieldset>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

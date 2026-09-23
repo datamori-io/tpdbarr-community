@@ -1,0 +1,318 @@
+/* ==========================================================================
+   The library — rails, tiles, the player.
+
+   The acquisition side is a list you read. This side is artwork you scan, so
+   it wants the width; the rest of the app keeps its narrower column.
+   ========================================================================== */
+
+main:has(.rail), main:has(.tiles), main:has(.stage) { max-width: 1560px; }
+
+/* ------------------------------------------------------------------ rails */
+
+.rail { margin: 0 0 30px; }
+
+.railhead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+
+.railtitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+a.railtitle .chevron { color: var(--muted); margin-left: 5px; transition: transform 0.15s, color 0.15s; display: inline-block; }
+a.railtitle:hover { color: var(--accent-hi); }
+a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px); }
+
+.railhead .muted { font-size: 12.5px; }
+.railcount { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+.railbody { position: relative; }
+
+.railtrack {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--tile-lg);
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  /* Room for the hover lift, which would otherwise be clipped by the scroller. */
+  padding: 10px 2px 14px;
+  scrollbar-width: none;
+}
+.railtrack::-webkit-scrollbar { display: none; }
+.railtrack > * { scroll-snap-align: start; }
+
+.railnav {
+  position: absolute;
+  top: 10px;
+  bottom: 14px;
+  width: 46px;
+  z-index: 3;
+  border: 0;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.railnav.left { left: 0; background: linear-gradient(to right, var(--bg) 40%, transparent); border-radius: var(--radius) 0 0 var(--radius); }
+.railnav.right { right: 0; background: linear-gradient(to left, var(--bg) 40%, transparent); border-radius: 0 var(--radius) var(--radius) 0; }
+.railbody:hover .railnav { opacity: 0.9; }
+.railnav:hover { opacity: 1; }
+.railnav[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ tiles */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-lg), 1fr));
+  gap: 16px 12px;
+  padding: 10px 0 20px;
+}
+
+.tile {
+  cursor: pointer;
+  transition: transform 0.16s ease;
+}
+.tile:hover { transform: scale(1.045); z-index: 2; }
+.tile:hover .tileart { border-color: var(--accent-hi); box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55); }
+
+.tileart {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: var(--panel-2);
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+.tileart img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Fades up over the poster once it is actually playing, never before. */
+.tilepreview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+.tilepreview.on { opacity: 1; }
+
+/*
+ * The frame under the cursor, and the timeline you pick it with — see
+ * hoverPreview() in library/core.js.
+ *
+ * The frame covers the whole tile rather than the top 85%: the strip lies over
+ * the bottom of the picture instead of taking a slice out of it, so a 16:9
+ * frame in a 16:9 tile is not squashed to fit the remainder. It sits above the
+ * preview video so that pointing at the strip answers with the frame rather
+ * than with whatever the loop happens to be showing.
+ */
+.tileframe {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+  z-index: 1;
+}
+.tileframe.on { opacity: 1; }
+
+/*
+ * 15% of the tile, and the same number is SCRUB_BAND in core.js. Only visible
+ * while the tile is hovered — an always-on bar across six hundred tiles is a
+ * pattern, not a control.
+ */
+.tilescrub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 15%;
+  display: flex;
+  align-items: flex-end;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+  opacity: 0;
+  transition: opacity 0.16s;
+  pointer-events: none;
+  z-index: 2;
+}
+.tile:hover .tilescrub { opacity: 1; }
+
+/* How far along the strip the cursor is, drawn the way every player draws it. */
+.tilescrubfill {
+  height: 3px;
+  width: 0;
+  background: var(--accent-hi);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+/* Nothing to hover with, so nothing to draw. */
+@media (hover: none) {
+  .tilescrub, .tileframe { display: none; }
+}
+
+.tilemarks { position: absolute; top: 7px; left: 7px; display: flex; gap: 5px; z-index: 2; }
+.pill {
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+  color: #fff;
+}
+.pill.warn { color: #e3b341; }
+/* Work already done, rather than work outstanding. Only the marker picker
+   raises one today; it is here because .pill lives here. */
+.pill.done { color: var(--green); }
+
+.tiletime {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.tileprogress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, 0.22); z-index: 2; }
+.tileprogressbar { height: 100%; background: var(--red); }
+
+.tilebody { padding: 8px 2px 0; }
+.tilebody .title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tilebody .meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.tilebody .meta span + span::before { content: " · "; }
+
+/* Where there is a description, the title holds two lines whether it needs
+   them or not, so a row of tiles starts its blurb on the same line. Scoped to
+   tiles that have one: the rails that do not keep the height they had. */
+.tilebody:has(.tiledesc) .title { min-height: 2.6em; }
+
+/* What it is about. Two lines like the title, so a row of tiles keeps its
+   shape however much Stash has to say about any one of them. */
+.tilebody .tiledesc {
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* An unidentified scene is showing you a filename, so it should not pretend
+   to be a title. */
+.title.untitled, h1.untitled { font-style: italic; color: var(--muted); font-weight: 500; }
+
+/* ------------------------------------------------------------- list header */
+
+.listhead { margin: 4px 0 6px; }
+.listhead h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+.listhead p { margin: 4px 0 0; font-size: 13px; }
+.listhead.with-portrait { display: flex; gap: 18px; align-items: flex-start; }
+.listhead .portrait {
+  width: 132px;
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  object-fit: cover;
+  aspect-ratio: 2 / 3;
+}
+
+/* ------------------------------------------------- the performer's vitals
+ *
+ * The column beside the photograph. The grid fills across before it fills
+ * down, so a performer Stash knows four things about gets one tidy row rather
+ * than a four-deep column with white space beside it; `auto-fit` on a min
+ * width then collapses to one column on a phone without a second breakpoint.
+ */
+
+/* Bigger than the 132px the poster pages use. A performer page is a portrait
+   with a record beside it, and at thumbnail size the face was lost to the
+   grid of facts next to it. */
+.listhead.person .portrait { width: 208px; }
+
+.listhead .who { min-width: 0; flex: 1; }
+.listhead .who .fave { color: var(--accent-hi); font-size: 18px; margin-left: 8px; vertical-align: 2px; }
+
+/*
+ * Three columns at most. The grid fills across before it fills down, so on a
+ * wide screen `auto-fit` alone gives five and the order stops reading as an
+ * order — height next to shoe size next to country. Capped, it stays a list
+ * somebody wrote down, and it still collapses to one on a phone.
+ */
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 4px 26px;
+  max-width: 840px;
+  margin: 10px 0 0;
+  font-size: 12.5px;
+}
+/* Label and value on one line, the label a fixed column so the values line up
+   down the page rather than wandering with the word lengths. */
+.vitals > div { display: flex; gap: 10px; padding: 1px 0; align-items: baseline; }
+.vitals dt { color: var(--muted); width: 96px; flex: none; }
+.vitals dd { margin: 0; color: var(--text-2); min-width: 0; overflow-wrap: anywhere; }
+
+/* A fact that did not come out of your own library says so, quietly. */
+.vitals .src {
+  margin-left: 7px;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 3px;
+  vertical-align: 1px;
+}
+
+/*
+ * Keeping what IAFD lent you. Quiet by design — it is an offer, not the thing
+ * you came to the page to do, and it only appears when there is something to
+ * add. Sized off the grid above it rather than the page's primary button.
+ */
+.listhead .keep {
+  margin: 12px 0 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.listhead .keep:hover:not(:disabled) { border-color: var(--accent-hi); color: var(--text); }
+.listhead .keep:disabled { opacity: 0.5; cursor: default; }
+
+.listhead .kept { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.listhead .kept.bad { color: var(--accent-hi); }
+
+/* The biography is prose, so it gets a measure rather than the header's width. */
+.listhead .bio { margin: 12px 0 0; max-width: 78ch; color: var(--text-2); font-size: 13px; }
+

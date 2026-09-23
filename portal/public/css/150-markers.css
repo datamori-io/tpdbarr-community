@@ -1,0 +1,984 @@
+/* ==================================================== the marker builder
+ *
+ * A cutting bench, laid out the way the cutting apps are: picture on top, the
+ * filmstrip that is the timeline under it, what has been cut below that. The
+ * playhead is fixed at the middle of the strip and the strip moves under it —
+ * see markerbuilder.js for why that is not a matter of taste.
+ *
+ * One size is shared with that file: .mbtile and .mbband are 64px tall because
+ * STRIP_H is 64. Change one and change the other.
+ */
+
+.mbuild { display: grid; gap: 14px; }
+
+/*
+ * `.link` is worn by anchors everywhere else in the app, so it never had to
+ * undo a button's own chrome. Both of this page's are real buttons — they
+ * change the address rather than being one — and without this they arrive as
+ * grey system pills with the link colour inside them.
+ */
+.mbuild button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* the queue
+ *
+ * A shelf, drawn by the library's own shelfPage — see picker() in
+ * markerbuilder.js. The filter bar, the wall and Show more are all styled in
+ * the library's sheets, so all that is left here is the line above them.
+ */
+
+.mbtoolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+}
+
+/* the bench */
+
+.mbtop { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.mbtitle { margin: 0 0 2px; font-size: 16px; }
+
+.mbstage {
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+/*
+ * Capped rather than sized. The strip has to be on screen at the same time as
+ * the picture — a bench where placing a mark means scrolling away from the
+ * thing you are marking is not one.
+ */
+.mbvideo { width: 100%; max-height: 46vh; object-fit: contain; background: #000; display: block; }
+
+.mbbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mbclock {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 15px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.mbbar .muted { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px; }
+.mbpending { color: var(--amber); font-size: 12.5px; }
+.mbkeys { display: flex; align-items: center; gap: 2px; }
+.mbkeys kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  margin: 0 1px;
+  border-radius: 4px;
+  border: 1px solid var(--line-hi);
+  background: var(--panel-2);
+  color: var(--text-2);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+}
+
+/* the strip */
+
+.mbstrip {
+  position: relative;
+  height: 86px;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  /* Dragging it scrubs; letting the browser select the tick labels instead is
+     the one thing that reliably breaks that. */
+  user-select: none;
+  touch-action: none;
+  cursor: ew-resize;
+}
+.mbstrip:focus { outline: none; border-color: var(--accent-hi); }
+
+.mbruler { position: relative; height: 18px; border-bottom: 1px solid var(--line); }
+.mbtick {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  padding-left: 4px;
+  border-left: 1px solid var(--line-hi);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.mbtrack { position: relative; height: 64px; }
+.mbtiles, .mbbands { position: absolute; inset: 0; }
+
+.mbtile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 64px;
+  background-repeat: no-repeat;
+  /* A hairline between tiles, so a strip of near-identical frames still reads
+     as a strip rather than as one smeared picture. */
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.45);
+}
+
+.mbband {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 64px;
+  cursor: pointer;
+}
+.mbband.point { width: 2px; background: var(--accent-hi); }
+.mbband.span {
+  background: var(--accent-wash);
+  border-left: 2px solid var(--accent-hi);
+  border-right: 2px solid var(--accent-hi);
+}
+
+/* The in point that has no out yet. Amber because it is not written down. */
+.mbband.open {
+  background: rgba(210, 153, 34, 0.2);
+  border-left: 2px dashed var(--amber);
+  border-right: 1px dashed var(--amber);
+}
+
+.mbbandname {
+  position: absolute;
+  bottom: 2px;
+  left: 3px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(20, 19, 20, 0.82);
+  color: var(--text-2);
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.mbhead {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+/* the prompt */
+
+/*
+ * Fixed rather than placed in the flow. It appears in answer to a keystroke,
+ * and a panel that pushes the timeline down at the moment you have just marked
+ * something on it moves the thing you were looking at.
+ */
+.mbprompt {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(460px, calc(100vw - 32px));
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+.mbpromptwhat { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px; color: var(--text); }
+.mbtaginput {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-hi);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.mbtaginput:focus { outline: none; border-color: var(--accent-hi); }
+
+/* Capped against the window as well as absolutely: the panel is fixed to the
+   bottom of the screen, and a list long enough to run off the top of a short
+   one takes the input box with it. */
+.mboptions { display: grid; gap: 3px; max-height: min(240px, 38vh); overflow-y: auto; }
+.mboption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.mboption:hover { background: var(--panel); }
+.mboption.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mboption.on .muted, .mboption.on .mbkey { color: rgba(255, 255, 255, 0.75); }
+.mboption.new { font-style: italic; }
+.mbkey {
+  min-width: 15px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.mbsaid { font-size: 12.5px; color: var(--muted); min-height: 18px; }
+.mbsaid.bad { color: var(--red); }
+
+/* what has been cut */
+
+.mbmarkers { display: grid; gap: 4px; }
+.mbmarker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-hi);
+  border-radius: var(--radius);
+}
+
+/* A span is a decided stretch of the scene; a point is somebody dropping a
+   pin on a moment. Worth telling apart without reading the times. */
+.mbmarker.span { border-left-color: var(--accent-hi); }
+
+.mbtime {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mbmarker .chip { padding: 3px 10px; color: var(--text); }
+.mbmarker .chip:hover { border-color: var(--accent-hi); }
+
+/* Padded out to something you can actually hit. This is the only control on
+   the page that destroys anything, so it is deliberately not a 16px glyph in
+   the corner — it is a comfortable target that happens to look like one. */
+.mbdrop {
+  padding: 6px 10px;
+  /* Pulled back out again so a bigger target does not make the row taller. */
+  margin: -6px -4px -6px auto;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mbdrop:hover { color: var(--red-hi); }
+
+@media (max-width: 620px) {
+  .mbkeys { display: none; }
+  .mbvideo { max-height: 34vh; }
+}
+
+/* ---------------------------------------------- the marker builder, by hand
+ *
+ * The transport row. Every key has a button, because a phone has none of the
+ * keys — see markerbuilder.js. Targets are sized for a fingertip rather than a
+ * cursor, which costs a desktop nothing and is the difference between usable
+ * and decorative on a phone.
+ */
+
+.mbtransport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mbnudges, .mbacts { display: flex; align-items: center; gap: 6px; }
+
+/*
+ * Nothing here is text you would want to select. Tapping a transport button
+ * otherwise leaves the label highlighted, and on iOS a press-and-hold on it
+ * raises the selection magnifier over the control you are trying to use.
+ */
+.mbtransport button, .mbpending { user-select: none; -webkit-user-select: none; }
+
+.mbnudge {
+  min-width: 56px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.mbnudge:hover { border-color: var(--line-hi); color: var(--text); }
+.mbnudge:active { background: var(--panel-2); }
+
+/* Wider and marked out, because it is the one in the middle of the row that
+   is not a seek and should not be hit by accident while nudging. */
+.mbplay {
+  min-width: 62px;
+  font-size: 15px;
+  color: var(--text);
+  border-color: var(--line-hi);
+}
+
+.mbact {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-hi);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mbact:hover { border-color: var(--accent-hi); }
+.mbact:active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Point is the one that gets used most, so it is the one that looks like the
+   default. In and Out are a pair and stay quiet until you are using them. */
+.mbacts .mbact:first-child { border-color: var(--accent); }
+
+.mbbadge {
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--line-hi);
+  background: var(--panel);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* The in point, which is also the button that drops it. */
+.mbpending {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--amber);
+  background: none;
+  color: var(--amber);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mbpending:hover { background: rgba(210, 153, 34, 0.12); }
+
+/* The way out of the prompt, for anything without an Esc key. */
+.mbpromptfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mbcancel {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-hi);
+  background: var(--panel);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mbcancel:hover { border-color: var(--accent-hi); color: var(--text); }
+
+/*
+ * A finger, not a cursor.
+ *
+ * Keyed off the input device rather than the width, because the two are not
+ * the same question: a tablet in landscape is wide and still has no keyboard,
+ * and a narrow desktop window has one. The badges go because the keys they
+ * name cannot be pressed; the targets grow because a fingertip is about 44px.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .mbbadge { display: none; }
+  .mbnudge, .mbact { min-height: 44px; }
+  .mbact { flex: 1; justify-content: center; }
+  .mbpending { padding: 8px 14px; font-size: 13px; }
+  .mbmarker { padding: 10px; }
+  .mbdrop { padding: 10px 14px; margin: -10px -8px -10px auto; }
+  .mbtime { font-size: 13px; }
+  /* Nothing hovers, so the cue has to be in the resting state. */
+  .mbrow { border-color: var(--line-hi); }
+}
+
+@media (max-width: 620px) {
+  /* Both groups get their own line rather than being squeezed onto one. The
+     nudges spread across it; the three actions share it equally. */
+  .mbtransport { flex-direction: column; align-items: stretch; gap: 8px; }
+  .mbnudges { justify-content: space-between; }
+  .mbnudges .mbnudge { flex: 1; min-width: 0; }
+  .mbacts .mbact { flex: 1; padding: 0 8px; }
+
+  /*
+   * A sheet rather than a floating panel. It is already fixed to the bottom of
+   * the screen; on a phone it may as well own that edge, which also means the
+   * software keyboard pushes against something the width of the screen instead
+   * of shunting a centred box sideways.
+   */
+  .mbprompt {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    transform: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+  .mboptions { max-height: 44vh; }
+  .mboption { padding: 11px 10px; font-size: 14px; }
+
+  .mbtop { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .mbbar { gap: 8px; }
+}
+
+/* The sharpen control: offer, progress, and what you ended up with. */
+.mbsharpen { white-space: nowrap; }
+
+/* Cut it again, whatever is there. A glyph rather than a word because it sits
+   beside the chip that already says what the strip is. */
+.mbregen {
+  min-width: 34px;
+  padding: 0 8px;
+  font-size: 14px;
+  line-height: 1;
+}
+.mbregen.working { border-color: var(--amber); color: var(--amber); }
+.mbregen:disabled { opacity: 0.4; cursor: default; }
+.mbsharpen.working { border-color: var(--amber); color: var(--amber); cursor: default; }
+.mbsharpen.have { border-color: var(--green); color: var(--green); }
+.mbsharpen:disabled { opacity: 1; }
+
+/*
+ * The frame ladder — see markerbuilder.js.
+ *
+ * Rungs stack downwards, coarsest at the top, and each one is a scrolling row
+ * rather than a wrapping grid: a rung is a stretch of time laid left to right,
+ * and wrapping it would put the second half of a minute underneath the first.
+ * The whole panel is capped and scrolls, because on a long film the top rung
+ * alone is two hundred frames and it must not push the transport off screen.
+ */
+
+/*
+ * The panel and the line down the middle of it.
+ *
+ * The line is a sibling of the scroller rather than a child: an absolutely
+ * placed child travels with the content, which would leave it halfway up a
+ * rung the moment the panel was scrolled. Being a sibling also makes it the
+ * strip's line — both are the middle of a full-width block, so they sit on
+ * the same pixel without either measuring the other.
+ */
+.mbladder { position: relative; }
+.mbladder[hidden] { display: none; }
+
+.mbgridhead {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  opacity: 0.55;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.mbgrid {
+  display: grid;
+  gap: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+/* display:grid beats the UA's [hidden] rule, so the panel has to be told. */
+.mbgrid[hidden] { display: none; }
+
+/* min-width so the row inside can scroll rather than stretching the column. */
+.mbrung { display: grid; gap: 5px; min-width: 0; }
+.mbrunghead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+}
+.mbrunghead strong { color: var(--text-2); font-weight: 600; }
+
+/* Wider and back in again, per rung. Sized for a fingertip on a tablet, where
+   they are the only way to reach past the ends of a rung. */
+.mbspans { display: flex; gap: 4px; flex: 0 0 auto; }
+.mbspan {
+  min-width: 30px;
+  min-height: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mbspan:hover:not(:disabled) { border-color: var(--accent-hi); color: var(--text); }
+.mbspan:disabled { opacity: 0.35; cursor: default; }
+
+.mbframes {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  /* A horizontal drag here is a scroll, not a scrub — this is not the strip.
+     Said outright as well, so a tablet does not spend the first few pixels of
+     the gesture deciding whether it was meant to be a page swipe. */
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  /* The rung is scrolled to put the playhead's frame under the line above, and
+     the padding that lets the first and last frames reach the middle is set in
+     markerbuilder.js — it is half a row wide and only known once laid out. */
+  scrollbar-width: thin;
+}
+
+.mbframe {
+  position: relative;
+  flex: 0 0 auto;
+  background-repeat: no-repeat;
+  background-color: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: zoom-in;
+}
+.mbframe:hover { border-color: var(--accent-hi); }
+
+/* The last rung the sheet can support. There is nothing further down to open,
+   so it says so with the cursor rather than by going dead on the click. */
+.mbframe.leaf { cursor: pointer; }
+
+/* The frame whose stretch of time is the rung below. Without it the row above
+   stops saying where you are. */
+.mbframe.opened { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+/* Where the playhead is standing, in every rung at once. */
+.mbframe.now { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+
+.mbframetime {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 0 3px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  border-radius: 0 3px 0 3px;
+  pointer-events: none;
+}
+
+@media (max-width: 620px) {
+  /* Half the screen is too much when the video is above it and the transport
+     below. Frames stay their own size — a smaller one is not worth looking at,
+     which is the entire point of the panel. */
+  .mbgrid { max-height: 38vh; padding: 8px; }
+}
+
+/* ------------------------------------------------------------- on a tablet
+ *
+ * A tablet is wide, so none of the narrow rules above apply to it, and it has
+ * no keyboard, so none of the desktop assumptions do either. It fell between
+ * the two: full-size targets on a page driven entirely by fingers.
+ *
+ * Keyed on the pointer rather than the width for the same reason the block
+ * further up is — a tablet in landscape is as wide as a laptop and still has
+ * nothing to press `t` with.
+ */
+@media (pointer: coarse) {
+  /*
+   * A double tap on a control is a page zoom on iOS unless this is said, and
+   * the two controls people tap fastest here are the nudges and the frames.
+   */
+  .mbtransport button,
+  .mbframe,
+  .mbspan,
+  .mbtoolbar button,
+  .mbbar button { touch-action: manipulation; }
+
+  /* Both halves have to be on screen together — the picture you are marking
+     and the ladder you are finding the moment in. Neither may take the room
+     the other needs. */
+  .mbvideo { max-height: 38vh; }
+  .mbgrid { max-height: 34vh; }
+
+  /* The scrub surface is a drag target rather than a cursor target, and the
+     selection magnifier appearing mid-drag is the one thing that reliably
+     ends the gesture on iOS. */
+  .mbstrip { -webkit-user-select: none; -webkit-touch-callout: none; }
+
+  /*
+   * The key legend goes with the badges, for the same reason and one more.
+   * It names ←, →, shift, alt, space and g, none of which a tablet has — and
+   * it is the widest thing in the bar, so on a 820px screen it is also what
+   * pushes the zoom controls onto a second line of their own.
+   */
+  .mbkeys { display: none; }
+
+  /* The bar wraps onto two lines as soon as an in point appears, so it is
+     given room to do that without the controls touching each other. */
+  .mbbar { gap: 10px; }
+
+  /* Nothing hovers, so which frame is lit has to carry at a glance rather
+     than under a cursor. */
+  .mbframe { border-width: 2px; }
+}
+
+/* ================================================== marker management
+ *
+ * A list of markers rather than of scenes — see markermanage.js for why that
+ * is a different page rather than a filter on the queue.
+ *
+ * Rows are the bench's marker rows with a scene bolted on, and they are
+ * deliberately the same rows: the same time button, the same tag chip, the
+ * same delete in the same place. Two lists of markers that look different are
+ * two things to learn.
+ */
+
+.mmbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.mmfind {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.mmfind:focus { outline: none; border-color: var(--accent-hi); }
+
+.mmtag, .mmsort {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  max-width: 220px;
+}
+
+.mmsaid { min-height: 18px; }
+
+.mmlist { display: grid; gap: 4px; }
+
+.mmrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 7px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-hi);
+  border-radius: var(--radius);
+}
+
+/* A span is a decided stretch of the scene; a point is somebody dropping a pin
+   on a moment. The same cue the bench's own list uses. */
+.mmrow.span { border-left-color: var(--accent-hi); }
+
+.mmtime {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.mmrow .chip { padding: 3px 10px; color: var(--text); }
+.mmrow .chip:hover { border-color: var(--accent-hi); }
+
+/* Which scene it is in. Takes the slack in the row so the controls at either
+   end stay where the eye left them, and truncates rather than wrapping — a
+   long title must not make one row three lines tall. */
+.mmwhere {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+.mmscene {
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mmwhere .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.mmtitle { max-width: 30ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mmedit {
+  padding: 6px 9px;
+  margin: -6px 0;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mmedit:hover { color: var(--accent-hi); }
+
+/* Delete sits hard right, the way it does on the bench. */
+.mmrow .mbdrop { margin-left: 0; }
+
+/*
+ * Retiming, opened inside the row it belongs to. On its own line — the row is
+ * already full, and a set of fields that pushed the scene title off the end of
+ * it would hide what is being retimed.
+ */
+.mmretime {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.mmfield {
+  width: 96px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line-hi);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+}
+.mmfield:focus { outline: none; border-color: var(--accent-hi); }
+
+.mmmore { justify-self: start; }
+
+@media (pointer: coarse) {
+  /* The same fingertip rule the bench follows: 44px targets, and the row
+     padded out so two of them are not touching. */
+  .mmrow { padding: 10px; gap: 12px; }
+  .mmedit { padding: 10px 12px; margin: -10px 0; font-size: 15px; }
+  .mmtime { font-size: 13px; }
+  .mmtag, .mmsort, .mmfind { min-height: 44px; }
+  .mmfield { min-height: 40px; width: 110px; }
+}
+
+@media (max-width: 620px) {
+  .mmtag, .mmsort { flex: 1 1 auto; max-width: none; }
+  /* The scene takes the whole of the second line rather than fighting the tag
+     chip for the first. */
+  .mmwhere { flex-basis: 100%; }
+  .mmtitle { display: none; }
+}
+
+/* =============================================== timestamps from elsewhere
+ *
+ * The review panel — see markerfetch.js. It sits in the flow of the bench
+ * rather than floating: it is read against the picture and the strip above it,
+ * and a panel covering those would be a panel you have to close to use.
+ */
+
+.mfpanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+}
+
+.mftop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mfclose {
+  padding: 4px 10px;
+  margin: -4px -4px -4px 0;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mfclose:hover { color: var(--text); }
+
+.mftabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.mftab.on { border-color: var(--accent); color: var(--text); }
+.mftab:disabled { opacity: 0.4; cursor: default; }
+
+/* The offset row. Its own line above the rows, because it changes every one
+   of them and a control that does that should not sit inside the list. */
+.mfbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mffield {
+  width: 68px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line-hi);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  text-align: right;
+}
+.mffield:focus { outline: none; border-color: var(--accent-hi); }
+
+.mfbump {
+  min-width: 34px;
+  min-height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mfbump:hover { border-color: var(--accent-hi); color: var(--text); }
+
+/* What is about to land on something. Amber rather than red: it is a question,
+   not a fault, and the answer is regularly "yes, replace it". */
+.mfwarn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--amber);
+}
+.mfwarn .chip { padding: 2px 9px; font-size: 12px; }
+
+.mfrows { display: grid; gap: 3px; max-height: 46vh; overflow-y: auto; }
+
+.mfrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-left: 3px solid var(--line-hi);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+/* A row with an answer to give reads differently from one with a tick. */
+.mfrow.onto { border-left-color: var(--amber); }
+
+.mftick { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+
+.mftime {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Somebody else's vocabulary, editable before it becomes a tag in this
+   library. Wide enough for the long ones without taking the row. */
+.mftag {
+  flex: 1 1 140px;
+  min-width: 90px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.mftag:focus { outline: none; border-color: var(--accent-hi); }
+
+.mfonto { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
+
+.mfpick {
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line-hi);
+  background: var(--panel);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+}
+
+.mfnone { display: grid; gap: 4px; }
+
+.mffoot { display: flex; align-items: center; gap: 12px; }
+.mfwrite { padding: 7px 14px; border-color: var(--accent); color: var(--text); }
+.mfwrite:disabled { opacity: 0.4; border-color: var(--line); cursor: default; }
+
+@media (pointer: coarse) {
+  .mfrow { padding: 9px 8px; gap: 10px; }
+  .mftick { width: 22px; height: 22px; }
+  .mftag, .mfpick, .mffield { min-height: 38px; }
+  .mfbump { min-width: 44px; min-height: 38px; }
+  .mfwrite { min-height: 44px; }
+}
+
+@media (max-width: 620px) {
+  /* The tag and the answer take the second line rather than squeezing the
+     time off the first. */
+  .mfrow { flex-wrap: wrap; }
+  .mftag { flex-basis: 100%; }
+  .mfonto { max-width: 100%; }
+}

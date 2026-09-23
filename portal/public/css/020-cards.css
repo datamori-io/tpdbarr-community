@@ -1,0 +1,235 @@
+/* -------------------------------------------------- scene and performer */
+
+.detail { display: flex; gap: 22px; align-items: flex-start; margin-bottom: 26px; flex-wrap: wrap; }
+.detail > div:last-child { flex: 1; min-width: 300px; }
+.detail h1 { margin: 0 0 8px; font-size: 25px; letter-spacing: -0.02em; line-height: 1.2; }
+.detail p { margin: 0 0 12px; }
+
+.detailart { width: 420px; max-width: 100%; border-radius: var(--radius); overflow: hidden; background: var(--panel-2); }
+.detailart.portrait { width: 240px; }
+.detailart img { width: 100%; display: block; }
+
+.detailmeta { display: flex; flex-wrap: wrap; gap: 4px 0; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.detailmeta > * + *::before { content: " · "; }
+
+.detailstate { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.detailstate .muted { font-size: 12.5px; }
+/*
+ * The probable-match question. It sits inside the action row it interrupts, so
+ * it reads as part of the decision rather than as a page of its own — and takes
+ * the full width of that row, because the answer needs the scene's name in it.
+ */
+.bridgeask {
+  flex-basis: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 13.5px;
+}
+.bridgeask p { margin: 0 0 8px; }
+.bridgehit { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.bridgebuttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.path {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--panel-2);
+  padding: 3px 8px;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.overview { color: var(--muted); max-width: 75ch; line-height: 1.6; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.chips .chip { cursor: default; }
+.chips a.chip { cursor: pointer; }
+.chips a.chip:hover { border-color: var(--accent-hi); color: var(--text); }
+.chip.person { color: var(--text); }
+.chip.quiet { font-size: 12px; padding: 4px 10px; }
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  max-width: 460px;
+}
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+
+.link { color: var(--accent-hi); }
+.link:hover { text-decoration: underline; }
+.small { font-size: 12.5px; }
+
+/* ------------------------------------------------------------ first run */
+
+.setup { max-width: 60ch; padding: 48px 0; }
+/* First run is the one screen with room for the full mark. */
+.setupmark {
+  display: block;
+  width: 260px;
+  margin: 0 0 10px -20px;
+  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: lighten;
+}
+.setup h1 { margin: 0 0 14px; font-size: 24px; letter-spacing: -0.02em; }
+.setup ol { margin: 0 0 22px; padding-left: 20px; color: var(--muted); }
+.setup li { margin-bottom: 8px; }
+
+/* ------------------------------------------------------------ needs you */
+
+.attention { display: grid; gap: 6px; }
+.arow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.arow.clickable { cursor: pointer; }
+.arow.clickable:hover { border-color: var(--accent-hi); }
+.arow .title { font-weight: 600; font-size: 14px; }
+.arow .meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+/* ------------------------------------------------------- nearly complete */
+
+.completion { display: grid; gap: 6px; }
+.crow {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.crow:hover { border-color: var(--accent-hi); }
+.crow img, .crow .noposter {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.crow .title { font-weight: 600; }
+.crow .meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.crow .meta span + span::before { content: " · "; }
+
+.bar {
+  margin-top: 7px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+  max-width: 340px;
+}
+.bar span { display: block; height: 100%; background: var(--green); }
+
+/* --------------------------------------------------------- performer rows */
+
+.pgroup { margin-bottom: 18px; }
+.pgroup h3 {
+  margin: 0 0 9px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-hi);
+}
+.pgroup h3 a:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------- card state */
+
+/*
+ * State is what this tool is for, so it gets its own row at full size rather
+ * than a translucent mark over the artwork.
+ */
+/* Two lines whether the title needs them or not, so a row of cards lines up. */
+.cardbody .title { min-height: 2.6em; }
+
+/*
+ * Three answers, evenly spread.
+ *
+ * This was a 6px gap with `margin-left: auto` on Add, which put Skip and Want
+ * shoulder to shoulder and threw Add a hundred pixels to the right — two
+ * controls you could hit by accident and one that looked like it belonged to
+ * something else. They are one decision with three answers, so they are spaced
+ * as three of a kind: `space-between` rather than a pushed-right last child, a
+ * gap you can see, and the same weight of padding on all of them.
+ *
+ * space-between rather than a fixed gap because the row's other occupants come
+ * and go — a scene in Stash has badges here and no Skip, and the spacing
+ * should not have to be tuned per combination.
+ */
+.cardstate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  row-gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  /* Holds the row open on cards with no Add button, so heights still match. */
+  min-height: 30px;
+}
+
+/* Equal weight, so no one of the three reads as the accident-prone one. */
+.cardstate .chip.quiet { padding: 5px 12px; font-size: 12.5px; }
+
+.cardstate button.add {
+  padding: 5px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.cardstate button.add:hover { border-color: var(--accent-hi); }
+.cardstate button.add:disabled { opacity: 0.4; cursor: default; }
+
+.crow button.add {
+  padding: 6px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.crow button.add:hover { border-color: var(--accent-hi); }
+.crow button.add:disabled { opacity: 0.4; cursor: default; }
+.gapnote { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .sitehead img { width: 72px; }
+  .scene { grid-template-columns: 24px 64px 1fr; }
+  .scene .right { grid-column: 3; justify-content: flex-start; }
+  .thumb { width: 64px; height: 36px; }
+  .thumb.portrait { width: 36px; height: 51px; }
+  .two { grid-template-columns: 1fr; }
+  .crow { grid-template-columns: 44px 1fr; }
+  .crow img, .crow .noposter { width: 44px; height: 44px; }
+  .crow button.add { grid-column: 2; justify-self: start; }
+}
+
+
+/*
+ * A fingertip on a card. The three answers are 44px apart-able rather than
+ * 44px tall — a taller row would cost a line of the description on every card
+ * in the wall, and what makes these safe to press is the space between them.
+ */
+@media (pointer: coarse) {
+  .cardstate { gap: 14px; row-gap: 10px; min-height: 36px; }
+  .cardstate .chip.quiet, .cardstate button.add { padding: 9px 14px; }
+}

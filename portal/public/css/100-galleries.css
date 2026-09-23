@@ -1,0 +1,376 @@
+/* ==========================================================================
+   Galleries
+
+   A photo set is neither a scene tile nor a portrait: it is whatever shape the
+   photographer shot, and a wall of them is only readable if they all agree. So
+   the cover crops square, and the pictures inside keep their own aspect in a
+   masonry-ish grid where the only thing held constant is the row height.
+   ========================================================================== */
+
+.facetart.square { aspect-ratio: 1 / 1; }
+.listhead .portrait.square { aspect-ratio: 1 / 1; object-fit: cover; }
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-md), 1fr));
+  gap: 8px;
+  padding: 12px 0 18px;
+}
+
+.shot {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel-2);
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.shot:hover { border-color: var(--accent-hi); transform: scale(1.02); z-index: 2; }
+.shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* A thumbnail that would not load is a picture that will not download, so it
+   says so rather than sitting there as an empty square someone might tick. */
+.shot.broken { opacity: 0.3; }
+.shot.broken::after {
+  content: "no";
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 3px;
+  font-size: 11px;
+  text-align: center;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------- the picker */
+
+.shots.picking .shot { opacity: 0.45; }
+.shots.picking .shot.on { opacity: 1; border-color: var(--accent-hi); }
+.shots.picking .shot.on::before {
+  content: "✓";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+}
+
+.gallerybuild .picker { margin-top: 12px; }
+.gallerybuild .toolbar { margin: 10px 0 0; }
+.gallerybuild input[type="url"], .gallerybuild input[type="text"] { min-width: 0; flex: 1; }
+.small { font-size: 12px; }
+
+/* ------------------------------------------------------------- the viewer
+   Full-bleed on top of everything, its own backdrop rather than a <dialog>:
+   the page underneath keeps its scroll position and the player, if there is
+   one, is not torn down by a modal taking focus. */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.viewerimg {
+  max-width: 100%;
+  max-height: calc(100vh - 96px);
+  object-fit: contain;
+  border-radius: var(--radius);
+}
+
+.viewernav, .viewerclose {
+  position: absolute;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.12s;
+}
+.viewernav { top: 50%; transform: translateY(-50%); width: 44px; height: 76px; font-size: 26px; }
+.viewernav.left { left: 16px; }
+.viewernav.right { right: 16px; }
+.viewerclose { top: 16px; right: 16px; width: 38px; height: 38px; font-size: 20px; }
+.viewernav:hover, .viewerclose:hover { opacity: 1; border-color: var(--accent-hi); }
+
+.viewercount {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+@media (max-width: 640px) {
+  .viewer { padding: 8px; }
+  .viewernav { width: 34px; height: 60px; font-size: 20px; }
+}
+
+/* ----------------------------------------------------------- the pencil
+   Hidden until the card is under the pointer, because a wall of galleries is
+   something you look at far more often than something you edit. It stays put
+   on touch, where there is no hover to reveal it. */
+
+.facetedit {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, border-color 0.12s;
+}
+.facet:hover .facetedit { opacity: 0.92; }
+.facetedit:hover { opacity: 1; border-color: var(--accent-hi); color: var(--text); }
+.facetedit:focus-visible { opacity: 1; outline: 2px solid var(--accent-hi); }
+
+@media (hover: none) {
+  .facetedit { opacity: 0.92; }
+}
+
+/* ------------------------------------------------------- the edit dialog */
+
+.galleryedit { max-width: 620px; }
+.galleryedit label { display: block; margin-bottom: 14px; }
+.galleryedit input[type="text"] { width: 100%; }
+
+.croprow { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 6px; }
+.croprow > div:first-child { flex: none; }
+.coverside { min-width: 0; flex: 1; display: grid; gap: 6px; }
+
+/* The crop preview is the card's own square, at the card's own size, so what
+   you set here is literally what you will see out there. */
+.cropbox {
+  position: relative;
+  width: 148px;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel-2);
+  cursor: crosshair;
+}
+.cropbox img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.coverpick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 5px;
+  max-height: 172px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.coverpick .shot { aspect-ratio: 1 / 1; opacity: 0.5; }
+.coverpick .shot.on { opacity: 1; border-color: var(--accent-hi); }
+.coverpick .shot:hover { opacity: 1; }
+
+/* ------------------------------------------------- filling in a group
+   Three stacked steps: the addresses to choose from, the box you can paste
+   one into, then what Stash read back off it. The middle one is deliberately
+   still there when candidates exist — the found list is a set of guesses and
+   typing over it must never feel like fighting the page. */
+.groupedit { max-width: 680px; }
+.groupedit input[type="url"] { width: 100%; }
+
+.urlchoices { margin-bottom: 14px; }
+.urllist { display: grid; gap: 4px; max-height: 210px; overflow-y: auto; }
+
+.urlchoice {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 9px;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.urlchoice:hover { border-color: var(--accent-hi); }
+.urllabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.urlwhy { flex: none; }
+
+.scraped:empty { display: none; }
+.scraped h3 { margin: 4px 0 10px; font-size: 14px; }
+
+/* Both covers side by side. They are the fastest way to see the scraper found
+   a different cut of the film than the one you hold. */
+.covers { display: flex; gap: 12px; margin-bottom: 12px; }
+.cover { display: grid; gap: 5px; justify-items: center; margin: 0; }
+.cover img {
+  width: 110px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+
+.scrapedfields { display: grid; gap: 7px; }
+.scrapedrow {
+  display: grid;
+  grid-template-columns: auto 74px 1fr;
+  gap: 9px;
+  align-items: baseline;
+  margin: 0 !important;
+  font-size: 13px;
+}
+.scrapedval { min-width: 0; max-height: 5.4em; overflow-y: auto; line-height: 1.35; }
+
+.galleryedit menu { display: flex; align-items: center; gap: 8px; padding: 0; margin: 14px 0 0; }
+.galleryedit menu .spacer { margin-left: auto; }
+
+.confirmrow { display: flex; align-items: center; gap: 8px; }
+
+/* The delete dialog. A tick list of what goes, then the sentence that says it
+   again — so the second press is read, not muscle memory. */
+.sceneremove .removewhats { margin: 0 0 4px; }
+.sceneremove .removeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0 0 10px;
+  cursor: pointer;
+}
+.sceneremove .removeline input { margin-top: 3px; }
+.sceneremove .removewhat { display: block; }
+.sceneremove .removeline .muted { display: block; margin-top: 2px; }
+.sceneremove .filepath { margin: -4px 0 12px 26px; }
+.sceneremove menu { flex-wrap: wrap; }
+.sceneremove .confirmrow { flex-wrap: wrap; }
+/* The sentence takes the line, the two buttons share the next one. */
+.sceneremove .confirmrow .muted { flex: 1 1 100%; }
+.confirmrow[hidden] { display: none; }
+
+/* ------------------------------------------------------------- the ties
+   Three rows of "what is this of": chips for what it already has, a box that
+   asks Stash for the rest. The results sit over the dialog rather than pushing
+   it about, so the row does not jump as you type. */
+
+.ties { display: grid; gap: 10px; margin: 16px 0 4px; }
+
+.tierow { display: flex; gap: 10px; align-items: flex-start; }
+.tielabel { flex: none; width: 84px; padding-top: 7px; font-size: 12.5px; color: var(--text-2); }
+.tiebody { position: relative; flex: 1; min-width: 0; }
+
+.tiechips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; min-height: 22px; align-items: center; }
+.tiechips .tagchip { display: inline-flex; align-items: center; gap: 5px; }
+
+/* The × on a chip, wherever a chip is. Red on hover because it removes
+   something; the same red, and the same ×, in all three places. */
+.chipx {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chipx:hover { color: var(--red-hi); }
+
+.tiebody input[type="search"] { width: 100%; }
+
+.tieresults {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 3px;
+  max-height: 210px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.tieresults[hidden] { display: none; }
+
+.tiehit {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.tiehit:hover { background: var(--panel-2); }
+
+/* ---------------------------------------------------- uploading your own
+   A third source in the build panel, and the tools above a gallery's
+   pictures. Both are plain rows: this is a file picker and two buttons, and
+   dressing it up would only hide which of them writes to the disk. */
+
+.uploadrow { margin-top: 12px; display: grid; gap: 6px; }
+.uploadrow input[type="file"] { font-size: 12.5px; color: var(--text-2); max-width: 100%; }
+.uploadrow input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.uploadrow input[type="file"]::file-selector-button:hover { border-color: var(--accent-hi); }
+
+.shottools { margin: 4px 0 0; flex-wrap: wrap; }
+
+/* In select mode a click ticks the picture rather than opening it, so the
+   grid says so: everything dims until it is picked. */
+.shots.selecting .shot { opacity: 0.5; }
+.shots.selecting .shot:hover { opacity: 0.8; }
+.shots.selecting .shot.on { opacity: 1; border-color: var(--accent-hi); }
+.shots.selecting .shot.on::before {
+  content: "✓";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+}
+

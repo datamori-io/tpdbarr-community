@@ -1,0 +1,788 @@
+/* ------------------------------------------------------------------ binge */
+
+/*
+ * The reel and the plugin frame both fill the screen rather than flowing down
+ * it, so the page hands them everything it has: no column width, no padding,
+ * and no scrollbar of its own — they scroll inside. Their height is set on the
+ * element itself, by fitFills() in util.js.
+ */
+main:has(.fillview) { max-width: none; margin: 0; padding: 0; }
+
+/*
+ * The section strip keeps its breathing room even on a full-bleed page — the
+ * frame below it is what wants the whole width, not the tabs above it.
+ */
+main:has(.fillview) .sections { padding: 12px 18px 0; }
+.bingeframe { display: block; width: 100%; border: 0; background: var(--bg); }
+
+/* -------------------------------------------------------------------- reel */
+
+.reelwrap { position: relative; width: 100%; background: #000; }
+
+/*
+ * One clip per screen, and the scroll settles on one rather than between two.
+ * scroll-snap-stop keeps a hard flick from skipping past three of them.
+ */
+.reel {
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.reel::-webkit-scrollbar { display: none; }
+
+/*
+ * The slide holds the room the chrome needs; the picture centres in the rest.
+ *
+ * This used to be per-mode, and the caption ended up in two different places
+ * depending on the framing — sat under the picture in Fit, laid over it in the
+ * crops. Reserving the space on the slide instead means the picture never
+ * reaches under the bar or the captions in any mode, and the captions sit in
+ * the same place whichever framing you are on.
+ */
+.reelslide {
+  position: relative;
+  height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding-top: var(--reel-bar, 52px);
+  padding-bottom: var(--reel-cap, 150px);
+}
+
+/* With the captions off, the picture takes the room they were holding. */
+.reel.noinfo .reelslide { padding-bottom: 76px; }
+.reel.noinfo .reelover { display: none; }
+
+/*
+ * Two shapes, because there are two kinds of thing in the reel.
+ *
+ * Reddit is phone-shaped already, so it gets the phone: cropped into 9:16 with
+ * the overlay laid over it, which is what a reel looks like.
+ *
+ * The library is not. These are 16:9 scenes, and cropping one to 9:16 throws
+ * away nearly two thirds of the width. So a library slide keeps its whole
+ * frame and is given the band between the bar at the top and its own captions
+ * at the bottom — the picture stops where the furniture starts instead of
+ * sitting underneath it.
+ */
+.reelframe {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.reelvid {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  cursor: pointer;
+}
+
+/* --- the phone, for anything already shaped like one --------------------- */
+
+.reel.crop-auto .reelslide.tall .reelframe { aspect-ratio: 9 / 16; }
+
+/*
+ * contain, not cover. A clip whose edges you cannot see is a clip you are not
+ * being shown — and these arrive in whatever shape the person who posted them
+ * chose, so cropping to a house style cuts the subject out of a good half.
+ */
+.reel.crop-auto .reelslide.tall .reelvid { object-fit: contain; }
+
+/*
+ * On a screen already narrower than the crop — a phone held upright — the
+ * frame is the screen, and pillarboxing it inside itself would be absurd.
+ */
+@media (max-aspect-ratio: 9 / 14) {
+  .reel.crop-auto .reelslide.tall .reelframe { aspect-ratio: auto; width: 100%; }
+}
+
+/* --- the band, for the library ------------------------------------------- */
+
+/*
+ * A column: the bar's height held clear at the top, the captions taking what
+ * they need at the bottom, and the picture given everything left over.
+ */
+.reel.crop-auto .reelslide.wide .reelframe {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.reel.crop-auto .reelslide.wide .reelvid { flex: 1; min-height: 0; height: auto; }
+
+/*
+ * Below the picture rather than over it, so nothing covers the scene. It keeps
+ * the gradient's weight without the gradient, which has nothing to fade into
+ * once it is on the black.
+ */
+/*
+ * Nothing special for the band any more: the caption is a child of the slide
+ * in every mode, so it is already at the bottom of the screen and already
+ * centred. The frame's padding-bottom above is what keeps the picture clear
+ * of it.
+ */
+
+/* --- one shape for everything, when auto is not what you want ------------ */
+
+/*
+ * Sized by whichever side runs out first, not by height.
+ *
+ * `height: 100%` from the base rule was overriding the ratio: on a phone a 4:3
+ * frame came out 390x700 — the shape of the screen — and cover-cropped to it,
+ * so 4:3 looked exactly like 9:16 and the button appeared not to work. Letting
+ * both sides be bounded and the ratio decide is what makes 4:3 landscape.
+ */
+.reel.crop-four .reelslide:not(.feed) .reelframe {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  display: block;
+  aspect-ratio: 4 / 3;
+}
+
+/*
+ * Filled to the 4:3 box, not letterboxed inside it.
+ *
+ * This was `contain`, and `contain` makes the control do nothing you can see:
+ * the library is 16:9, a 16:9 clip contained in a 4:3 box renders at exactly
+ * the size it renders at in Fit, and the only difference between the two modes
+ * was the height of the black around it. A mode called 4:3 that shows you 16:9
+ * is a button that appears broken.
+ *
+ * So it crops, which is what the name says and what the other mode is for
+ * avoiding. **The rule about seeing a clip's edges still stands where it was
+ * made** — it was made about the feeds, and RedGIFs and Reddit slides ignore
+ * this control entirely, below.
+ */
+.reel.crop-four .reelslide:not(.feed) .reelvid { object-fit: cover; flex: none; height: 100%; }
+
+/* ------------------------------------------------------------- sideways
+ *
+ * A phone held on its side, where every reserve on this page is wrong.
+ *
+ * The slide holds room at the top for the bar and at the bottom for the
+ * caption, and both are measured rather than guessed — which is right, and
+ * which in landscape produced this: on an iPhone at 844x390 the bar asked for
+ * 54px and the caption for 185, so 239 of 390 went to furniture and the
+ * picture got 151px of height and 201 of width on a screen 844 wide.
+ *
+ * The caption is tall because it is laid out for a portrait column — title,
+ * cast, tags, buttons, stacked and centred. There is no room for that
+ * sideways and there does not need to be: it is already absolutely positioned,
+ * so it can go back over the picture the way a reel's caption normally does,
+ * and the reserves come off.
+ *
+ * Keyed on height rather than orientation alone, because a short window on a
+ * desktop has exactly the same problem and no orientation to report it with.
+ */
+@media (max-height: 560px) {
+  .reelslide,
+  .reel.noinfo .reelslide {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  /*
+   * Over the picture now, so it needs something to be legible against. The
+   * gradient is only here — in portrait the caption sits on the black below
+   * the picture and has nothing to fade into.
+   *
+   * The 76px at its foot stays. That is not spacing, it is clearance for the
+   * corner buttons, which are absolutely positioned at bottom:18px inside this
+   * overlay and would otherwise have the title running through them. It costs
+   * nothing now: the overlay floats, so its height no longer comes out of the
+   * picture's.
+   */
+  .reelover {
+    padding-top: 40px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 60%, transparent 100%);
+  }
+
+  /* The cast and the tag line go first: they are the least of what the caption
+     says and the most of what it costs in height. */
+  .reelover .reelcast,
+  .reelover .reeltagline { display: none; }
+
+  .reelover .reelmeta { gap: 2px; }
+
+  /* The bar overlays too, and fades rather than sitting on a band. */
+  .reelbar {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+    border-bottom: 0;
+  }
+}
+
+/* ---------------------------------------------------- the feeds always fit
+ *
+ * RedGIFs and Reddit ignore the framing button entirely. Their shape is
+ * whatever was posted — portrait phone video, the odd landscape clip, a square
+ * screenshot — and there is no house shape that flatters all of it. So the
+ * frame takes the screen, the clip takes its own ratio inside it, and nothing
+ * is cut off. The control above is for the library, which is the only place a
+ * consistent shape is worth having.
+ */
+.reel .reelslide.feed .reelframe {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reel .reelslide.feed .reelvid,
+.reel .reelslide.feed img {
+  object-fit: contain;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+}
+
+
+
+/* The bar sits over the reel rather than above it: the clip gets the screen. */
+/*
+ * One row, always, at every width.
+ *
+ * A grid of three columns rather than a flex row: the feed window has to be
+ * centred against the *screen*, not against whatever the sides happen to
+ * weigh — and the left side changes weight every time a tag chip appears, so a
+ * flex row with spacers would slide the centre about as you filter.
+ *
+ * The outer columns are 1fr and minimum zero, which is what lets the sides give
+ * up room rather than pushing anything onto a second line. What has to survive
+ * a narrow screen survives by truncating, not by wrapping.
+ */
+.reelbar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent);
+  pointer-events: none;
+}
+
+.reelleft, .reelright {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.reelright { justify-content: flex-end; }
+
+/*
+ * The tag picker, wearing an icon instead of a word.
+ *
+ * The select keeps doing the work — it is native, so it behaves properly on a
+ * phone — and its closed state is deliberately blank, with the icon drawn over
+ * where the text would be. Its options still read as words the moment it opens,
+ * which is the only place words were doing anything.
+ */
+.reeltags { position: relative; display: inline-flex; flex: none; }
+.reeltags svg {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  color: var(--text-2);
+}
+.reelpick.tags { width: 58px; padding-left: 30px; padding-right: 6px; }
+.reelpick.tags:disabled { opacity: 0.45; }
+.reelbar > * { pointer-events: auto; }
+
+.reelpick, .reelmute, .reelplugin {
+  padding: 6px 11px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: rgba(20, 19, 20, 0.75);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.reelpick:hover, .reelmute:hover, .reelplugin:hover { border-color: var(--line-hi); color: var(--text); }
+.reelpick:disabled, .reelmute:disabled { opacity: 0.45; cursor: default; }
+
+.reelplugin { margin-left: 10px; }
+
+/*
+ * The caption belongs to the slide, not to the picture.
+ *
+ * It used to live inside the frame, which meant that in a crop it sat on top
+ * of the clip and, at 4:3 on a phone, was taller than the frame it was in. Out
+ * here it is pinned to the bottom of the screen whatever shape the picture is,
+ * and centred — a reel is read down the middle, not off the left edge.
+ */
+.reelover {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Room at the foot for the button row, which lives inside here now. */
+  padding-bottom: 76px;
+  gap: 8px;
+  padding-left: 18px;
+  padding-right: 18px;
+  padding-top: 18px;
+  text-align: center;
+  /* Below the picture rather than over it, so nothing is ever covered. */
+  background: none;
+  pointer-events: none;
+}
+.reelover a, .reelover button { pointer-events: auto; }
+
+.reelmeta {
+  min-width: 0;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The marker's own tag, which is the nearest thing a clip has to a name. */
+.reeltag {
+  pointer-events: auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-hi);
+  color: var(--accent-hi);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.reeltitle {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.reeltitle:hover { color: var(--accent-hi); }
+
+.reelsub { font-size: 13px; color: var(--text-2); }
+.reelcast { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+
+.reelactmark { font-size: 15px; line-height: 1.1; }
+
+@media (max-width: 700px) {
+  .reelover { flex-direction: column; align-items: stretch; gap: 12px; }
+  .reelacts { flex-direction: row; margin-left: 0; }
+}
+
+/* ------------------------------------------------------------------ reddit */
+
+.redditstatus { font-size: 12.5px; color: var(--muted); }
+
+.redditgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-md), 1fr));
+  gap: 16px;
+}
+
+.redditcard {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.redditshot {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: var(--panel);
+}
+.redditshot:hover { border-color: var(--accent-hi); }
+.redditshot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* A post whose picture Reddit will not hand over without another request. */
+.redditnone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.redditbadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid var(--line-hi);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.redditwho { color: var(--text); font-size: 13.5px; font-weight: 600; text-decoration: none; }
+.redditwho:hover { color: var(--accent-hi); }
+
+.redditwhat {
+  font-size: 12.5px;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.redditwhen { font-size: 11.5px; color: var(--muted); }
+.redditwhen a { color: var(--muted); }
+.redditwhen a:hover { color: var(--accent-hi); }
+
+/*
+ * A slide from Reddit. It borrows the reel's own furniture — same frame, same
+ * overlay, same crop — so that scrolling past one is not a jolt. The chip is a
+ * different colour because where a clip came from is worth knowing at a glance.
+ */
+.reelfrom {
+  background: rgba(47, 129, 247, 0.16);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* A still does not play, so it does not offer to be clicked. */
+.reelstill { cursor: default; }
+
+.redditadd {
+  flex: 1;
+  min-width: 190px;
+  max-width: 330px;
+  padding: 6px 11px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+.redditadd:focus { outline: 2px solid var(--accent-hi); outline-offset: -1px; }
+
+.redditnote { font-size: 12.5px; color: var(--red); }
+
+.redditmine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
+
+.redditdrop {
+  margin-left: 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.redditdrop:hover { color: var(--red-hi); }
+
+
+/* ------------------------------------------------- reel: hand controls */
+
+/*
+ * The two that have to be reachable with a thumb. The bar scrolls off the top
+ * of a phone the moment the reel moves, so framing and rolling live down here
+ * on the picture instead, where a hand already is.
+ */
+/*
+ * One row across the foot of the screen, built from two halves.
+ *
+ * The reel owns four of these — rolling, shuffle, sound, framing — and each
+ * slide owns two more, its O and its way in. They cannot be one element,
+ * because four of them outlive every slide and two do not. So both halves sit
+ * at the same height in the same numbered slots, and the row reads as one.
+ *
+ *   roll  shuffle  O  ·····tag·····  open  sound  fit
+ *     1      2     3                  3     2      1
+ */
+.reelwrap { --corner-in: 18px; --corner-step: 58px; }
+
+.reelcorner {
+  position: absolute;
+  bottom: 18px;
+  z-index: 3;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 46px;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-hi);
+  background: rgba(20, 19, 20, 0.72);
+  backdrop-filter: blur(6px);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.1;
+  text-decoration: none;
+  cursor: pointer;
+}
+.reelcorner:hover { color: var(--text); border-color: var(--accent-hi); }
+.reelcorner.on { color: var(--accent-hi); border-color: var(--accent-hi); }
+.reelcorner:disabled { opacity: 0.5; cursor: default; }
+
+/* The four that carry no second line read at their own size. */
+.reelcorner.slot1, .reelcorner.slot2 { font-size: 13px; }
+
+.slot1.left { left: var(--corner-in); }
+.slot2.left { left: calc(var(--corner-in) + var(--corner-step)); }
+.slot3.left { left: calc(var(--corner-in) + (2 * var(--corner-step))); }
+
+.slot1.right { right: var(--corner-in); }
+.slot2.right { right: calc(var(--corner-in) + var(--corner-step)); }
+.slot3.right { right: calc(var(--corner-in) + (2 * var(--corner-step))); }
+.slot4.left { left: calc(var(--corner-in) + (3 * var(--corner-step))); }
+.slot4.right { right: calc(var(--corner-in) + (3 * var(--corner-step))); }
+
+/*
+ * The gap the two clusters leave. Padded to their width so a long tag name
+ * stops short of them rather than running underneath.
+ */
+.reeltagline {
+  position: absolute;
+  inset: auto 0 18px 0;
+  z-index: 2;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 calc(var(--corner-in) + (4 * var(--corner-step)));
+  pointer-events: none;
+}
+
+/* A round icon button, for the bar. */
+.reelicon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(20, 19, 20, 0.75);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.reelicon:hover { color: var(--text); border-color: var(--line-hi); }
+
+/*
+ * Where you are in the clip, and the handle for changing it. Thin, because it
+ * is the whole width of the picture and the picture is the point.
+ */
+.reelscrub {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+}
+.reelscrub i { display: block; height: 100%; width: 0; background: var(--accent-hi); }
+
+/* Thicker while a thumb is on it, so it is obvious what is being dragged. */
+.reelslide.scrubbing .reelscrub { height: 7px; }
+.reelslide.scrubbing { cursor: ew-resize; }
+
+/*
+ * A sideways drag is a scrub, not a scroll. Without this the browser takes the
+ * gesture for the snap scroller and the clip never moves.
+ */
+.reelslide { touch-action: pan-y; }
+
+/*
+ * A 4:3 frame on an upright phone is only a couple of hundred pixels tall, and
+ * the overlay was written for a frame the height of the screen — the tag chip
+ * ended up clipped against the top edge. So on a narrow screen the captions
+ * give up their spare room: less padding, one line of title, and the cast goes
+ * rather than pushing everything else out of the picture.
+ */
+@media (max-width: 620px) {
+  .reelover { padding: 12px 12px 16px; gap: 9px; }
+  .reelmeta { gap: 3px; }
+  .reeltitle {
+    font-size: 15px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .reelsub { font-size: 12px; }
+
+}
+
+/*
+ * One row, whatever the width.
+ *
+ * Wrapping put the bar on two lines on a phone and pushed the reel down; the
+ * pickers give way instead. They share what room there is and ellipsis their
+ * own text, and the gear — the only thing here that is not a menu — keeps its
+ * size, because a control that shrinks to nothing is worse than a short label.
+ */
+.reelbar { flex-wrap: nowrap; }
+
+.reelbar .reelpick {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 190px;
+  text-overflow: ellipsis;
+}
+
+.reelbar .reelicon { flex: 0 0 auto; }
+
+@media (max-width: 620px) {
+  .reelbar { gap: 6px; padding: 8px 10px; }
+  .reelbar .reelpick { font-size: 12px; padding: 5px 6px; }
+  .reelex { display: none; }
+  /*
+   * The tag goes back into the captions on a phone.
+   *
+   * Seven buttons at forty pixels leave about forty in the middle, and
+   * "Orgasm" rendered into twenty of them. Above the title is where it lived
+   * before the button row existed, and there is room for it there.
+   */
+  .reeltagline {
+    position: static;
+    order: -1;
+    height: auto;
+    padding: 0;
+    pointer-events: auto;
+  }
+
+  .reelwrap { --corner-in: 10px; --corner-step: 46px; }
+  .reelcorner { bottom: 12px; min-width: 40px; height: 40px; padding: 0 8px; }
+  .reelcorner .reelglyph { width: 17px; height: 17px; }
+  .reeltagline { bottom: 12px; height: 40px; }
+  .reelover { padding-bottom: 62px; }
+  .reel.noinfo .reelslide { padding-bottom: 64px; }
+}
+
+
+/* A tag being kept out of the reel, with the way to put it back. */
+.reelex {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(20, 19, 20, 0.75);
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: line-through;
+}
+
+/* A decision already made reads as a state, not as another thing to press. */
+.badge.ignored { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.chip.ignore:hover { border-color: var(--muted); color: var(--text); }
+.chip.track.on { background: var(--accent-wash); border-color: var(--accent-hi); color: var(--text); }
+
+/* "Nothing decided yet" is an em dash, not a nought — see catalogue.js. */
+.coverage .pct.none { color: var(--muted); }
+
+.controls .spacer { flex: 1; }
+
+/* ------------------------------------------------- reel: settings */
+
+/*
+ * Line art rather than emoji. On currentColor, so an icon follows whatever its
+ * button is doing — hover, the accent when a control is on — instead of being
+ * a coloured picture sitting in a white row.
+ */
+.reelglyph {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+  pointer-events: none;
+}
+
+.reelicon .reelglyph { margin: auto; }
+.reelcorner .reelglyph { width: 20px; height: 20px; }
+
+.reelsettings {
+  width: min(480px, calc(100vw - 32px));
+  padding: 22px 24px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+}
+.reelsettings::backdrop { background: rgba(0, 0, 0, 0.6); }
+.reelsettings h2 { margin: 0 0 6px; font-size: 17px; }
+.reelsettings p { margin: 0 0 18px; font-size: 12.5px; }
+
+/* Icon, name, slider, number — one grid so the four columns line up. */
+.reelset {
+  display: grid;
+  grid-template-columns: 34px 1fr minmax(0, 150px) 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.reelsetlib { border-top: 0; }
+
+.reelseticon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-2);
+}
+a.reelseticon:hover { color: var(--accent-hi); border-color: var(--accent-hi); }
+
+.reelsetname { font-size: 13.5px; min-width: 0; }
+.reelsetname a { color: var(--text); text-decoration: none; }
+.reelsetname a:hover { color: var(--accent-hi); }
+.reelsetname .muted { font-size: 12px; }
+
+.reelset input[type="range"] { width: 100%; accent-color: var(--accent); }
+.reelset b { text-align: right; font-size: 13px; color: var(--text-2); }
+
+.reelsettings menu { display: flex; justify-content: flex-end; gap: 8px; margin: 18px 0 0; padding: 0; }
+

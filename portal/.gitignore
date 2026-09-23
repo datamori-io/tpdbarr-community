@@ -1,0 +1,36 @@
+# Credentials. The SMB user and password for the movie share live here.
+.env
+
+# Everything the portal writes about itself, and none of it belongs in a
+# history: config.json rewrites on every tracked studio, every ignored scene
+# and every thumbnail-size click, so committing it would bury real changes under
+# thousands of noise commits — and it carries the Whisparr and TMDB keys.
+#
+# It is not unimportant. It holds the want list, the ignore list and the tracked
+# catalogues, which nothing can regenerate. That is what the dated backups in
+# backups/ are for, and why they go to the NAS as well as staying here.
+config/
+
+# The dated copies themselves.
+backups/
+
+# Node, in case a dependency ever arrives. There are none today: the whole app
+# is Node stdlib, which is why there is no lockfile to commit either.
+node_modules/
+npm-debug.log*
+
+# Editor and OS litter.
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Scratch files from a working session. Anything named _something is mine, not
+# the app's — probes, one-off scripts, restores.
+_*.mjs
+_*.js
+_*.ps1
+
+# The template is the one env file that belongs in the repo.
+!.env.example

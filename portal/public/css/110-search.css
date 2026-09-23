@@ -1,0 +1,468 @@
+/* ============================================================== the search
+ *
+ * The acquisition side is a search area, so its controls get the top of the
+ * page and the results get everything below. The panel is one block rather
+ * than a scattering of chips so that "what am I asking" is answerable at a
+ * glance before you look at a single result.
+ */
+
+.searchpanel {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.searchline { display: flex; gap: 8px; }
+.searchline .bigsearch {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.searchline .bigsearch:focus { border-color: var(--accent-hi); outline: none; }
+.searchline button {
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.searchline button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.searchline button.primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+
+/* The three type-aheads, side by side and equal — performer, studio, tag are
+   the same kind of question asked of three catalogues. */
+.facetsearch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.facetfield { position: relative; }
+.facetinput {
+  width: 100%;
+  padding: 8px 12px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.facetinput:focus { border-color: var(--accent-hi); outline: none; }
+
+.facetmenu { display: none; }
+.facetfield.open .facetmenu {
+  display: block;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+.facetrow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.facetrow:hover { background: var(--panel); }
+.facetrow img { width: 28px; height: 38px; object-fit: cover; border-radius: 4px; flex: none; }
+.facedot { width: 28px; height: 38px; border-radius: 4px; background: var(--line); flex: none; }
+.facename { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.facetnone { padding: 8px; color: var(--muted); font-size: 13px; }
+
+/* The active filters. A chip is the filter itself, so removing one is on the
+   chip and not in a menu somewhere else. */
+.filterchips { align-items: center; }
+.filterchips .chip { display: inline-flex; align-items: center; gap: 6px; }
+.filterchips .chip.performer { border-color: var(--accent-hi); }
+.filterchips .chip.studio { border-color: var(--blue); }
+.filterchips .chip.tag { border-color: var(--line-hi); }
+/* .chipx itself is up with the tie chips — one ×, one rule. */
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.controls .control {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.controls select,
+.controls input[type="date"] {
+  padding: 6px 8px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.controls .check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-2); }
+
+/* A performer or a studio in a result row is a filter, not decoration. */
+.metalink { color: var(--text-2); border-bottom: 1px dotted var(--line-hi); }
+.metalink:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
+
+/* ------------------------------------------------------------ the percentage
+ *
+ * Attached to the studio or performer it is about — a table of percentages off
+ * to one side is a number nobody can act on.
+ */
+
+.subject { margin-bottom: 18px; }
+.subjectbody {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.subjectbody img,
+.subjectbody .noposter {
+  width: 92px;
+  height: 128px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--line);
+}
+.subjectbody h2 { margin: 0 0 2px; font-size: 20px; }
+
+/* The pooled queue's subject is not a thing with a picture — it is every
+   catalogue at once — so it takes the same panel without the poster column. */
+.subject.pooled .subjectbody { grid-template-columns: 1fr; }
+.subject.pooled .subjectbody p { margin: 4px 0 6px; }
+/*
+ * Tracked, and how to stop.
+ *
+ * The state used to be a green-outlined button, which was the only green
+ * control in the app — everywhere else "this one is on" is the accent wash
+ * the view switches and the pass chips use. So it wears that instead, and it
+ * is a label rather than a button because pressing it is not how you stop.
+ */
+.subjecttrack { display: grid; gap: 6px; justify-items: stretch; align-content: center; }
+
+.trackedis {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-hi);
+  background: var(--accent-wash);
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Quieter than the label above it: stopping is the rarer thing and the one
+   with consequences, so it asks to be read rather than pressed in passing. */
+.subjecttrack .trackstop { font-size: 12px; padding: 4px 10px; }
+.subjecttrack .trackstop:hover { border-color: var(--red-hi); color: var(--red-hi); }
+
+.coverage { display: grid; gap: 4px; margin-top: 8px; }
+.coverage .pct { font-size: 22px; font-weight: 600; line-height: 1.1; }
+.coverage .meta { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 12px; }
+
+.tracked { display: grid; gap: 10px; }
+.tracked .crow { cursor: default; }
+.tracked .crow:hover { border-color: var(--line); }
+.trackedactions { display: grid; gap: 6px; justify-items: stretch; align-content: center; }
+
+/* The wild card sits apart because it is a different catalogue with a different
+   route out — v2 rather than v3 — and blending it in would hide that. */
+.wildcard { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 22px; }
+
+/* The indexers, under the wild card: rows rather than cards, because a release
+   has a name and some numbers and no picture. */
+.indexers { margin-top: 22px; }
+.indexers .toolbar input[type=search] { flex: 1 1 260px; min-width: 0; }
+.indexers .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.releasefilter { flex: 1 1 260px; min-width: 0; }
+.indexers .toolbar[hidden], .release[hidden] { display: none; }
+.releases { display: grid; gap: 6px; }
+.release {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+}
+.release .releasename { min-width: 0; overflow-wrap: anywhere; font-size: 13.5px; }
+.release .releasename a { color: inherit; }
+.release .releasemeta { grid-column: 1; display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; }
+.release button { grid-column: 2; grid-row: 1 / span 2; }
+
+@media (max-width: 720px) {
+  .facetsearch { grid-template-columns: 1fr; }
+  .subjectbody { grid-template-columns: 64px 1fr; }
+  .subjectbody button { grid-column: 2; justify-self: start; }
+}
+
+/* A performer photo is a portrait and cropping it to fit is right. A studio
+   image is a logo — usually wide, often with the name in it — and cropping one
+   is how you end up with half a word. So each gets the box it deserves: the
+   performer fills a tall one, the studio sits whole inside a wide one. */
+.tracked .crow { grid-template-columns: 96px 1fr auto; align-items: start; }
+.tracked .crow img.art, .tracked .crow .noposter { width: 96px; border-radius: 8px; }
+.tracked .crow img.performer, .tracked .crow .noposter.performer {
+  width: 66px;
+  height: 92px;
+  object-fit: cover;
+}
+.tracked .crow img.studio, .tracked .crow .noposter.studio {
+  height: 66px;
+  object-fit: contain;
+  background: var(--panel-2);
+  padding: 6px;
+}
+.tracked .coverage .pct { font-size: 17px; }
+
+.subjectbody img.performer, .subjectbody .noposter.performer {
+  width: 92px;
+  height: 128px;
+  object-fit: cover;
+}
+.subjectbody img.studio, .subjectbody .noposter.studio {
+  width: 128px;
+  height: 92px;
+  object-fit: contain;
+  background: var(--panel-2);
+  padding: 8px;
+}
+.subjectbody:has(img.studio), .subjectbody:has(.noposter.studio) { grid-template-columns: 128px 1fr auto; }
+
+/* ------------------------------------------------------- list or grid
+ *
+ * Results read two ways. The grid's column width is a live custom property so
+ * the slider can scale it while you drag, without rebuilding a single card.
+ */
+
+/* The head is baseline-aligned for its title and note; the tools are not text
+   and sit centred, pushed to the far end. */
+.feedhead .spacer { flex: 1; }
+.viewtools { display: flex; align-items: center; gap: 10px; align-self: center; }
+.viewswitch { display: inline-flex; }
+.viewswitch .chip { border-radius: 0; margin: 0; }
+.viewswitch .chip:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.viewswitch .chip:last-child { border-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px; }
+.viewswitch .chip.on {
+  background: var(--accent-wash);
+  border-color: var(--accent-hi);
+  color: var(--text);
+}
+
+.viewswitch.sizes .chip { min-width: 30px; padding-inline: 8px; text-align: center; }
+
+/* Under the shelf's heading, saying which of its two shelves you are reading. */
+.viewswitch.shelfviews { margin: 2px 0 12px; }
+
+/* Four steps, and the class is the whole of the change — no card is rebuilt to
+   resize the wall. S drops the meta line: at that width there is no room for it
+   and a truncated studio name reads worse than none. */
+/*
+ * Sized off the same scale as every other wall in the app rather than a private
+ * one of its own. It used to carry .scale-s/m/l/xl classes driven by a second
+ * size control that lived only on this page — so the app-wide control set a
+ * multiplier this grid did not read, and clicking it did nothing here.
+ */
+.resultgrid { grid-template-columns: repeat(auto-fill, minmax(var(--tile-lg), 1fr)); }
+.resultgrid .cardstate { flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .viewswitch.sizes { display: none; }
+}
+
+/* ------------------------------------------------------------ studio page
+ *
+ * The library page that carries a catalogue: a logo, a percentage, three views
+ * of one shelf, and the cast as a filter rather than as a set of links.
+ */
+
+/* A logo is not a portrait. Contained and wide, or the crop takes the name off
+   it — the same reasoning as the studio tiles. */
+.listhead .portrait.logo {
+  width: 190px;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  padding: 10px;
+}
+.listhead .portrait.logo.noposter { background: var(--panel-2); }
+
+/* The track button sits at the far end of the header, away from the numbers it
+   turns on. */
+.listhead.with-portrait > .add { margin-left: auto; align-self: flex-start; }
+
+.studiobar { align-items: center; gap: 10px; }
+
+/* The cast rail filters the shelf instead of navigating, so the one you picked
+   has to look picked. */
+.facet.on { border-color: var(--accent); }
+.facet.on .facetbody .title { color: var(--accent-hi); }
+
+.rail.cast { margin-top: 26px; }
+.rail.cast .railtitle { font-size: 15px; font-weight: 600; color: var(--text-2); }
+
+@media (max-width: 720px) {
+  .listhead .portrait.logo { width: 140px; }
+  .listhead.with-portrait > .add { margin-left: 0; }
+}
+
+/* The want mark on a scene card. Quiet until it is on: the card's own answer
+   is the artwork, and a wall of lit buttons reads as noise. */
+.chip.track.on {
+  border-color: var(--accent);
+  color: var(--text);
+}
+/* Add already claims the far end with an auto margin; the mark sits with the
+   badges, which is where the reading is rather than the doing. */
+.chip.track { padding: 3px 9px; font-size: 12px; }
+
+/* The second half of the want list — what turned up. A smaller heading than
+   the band's own, because it is a footnote to it rather than a new question. */
+.feedhead.sub { margin-top: 26px; }
+.feedhead.sub h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
+
+
+/*
+ * The two answers you can give a whole stretch at once — see renderDecide().
+ *
+ * Under the queue rather than over it, because the sentence they finish is
+ * "I have scrolled through this and": you reach them by getting to the bottom,
+ * which is the same gesture as having looked.
+ */
+.decidebulk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.decidebulk[hidden] { display: none; }
+.decidebulk .chip { padding: 7px 14px; }
+
+@media (pointer: coarse) {
+  /* Both of these throw work away in bulk, so they are the last controls on
+     the page that should be easy to hit by accident — full-size targets, but
+     with room between them. */
+  .decidebulk { gap: 14px; }
+  .decidebulk .chip { min-height: 44px; }
+}
+
+/* The two id filters share a line; this is the breath between them so the
+   second label does not read as belonging to the first control. */
+.sortline .filtergap { margin-left: 10px; }
+
+/* Why a row is ticked when nobody ticked it. Green like the fingerprint badge
+   it sits beside: both are the page saying it is sure, for different reasons. */
+.badge.looksame { background: rgba(46, 160, 67, 0.18); color: #7ee787; }
+.badge.looksame[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- job line
+ *
+ * A job card's button and the sentence saying what it does, on one line.
+ *
+ * `.controls` wraps, which is right for a row of filters and wrong here: it
+ * meant the length of the sentence decided the shape of the card. Fingerprints
+ * kept its note beside the button and Previews and sprites pushed its own onto
+ * a second line, so six cards doing the same thing read as six different
+ * cards.
+ *
+ * The button keeps its width and the sentence takes the rest, wrapping inside
+ * its own column rather than under the button. `min-width: 0` is what lets it
+ * — without it a flex item refuses to shrink below its longest word and the
+ * row overflows the card instead.
+ */
+.jobline { flex-wrap: nowrap; align-items: flex-start; }
+.jobline > button { flex: none; }
+.jobline > .muted {
+  flex: 1;
+  min-width: 0;
+  /* The first line of the sentence on the button's own line, not the top of
+   * its box. A button is taller than a line of 13px text, so top-aligning the
+   * two puts the sentence above the label it belongs to. */
+  padding-top: 6px;
+}
+
+/* Narrow enough that a button and a paragraph side by side leaves the
+ * paragraph in a column two words wide. There the stack is the readable
+ * shape, which is what .controls did all along. */
+@media (max-width: 620px) {
+  .jobline { flex-wrap: wrap; }
+  .jobline > .muted { flex: 1 1 100%; }
+}
+
+/* ----------------------------------------------------------------- job row
+ *
+ * The three asks — scan, fingerprints, previews — side by side above the
+ * piles they act on.
+ *
+ * Equal columns rather than auto ones, so the row does not re-proportion
+ * itself every time a sentence changes: these cards say different things at
+ * different lengths depending on what Stash is doing, and a layout that moves
+ * while you read it is worse than one that leaves a gap.
+ *
+ * The cards carry their own bottom margin, which is the wrong axis in here.
+ */
+.jobrow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+/*
+ * Same height, ragged bottoms being the one thing three cards side by side
+ * cannot get away with — their sentences are different lengths by nature and
+ * the row would step down twice across the page. The content sits at the top
+ * of each and the slack goes underneath.
+ */
+.jobrow > .searchpanel {
+  margin-bottom: 0;
+  align-content: start;
+}
+
+/*
+ * A third of a row is too narrow for a button and a paragraph beside each
+ * other — the paragraph ends up a column two words wide. So inside this row
+ * the sentence goes back under the button, which is the readable shape at
+ * this width and the one .controls had all along.
+ */
+.jobrow .jobline { flex-wrap: wrap; }
+.jobrow .jobline > .muted { flex: 1 1 100%; padding-top: 0; }
+
+/* Two up, then one, before the columns get narrower than a button. */
+@media (max-width: 1000px) {
+  .jobrow { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 660px) {
+  .jobrow { grid-template-columns: 1fr; }
+}
+
+/* A press-twice button on Manage › Stash, armed: the next press deletes or overwrites. */
+.jobline > button.danger { border-color: var(--red); background: var(--red); color: #fff; }
+
+/* Monitored: what the Whisparrs are still looking for, one row each, with the
+   Indexers band opening underneath the row it was asked from. */
+.monitoredfilter { flex: 1 1 280px; min-width: 0; }
+.monitored { display: grid; gap: 6px; }
+.mrow { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.mrow .mhead { display: flex; align-items: center; gap: 12px; }
+.mrow .mtitle { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13.5px; }
+.mrow .mtitle a { color: inherit; }
+.mrow .mmeta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; margin-top: 2px; }
+.indexers.bare { margin-top: 10px; }
+.monitoredheld { margin-top: 16px; }
+.monitoredheld > summary { cursor: pointer; padding: 6px 0; }

@@ -1,0 +1,115 @@
+{
+ "Uid": "a0a76331-cbd0-4a0d-b37a-968ec1e7dafb",
+ "Name": "Faststart Remux",
+ "Enabled": true,
+ "Type": 0,
+ "ReadOnly": false,
+ "Default": false,
+ "Description": "Rewrites the MP4 container with the index at the front so seeking is instant. Copies streams - no re-encode, no quality change.",
+ "Icon": "fas fa-forward",
+ "Bridgeable": false,
+ "Properties": {
+  "Fields": [],
+  "Variables": {}
+ },
+ "Parts": [
+  {
+   "Uid": "71fe0e23-c65b-45e0-80f8-0cda9e7c5ee4",
+   "ReadOnly": false,
+   "FlowElementUid": "FileFlows.VideoNodes.VideoFile",
+   "xPos": 400,
+   "yPos": 100,
+   "Label": "",
+   "Inputs": 0,
+   "Outputs": 1,
+   "OutputConnections": [
+    {
+     "Input": 1,
+     "Output": 1,
+     "InputNode": "96a18a39-cf22-4878-8c77-9877a721bef7"
+    }
+   ],
+   "Type": 0,
+   "Model": {}
+  },
+  {
+   "Uid": "96a18a39-cf22-4878-8c77-9877a721bef7",
+   "ReadOnly": false,
+   "FlowElementUid": "FileFlows.VideoNodes.FfmpegBuilderNodes.FfmpegBuilderStart",
+   "xPos": 400,
+   "yPos": 220,
+   "Label": "",
+   "Inputs": 1,
+   "Outputs": 1,
+   "OutputConnections": [
+    {
+     "Input": 1,
+     "Output": 1,
+     "InputNode": "6660bee1-fbab-45e9-b92e-d7f5556bd8de"
+    }
+   ],
+   "Type": 4,
+   "Model": {}
+  },
+  {
+   "Uid": "6660bee1-fbab-45e9-b92e-d7f5556bd8de",
+   "ReadOnly": false,
+   "FlowElementUid": "FileFlows.VideoNodes.FfmpegBuilderNodes.FfmpegBuilderCustomParameters",
+   "xPos": 400,
+   "yPos": 340,
+   "Label": "Faststart",
+   "Inputs": 1,
+   "Outputs": 1,
+   "OutputConnections": [
+    {
+     "Input": 1,
+     "Output": 1,
+     "InputNode": "6272d0b8-416c-4710-b4e9-f2472104d7fe"
+    }
+   ],
+   "Type": 6,
+   "Model": {
+    "Parameters": [
+     "-movflags",
+     "+faststart"
+    ],
+    "ForceEncode": false
+   }
+  },
+  {
+   "Uid": "6272d0b8-416c-4710-b4e9-f2472104d7fe",
+   "ReadOnly": false,
+   "FlowElementUid": "FileFlows.VideoNodes.FfmpegBuilderNodes.FfmpegBuilderExecutor",
+   "xPos": 400,
+   "yPos": 460,
+   "Label": "",
+   "Inputs": 1,
+   "Outputs": 2,
+   "OutputConnections": [
+    {
+     "Input": 1,
+     "Output": 1,
+     "InputNode": "6469b522-3c2f-411f-be39-4338d71fc942"
+    }
+   ],
+   "Type": 5,
+   "Model": {
+    "HardwareDecoding": "auto",
+    "Strictness": "experimental"
+   }
+  },
+  {
+   "Uid": "6469b522-3c2f-411f-be39-4338d71fc942",
+   "ReadOnly": false,
+   "FlowElementUid": "FileFlows.BasicNodes.File.ReplaceOriginal",
+   "xPos": 400,
+   "yPos": 580,
+   "Label": "",
+   "Inputs": 1,
+   "Outputs": 1,
+   "OutputConnections": [],
+   "Type": 2,
+   "Model": {}
+  }
+ ]
+}

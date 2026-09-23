@@ -1,0 +1,13 @@
+/* ------------------------------------------------- swapping their picture
+ *
+ * On the performer and studio pages, under the record. Quiet on purpose: it
+ * is something you do occasionally to a page you are mostly here to read.
+ */
+.pictureswap {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pictureswap .toolbar { flex-wrap: wrap; }
+.pictureswap input[type="file"] { font-size: 12px; max-width: 100%; }

@@ -1,0 +1,406 @@
+/* ============================================================ the Overview
+ *
+ * Two pages out of one file. The Overview is a video hub: a rule, a small grey
+ * label, one item given room to be read, and the rest of that section beside
+ * it small. The Stats tab keeps the original motif — the library is a
+ * pipeline; the flow bar is the whole of it at a glance and the cards under it
+ * are the questions you would ask next.
+ *
+ * The colour rule holds everywhere in the Stats half. Grey is upstream — not
+ * yours yet as far as Stash is concerned. Text-colour is yours. Coral is
+ * whatever the mark is actually about, and never more than one thing per
+ * chart.
+ */
+
+/* ----------------------------------------------------------- the hub
+ *
+ * A section is a rule, a small grey label and a MORE, over either a row of
+ * news cards or a scrolling shelf of scenes. MORE is not the same offer as the
+ * scroll: the scroller carries the two dozen the server sent, MORE opens the
+ * shelf that holds three thousand.
+ */
+
+.editorial { margin: 0 0 34px; }
+/* The scroller's own top padding leaves room for the tile hover-lift, so the
+   header does not need to hold the gap open as well. */
+.editorial .railbody { margin-top: -6px; }
+
+/* Label left, note beside it, MORE hard right, all sitting on one rule. */
+.edhead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.edname {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.ednote { font-size: 12px; color: var(--muted); }
+
+.edmore {
+  margin-left: auto;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+.edmore:hover { color: var(--accent-hi); }
+.edmore span { display: inline-block; transition: transform 0.15s; }
+.edmore:hover span { transform: translateX(3px); }
+
+/* The thumbnail-size control lands in the first section rule that has a shelf
+   under it. MORE has already claimed the free space, so this sits beside it
+   rather than taking an `auto` of its own and splitting the row in two. */
+.edhead .sizepick { margin-left: 14px; }
+
+/* One card, whatever it is holding: art, then the words. The three shapes
+   below only change where the art sits and how big it is. */
+.edcard { cursor: pointer; min-width: 0; }
+.edart {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--panel-2);
+  aspect-ratio: 16 / 9;
+}
+.edart img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.15s; }
+.edcard:hover .edart img { opacity: 0.8; }
+.edcard:hover .edtitle { color: var(--accent-hi); }
+
+.edtext { min-width: 0; }
+.edtitle {
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  transition: color 0.12s;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.edmeta { margin-top: 5px; font-size: 11.5px; color: var(--muted); }
+.edmeta span + span::before { content: " · "; }
+.edsummary {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- news: a row of big cards, art over words, like a picks strip --- */
+
+.ednews {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 22px 20px;
+}
+.ednews .edtext { margin-top: 10px; }
+/* What MORE reveals. Physically smaller than the three above it — these are
+   the rest of the pile, not another set of leads. */
+.ednews.more {
+  margin-top: 26px;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 18px 16px;
+}
+.ednews.more:empty { display: none; }
+.ednews.more .edtext { margin-top: 8px; }
+.ednews.more .edtitle { font-size: 12.5px; -webkit-line-clamp: 3; }
+.ednews.more .edmeta { font-size: 11px; }
+.ednews.more .edsummary { display: none; }
+
+.overviewtop { margin: 0 0 30px; }
+
+/* ------------------------------------------------------------ the pipeline */
+
+.flowpanel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px 14px;
+  margin: 0 0 14px;
+}
+
+.flowhead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.flowhead h2 { font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
+
+/* The bar itself. One row of proportional segments, so its shape is the state
+   of the pipeline — a fat middle is a backlog at the encoder. */
+.flow {
+  display: flex;
+  gap: 3px;
+  height: 30px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.flowseg {
+  display: block;
+  min-width: 3px;
+  border-radius: 3px;
+  background: var(--line);
+  transition: filter 0.15s ease;
+}
+a.flowseg:hover { filter: brightness(1.45); }
+
+/* Left to right, the ramp from "somewhere else" to "yours and filed". */
+.flow-downloaded .flowdot, .flowseg.flow-downloaded { background: #46424a; }
+.flow-editing    .flowdot, .flowseg.flow-editing    { background: #6a6470; }
+.flow-encoding   .flowdot, .flowseg.flow-encoding   { background: var(--amber); }
+.flow-library    .flowdot, .flowseg.flow-library    { background: var(--accent-hi); }
+.flow-film       .flowdot, .flowseg.flow-film       { background: var(--text-2); }
+
+.flowkeys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin-top: 12px;
+}
+
+.flowkey {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+a.flowkey:hover { border-bottom-color: var(--line-hi); }
+
+/* A stage at nought keeps its figure — a queue that has cleared is worth
+   seeing — but stops competing with the ones that have something in them. */
+.flowkey.spent { opacity: 0.45; }
+
+.flowdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  align-self: center;
+  flex: none;
+}
+
+.flowkey b {
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.flowname { font-size: 12.5px; color: var(--muted); }
+
+/* --------------------------------------------------------------- the cards */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px 15px;
+  color: inherit;
+  text-decoration: none;
+}
+a.metric:hover { border-color: var(--accent-hi); }
+
+.metric h3 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.metricbig {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.metricsub { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+
+/* The chart sits at the bottom of the card whatever the wording above it does,
+   so a row of cards keeps one baseline instead of five ragged ones. */
+.metricchart { margin-top: auto; padding-top: 14px; }
+
+/* --------------------------------------------------------------- the marks */
+
+.spark { display: block; width: 100%; height: 54px; overflow: visible; }
+
+/* Namespaced away from the acquisition side's `.bar`, which sets a CSS height
+   — and in SVG2 that beats the height attribute, flattening every column. */
+.spark .sparkbar { fill: var(--line-hi); }
+/* One coral column: the month you are in. */
+.spark .sparkbar.now { fill: var(--accent-hi); }
+.spark .sparkbase { stroke: var(--line); stroke-width: 0.4; vector-effect: non-scaling-stroke; }
+
+.spark .areafill { fill: var(--accent-wash); }
+.spark .arealine {
+  fill: none;
+  stroke: var(--accent-hi);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  /* The viewBox is stretched to the card's width, so without this the line
+     would be drawn thin horizontally and fat vertically. */
+  vector-effect: non-scaling-stroke;
+}
+
+.sparkaxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Parts of a whole. */
+.stack {
+  display: flex;
+  gap: 2px;
+  height: 22px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stackseg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2px;
+  border-radius: 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #141314;
+}
+/* Only a segment with room says its own share; the rest are in the key. */
+.stackseg span { opacity: 0.75; }
+
+.stackseg.good, .stackkey.good i { background: var(--accent-hi); }
+.stackseg.mid,  .stackkey.mid i  { background: #8d6f74; }
+.stackseg.low,  .stackkey.low i  { background: var(--line-hi); }
+.stackseg.nil,  .stackkey.nil i  { background: #3f3c3d; }
+.stackseg.low, .stackseg.nil { color: var(--text-2); }
+
+.stackkeys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 9px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.stackkey { display: inline-flex; align-items: center; gap: 6px; }
+.stackkey i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* The ring. */
+.ringwrap { display: flex; justify-content: center; }
+.ring { width: 76px; height: 76px; }
+.ringtrack { fill: none; stroke: var(--line); stroke-width: 4; }
+.ringfill {
+  fill: none;
+  stroke: var(--accent-hi);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+/* ------------------------------------------------------------ the tidy-up */
+
+.tidy {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 15px 18px 16px;
+  margin: 26px 0 10px;
+}
+/* Nothing to do is one quiet line, not a panel with dead buttons in it. */
+.tidy.quiet { border-style: dashed; padding: 12px 18px; }
+
+.tidylines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 12px 0 14px;
+}
+.tidyline { display: flex; flex-direction: column; gap: 2px; }
+.tidyline b { font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.tidyacts { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Not `.toolbar` — see the note in tidyPanel(). */
+.tidybar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+
+/* The only button in the app that deletes someone else's files. It is allowed
+   to look like it — and it still asks first. */
+.act.danger { border-color: var(--red); color: var(--red-hi); }
+.act.danger:hover:not(:disabled) { background: var(--red); border-color: var(--red); color: #fff; }
+
+@media (max-width: 640px) {
+  .metricbig { font-size: 22px; }
+  .flowkeys { gap: 6px 16px; }
+  .flowkey b { font-size: 15px; }
+}
+
+/* --------------------------------------------------- the movie gap-filler */
+
+.gappanel { margin: 0 0 20px; }
+.gappanel .note { margin-bottom: 10px; }
+
+.candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-md), 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.matchpick {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.candart {
+  aspect-ratio: 2 / 3;
+  background: var(--panel-2);
+  display: grid;
+  place-items: center;
+}
+.candart img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.candbody { padding: 9px 11px 11px; display: grid; gap: 7px; }
+.candbody .title { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.candbody .meta { font-size: 11.5px; color: var(--muted); }
+.candbody .act { justify-content: center; }
+
