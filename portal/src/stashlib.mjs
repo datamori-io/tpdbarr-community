@@ -134,6 +134,8 @@ export function card(scene) {
     // The height it is and the height it is meant to end up at, for the colour
     // on the tile. See targetOf in resolution.mjs.
     height: file?.height || 0,
+    // Which folder it is in, drawn under the tile's studio and date.
+    path: file?.path || null,
     target: targetOf(scene.id, file?.height || 0, file?.path),
     organized: !!scene.organized,
     // Where it is in the pipeline, read off the path rather than the

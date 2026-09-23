@@ -34,6 +34,22 @@ export const el = (tag, props = {}, ...children) => {
   return node;
 };
 
+/*
+ * Which folder a file is in: the mount in bold, then the folders under it.
+ * Takes the file's path and drops the filename; the full path is the hover.
+ * Used on the library tiles and the Not organised cards.
+ */
+export function folderLine(path, className = 'folderline') {
+  if (!path) return null;
+  const parts = String(path).split('/').filter(Boolean);
+  parts.pop();
+  const [root, ...rest] = parts;
+  if (!root) return null;
+  return el('div', { className, title: path },
+    el('b', {}, '/' + root),
+    rest.length ? ' / ' + rest.join(' / ') : '');
+}
+
 export const minutes = (n) => (n ? `${n} min` : '');
 
 // Runtimes are in seconds on the library side and minutes on the TPDB side.

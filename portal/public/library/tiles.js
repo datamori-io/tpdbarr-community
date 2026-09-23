@@ -3,7 +3,7 @@
  * facet, the rails they sit in, and the filter bar every shelf wears.
  */
 
-import { clock, el } from '../util.js';
+import { clock, el, folderLine } from '../util.js';
 import { blurb } from '../catalogue.js';
 import { heading, hoverPreview, initial, loading, onTeardown } from './core.js';
 
@@ -88,6 +88,7 @@ export function tile(scene) {
         scene.studio ? el('span', {}, scene.studio.name) : null,
         scene.date ? el('span', {}, scene.date) : null
       ),
+      folderLine(scene.path, 'tilefolder'),
       about ? el('div', { className: 'tiledesc' }, about) : null
     )
   );

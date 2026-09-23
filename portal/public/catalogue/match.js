@@ -1,6 +1,6 @@
 /* Scenes Stash never identified, and the candidates for them. */
 
-import { api, el, gigabytes } from '../util.js';
+import { api, el, folderLine, gigabytes } from '../util.js';
 import { SECTION_OF, painterFor, show, state } from '../import/core.js';
 import { compareSheet } from './compare.js';
 import { generateBit, liveArt } from './liveart.js';
@@ -2647,22 +2647,6 @@ const picked = new Set();
  * card, and the bar should not be reaching into somebody else's DOM to make
  * twenty-four of them.
  */
-/*
- * Which folder the file is in: the mount in bold, then the folders under it.
- * On this pile it is the difference between a scene that needs only a tick and
- * one still sitting in a download folder. The full path is the hover.
- */
-function folderLine(path) {
-  if (!path) return null;
-  const parts = String(path).split('/').filter(Boolean);
-  parts.pop();
-  const [root, ...rest] = parts;
-  if (!root) return null;
-  return el('div', { className: 'cardfolder', title: path },
-    el('b', {}, '/' + root),
-    rest.length ? ' / ' + rest.join(' / ') : '');
-}
-
 function taggableCard(scene) {
   // Same picture rule as the match rows: the portal decides, because Stash
   // answers a missing cover with a placeholder rather than a miss.
@@ -2676,7 +2660,7 @@ function taggableCard(scene) {
       el('div', { className: 'meta' },
         el('span', {}, scene.date || 'no date'),
         scene.studio?.name ? el('span', {}, scene.studio.name) : null),
-      folderLine(scene.path)
+      folderLine(scene.path, 'cardfolder')
     )
   );
 
