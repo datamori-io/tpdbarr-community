@@ -277,6 +277,37 @@ arrives a moment after the rest of the page.
 A scene appearing under two roots is counted once, at the **furthest along** of
 them: it has already moved, the old copy just has not been swept up.
 
+### What a tile says
+
+Bottom left of every scene tile: the resolution, then where the scene stands.
+
+| Status | When |
+|---|---|
+| **Waiting to import** | the file is in `/Import Folder` (waiting on FileFlows) or `/pc-import` (yours to cut and match first) |
+| **Needs organizing** | filed in `/organized_scenes`, not yet ticked organised in Stash |
+| **Filed** | filed in `/organized_scenes` and organised |
+
+Films in `/movies` show the resolution and no status.
+
+Both badges share one colour, which compares the file against its **target
+resolution**:
+
+| Colour | Means |
+|---|---|
+| **Red** | bigger than the target, so an encode is still owed |
+| **Yellow** | at or under the target, but not finished |
+| **Green** | at or under the target, filed and organised (an organised film counts) |
+
+The target is **720p**, which is what FileFlows turns a filed scene into, unless
+the scene page chose otherwise:
+- **1080p or 480p** is the target when that was chosen.
+- **Keep** makes the file as it is the target.
+- **Films** always count as at target, because FileFlows never touches `/movies`.
+
+A filed scene's choice is its `.fileflows-ignore` flag. The portal checks for
+those flags when it reads the shelf, which takes about a second and a half for
+four thousand folders, then keeps the result for ten minutes.
+
 ### The cards are charts, not scoreboards
 
 Five small charts, each with the sentence it is evidence for, all tallied in a

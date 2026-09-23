@@ -72,6 +72,12 @@ library.
 - **Every shelf uses one filter bar**: Scenes, Performers, Studios and Galleries
   share the same search, dropdowns, sort, Clear and Random. The dropdown counts
   update as you narrow.
+- **Every tile says where the scene stands**, bottom left: *Waiting to import*,
+  *Needs organizing* or *Filed*, beside the resolution.
+  - **Red** means bigger than its target resolution (720p unless you chose
+    otherwise).
+  - **Yellow** means at or under the target but not finished.
+  - **Green** means filed, organised and at target.
 - **Hover a tile to preview it.** The scene's preview loop plays, and running
   the mouse along the bottom scrubs the whole runtime off Stash's sprite sheet
   without loading the video.
