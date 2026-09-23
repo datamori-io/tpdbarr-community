@@ -162,7 +162,9 @@ a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px)
   .tilescrub, .tileframe { display: none; }
 }
 
-.tilemarks { position: absolute; top: 7px; left: 7px; display: flex; gap: 5px; z-index: 2; }
+/* Bottom left, clear of the progress bar, and never in the way of the hover
+   scrub that runs along the same edge. */
+.tilemarks { position: absolute; bottom: 7px; left: 7px; right: 64px; display: flex; flex-wrap: wrap; gap: 5px; z-index: 2; pointer-events: none; }
 .pill {
   font-size: 10.5px;
   font-weight: 650;
@@ -177,6 +179,11 @@ a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px)
 /* Work already done, rather than work outstanding. Only the marker picker
    raises one today; it is here because .pill lives here. */
 .pill.done { color: var(--green); }
+
+/* Resolution against its target — see tiles.js. */
+.pill.res-over { color: #ff6b6b; }
+.pill.res-under { color: #e3b341; }
+.pill.res-done { color: #3fb950; }
 
 .tiletime {
   position: absolute;

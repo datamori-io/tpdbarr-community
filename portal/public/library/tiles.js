@@ -22,23 +22,46 @@ export function tile(scene) {
   );
 
   const marks = el('div', { className: 'tilemarks' });
-  if (scene.resolution) marks.append(el('span', { className: 'pill' }, scene.resolution));
 
   /*
-   * Where it is in the pipeline, and only when that is somewhere other than
-   * filed. Every scene on the shelf used to be filed by definition, so the tile
-   * flagged Stash's `organized` box instead; now the shelf is the whole of
-   * Stash, and the folder is the honest answer to "why is this here twice" or
-   * "why can I not play this yet". A filed scene says nothing, because that is
-   * the normal case and a badge on everything is a badge on nothing.
+   * Bottom left: the resolution, then where the scene stands, in one colour.
+   *
+   * The colour is about the file against what it is meant to end up at — the
+   * target, which is 720 unless a choice was made on the scene page:
+   *
+   *   red     bigger than the target, so an encode is still owed
+   *   yellow  at or under it, but not finished
+   *   green   at or under it, filed in /organized_scenes and organised
+   *
+   * The words are about the folder and Stash's organised box:
+   *
+   *   Waiting to import  still in /Import Folder or /pc-import
+   *   Needs organizing   filed, but not ticked organised in Stash
+   *   Filed              filed and organised
+   *
+   * Films sit in /movies, outside this pipeline, so they carry the resolution
+   * and its colour but no status word.
    */
-  if (scene.stage === 'encoding') {
-    marks.append(el('span', { className: 'pill warn', title: 'Waiting on FileFlows — /Import Folder' }, 'Encoding'));
-  } else if (scene.stage === 'editing') {
-    marks.append(el('span', { className: 'pill warn', title: 'Yours to cut first — /pc-import' }, 'Editing'));
-  } else if (!scene.organized) {
-    marks.append(el('span', { className: 'pill warn', title: 'Not organised in Stash' }, 'Unfiled'));
+  const filed = scene.stage === 'library' || scene.stage === 'film';
+  const tone = !scene.height || !scene.target ? ''
+    : scene.height > scene.target ? 'res-over'
+    : filed && scene.organized ? 'res-done'
+    : 'res-under';
+  const targetNote = scene.target ? ` — target ${scene.target}p` : '';
+
+  if (scene.resolution) {
+    marks.append(el('span', { className: `pill ${tone}`, title: `${scene.height}p${targetNote}` }, scene.resolution));
   }
+
+  const status = scene.stage === 'library'
+    ? (scene.organized
+      ? ['Filed', 'In /organized_scenes and organised in Stash']
+      : ['Needs organizing', 'In /organized_scenes, not yet ticked organised in Stash'])
+    : scene.stage === 'film' ? null
+    : ['Waiting to import', scene.stage === 'editing'
+      ? 'In /pc-import — yours to cut and match first'
+      : 'In /Import Folder — waiting on FileFlows'];
+  if (status) marks.append(el('span', { className: `pill ${tone}`, title: status[1] }, status[0]));
   if (marks.childElementCount) art.append(marks);
 
   if (scene.duration) art.append(el('div', { className: 'tiletime' }, clock(scene.duration)));

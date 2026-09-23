@@ -65,6 +65,53 @@ async function save() {
 
 export async function flag(dir) {
   await writeFile(join(dir, IGNORE), '');
+  flags.dirs.add(dir);
+}
+
+/* ------------------------------------------------------------- the target
+ *
+ * What a scene is meant to end up at, for the colour on its tile. Red is a
+ * file still bigger than that, yellow is at or under it but not finished, and
+ * green is filed, organised and at it.
+ *
+ *   not filed, a choice made   that choice ('keep' is the file as it is)
+ *   filed and flagged          the file as it is — the flag means "leave it"
+ *   anything else              720, what FileFlows turns a filed scene into
+ *
+ * The tile has to be drawn from one synchronous read, and a filed scene's
+ * choice lives only on disk as the flag. So the flags are swept into memory
+ * alongside the shelf read — one stat per filed folder, about a second and a
+ * half for four thousand of them — and kept for ten minutes. A flag this
+ * module writes or removes updates the set at once.
+ */
+export const DEFAULT_TARGET = 720;
+const FLAG_TTL = 10 * 60 * 1000;
+const flags = { dirs: new Set(), at: 0, busy: null };
+
+export async function warm(paths) {
+  await load();
+  if (flags.busy) return flags.busy;
+  if (Date.now() - flags.at < FLAG_TTL) return null;
+
+  const dirs = [...new Set(paths.filter((p) => String(p || '').includes(FILED)).map((p) => dirname(p)))];
+  flags.busy = (async () => {
+    const found = new Set();
+    for (let i = 0; i < dirs.length; i += 48) {
+      const batch = dirs.slice(i, i + 48);
+      const hits = await Promise.all(batch.map(flagged));
+      batch.forEach((dir, n) => { if (hits[n]) found.add(dir); });
+    }
+    flags.dirs = found;
+    flags.at = Date.now();
+  })().finally(() => { flags.busy = null; });
+  return flags.busy;
+}
+
+export function targetOf(sceneId, height, path) {
+  const pending = cache?.scenes?.[sceneId]?.choice;
+  if (pending) return pending === 'keep' ? height : pending;
+  if (path && String(path).includes(FILED) && flags.dirs.has(dirname(path))) return height;
+  return DEFAULT_TARGET;
 }
 
 const flagged = (dir) => stat(join(dir, IGNORE)).then(() => true, () => false);
@@ -169,6 +216,7 @@ export async function release(config, sceneId) {
   const now = await plan(config, sceneId);
   if (!now.filed) throw refuse('Only a filed scene has a flag to take off.');
   await rm(join(dirname(now.path), IGNORE), { force: true });
+  flags.dirs.delete(dirname(now.path));
   return plan(config, sceneId);
 }
 

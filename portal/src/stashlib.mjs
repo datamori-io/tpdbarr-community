@@ -14,6 +14,7 @@ import * as stashdb from './stashdb.mjs';
 import { rememberPaths } from './media.mjs';
 import { iafdUrlOf, lookup as iafdLookup, proposal as iafdProposal } from './iafd.mjs';
 import * as studiofacts from './studiofacts.mjs';
+import { targetOf, warm as warmTargets } from './resolution.mjs';
 
 const CARD = `
   id title details date organized rating100 o_counter play_count resume_time created_at
@@ -130,6 +131,10 @@ export function card(scene) {
     performers: (scene.performers || []).map((p) => ({ id: p.id, name: p.name, favorite: !!p.favorite })),
     duration,
     resolution: resolution(file?.height),
+    // The height it is and the height it is meant to end up at, for the colour
+    // on the tile. See targetOf in resolution.mjs.
+    height: file?.height || 0,
+    target: targetOf(scene.id, file?.height || 0, file?.path),
     organized: !!scene.organized,
     // Where it is in the pipeline, read off the path rather than the
     // `organized` flag — the folder is what FileFlows actually moves. See STAGES.
@@ -743,6 +748,12 @@ export async function shelf(config, { force = false } = {}) {
      }`,
     { f: { ...inLibrary }, p: { per_page: -1, sort: 'date', direction: 'DESC' } }
   );
+
+  // The resolution flags, swept before the cards are drawn so a kept 4K file
+  // is not painted red for the life of this cache. A slow share is not worth
+  // holding the shelf for: after four seconds it draws with what it has.
+  const paths = query.findScenes.scenes.flatMap((s) => (s.files || []).map((f) => f.path));
+  await Promise.race([warmTargets(paths), new Promise((r) => setTimeout(r, 4000))]).catch(() => {});
 
   const data = {
     count: query.findScenes.count,
