@@ -14,6 +14,32 @@ Two editions, same integration logic:
 - **[fileflows/](fileflows/)** — the FileFlows flows that encode scenes
   before Stash files them. Optional.
 
+## The Feed — your markers, like TikTok
+
+<img src="docs/screenshots/feed-phone.jpg" alt="The Feed on a phone: one marker clip, its tag, scene, studio and cast, with the control bar below" width="300" align="right" />
+
+A vertical, swipe-through feed of the **moments** in your library rather than
+whole scenes. Every Stash scene marker becomes a clip, and the portal plays
+them one after another, full screen, like a short-video app.
+
+- **Swipe up for the next clip** (or ↓ / `j`). Swipe the feed strip sideways
+  (or ← / →) to change feed, drag along a clip to scrub, and Space pauses.
+- **Your own clips, at 720p.** Stash renders marker clips at 640x360 whatever
+  the source. The portal cuts its own from the original file at 720p and
+  falls back to Stash's clip, then to the scene itself, if one isn't there.
+- **Five feeds.** *Markers*, *Scenes*, *RedGIFs*, *Reddit*, or *All three*,
+  which mixes your library with RedGIFs and Reddit posts from the performers
+  you already have (75/15/10 by default, set with a slider).
+- **Filter by tag**, shuffle (a new order every visit, stable while you page),
+  auto-advance to the next clip after one loop, and switch the framing between
+  Fit and 4:3.
+- **It remembers how you left it** — feed, framing, mix — on the server, so
+  your phone and your desktop agree.
+
+Open it from **Feed** next to the name in the top bar, or go to `#/binge`.
+
+<br clear="right" />
+
 ## Screenshots
 
 Pictures are blurred on purpose — this is an adult library.
