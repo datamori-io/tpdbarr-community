@@ -33,6 +33,7 @@ import * as downscale from './downscale.mjs';
 export const IGNORE = '.fileflows-ignore';
 
 const FILED = '/organized_scenes/';
+const FILMS = '/movies/';
 const CONFIG_DIR = process.env.CONFIG_DIR || './config';
 const PATH = join(CONFIG_DIR, 'resolution.json');
 
@@ -76,6 +77,7 @@ export async function flag(dir) {
  *
  *   not filed, a choice made   that choice ('keep' is the file as it is)
  *   filed and flagged          the file as it is — the flag means "leave it"
+ *   a film, in /movies         the file as it is — FileFlows never goes there
  *   anything else              720, what FileFlows turns a filed scene into
  *
  * The tile has to be drawn from one synchronous read, and a filed scene's
@@ -111,6 +113,7 @@ export function targetOf(sceneId, height, path) {
   const pending = cache?.scenes?.[sceneId]?.choice;
   if (pending) return pending === 'keep' ? height : pending;
   if (path && String(path).includes(FILED) && flags.dirs.has(dirname(path))) return height;
+  if (path && String(path).includes(FILMS)) return height;
   return DEFAULT_TARGET;
 }
 

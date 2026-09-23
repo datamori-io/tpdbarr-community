@@ -39,8 +39,8 @@ export function tile(scene) {
    *   Needs organizing   filed, but not ticked organised in Stash
    *   Filed              filed and organised
    *
-   * Films sit in /movies, outside this pipeline, so they carry the resolution
-   * and its colour but no status word.
+   * Films sit in /movies, outside this pipeline: they are always at target, so
+   * never red, and carry the resolution but no status word.
    */
   const filed = scene.stage === 'library' || scene.stage === 'film';
   const tone = !scene.height || !scene.target ? ''
