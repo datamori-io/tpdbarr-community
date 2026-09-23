@@ -404,3 +404,97 @@ a.metric:hover { border-color: var(--accent-hi); }
 .candbody .meta { font-size: 11.5px; color: var(--muted); }
 .candbody .act { justify-content: center; }
 
+
+/* ------------------------------------------------------------ the feed
+ *
+ * The one thing on the Overview drawn big and in colour: the Feed, sold with
+ * itself. A screen of live marker clips on the left, the pitch on the right,
+ * stacked on a phone with the screen first — that is where it gets used.
+ */
+.feedhero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  margin: 4px 0 38px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--accent-wash), transparent 60%),
+    var(--panel);
+}
+
+.fhscreen {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #000;
+  cursor: pointer;
+}
+.fhvideo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fhscreen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent 45%);
+  pointer-events: none;
+}
+
+.fhcaption {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.fhtag {
+  padding: 2px 9px;
+  margin-bottom: 3px;
+  border: 1px solid var(--accent-hi);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--accent-hi);
+}
+.fhscene { font-weight: 700; font-size: 14px; }
+.fhwho { font-size: 12px; color: var(--text-2); }
+
+.fhkicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-hi);
+}
+.fhtitle { margin: 6px 0 10px; font-size: 34px; line-height: 1.05; }
+.fhlede { margin: 0 0 16px; color: var(--text-2); line-height: 1.55; }
+.fhlede b { color: var(--text); }
+
+.fhchips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+.fhchips:empty { display: none; }
+.fhchip {
+  padding: 4px 11px;
+  border: 1px solid var(--line-hi);
+  border-radius: 999px;
+  background: var(--panel-2);
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.fhchip:hover { border-color: var(--accent-hi); color: var(--accent-hi); }
+
+.fhstart { font-size: 15px; padding: 10px 20px; }
+.fhstart span { display: inline-block; transition: transform 0.15s; }
+.fhstart:hover span { transform: translateX(3px); }
+
+@media (max-width: 760px) {
+  .feedhero { grid-template-columns: 1fr; gap: 16px; padding: 12px; }
+  .fhtitle { font-size: 28px; }
+  .fhstart { width: 100%; }
+}

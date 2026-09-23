@@ -44,6 +44,7 @@ export async function showOverview() {
     ];
 
     shell('#/library',
+      feedHero(),
       newsBand(),
       ordered.map(sceneSection)
     );
@@ -51,6 +52,96 @@ export async function showOverview() {
     if (!holds(mine)) return;
     failedIn('#/library', err);
   }
+}
+
+/* ------------------------------------------------------------- the feed
+ *
+ * The highlight, above even the news: the Feed is the new way into the
+ * library — the moments rather than the films, one after another, a thumb to
+ * move on — and a link in the top bar was not selling it.
+ *
+ * The preview is the real thing, muted: marker clips from the same endpoint
+ * the reel reads, each played for a few seconds and then swapped for the next.
+ * Ours first, Stash's if ours is not cut yet, and a clip that plays neither is
+ * skipped rather than left as a black box.
+ *
+ * Its timer outlives the render, so every tick checks the video is still on
+ * the page and stops for good when it is not. Leaving the Overview is the
+ * teardown; nothing has to remember to call one.
+ */
+const TEASE_MS = 6000;
+
+function feedHero() {
+  const video = el('video', { className: 'fhvideo', muted: true, playsInline: true, loop: true, autoplay: true });
+  video.muted = true;
+  const caption = el('div', { className: 'fhcaption' });
+  const count = el('span', {}, 'Your markers');
+  const chips = el('div', { className: 'fhchips' });
+
+  const go = (query = '') => { location.hash = '#/binge?feed=library' + query; };
+  const start = el('button', { className: 'primary fhstart', type: 'button' }, 'Start the feed ', el('span', {}, '→'));
+  start.onclick = () => go();
+
+  const screen = el('div', { className: 'fhscreen', title: 'Open the Feed' }, video, caption);
+  screen.onclick = () => go();
+
+  const hero = el('section', { className: 'feedhero' },
+    screen,
+    el('div', { className: 'fhtext' },
+      el('div', { className: 'fhkicker' }, 'A new way in'),
+      el('h2', { className: 'fhtitle' }, 'The Feed'),
+      el('p', { className: 'fhlede' },
+        count, ' from your library, one after another. Swipe up for the next, sideways to change feed. ',
+        el('b', {}, 'Made for one hand.')),
+      chips,
+      start)
+  );
+
+  const seed = String(Math.floor(Math.random() * 1e9));
+  Promise.all([
+    api(`/api/library/reel?feed=library&seed=${seed}&page=1`),
+    api('/api/library/reel/tags').catch(() => ({ tags: [] })),
+  ]).then(([reel, { tags }]) => {
+    const items = (reel.items || []).filter((i) => i.kind === 'marker');
+    if (reel.count) count.textContent = `${reel.count.toLocaleString()} moments`;
+    if (!items.length) { screen.remove(); return; }
+
+    // The tags this page of the shuffle is actually made of, most common first.
+    const ids = new Map(tags.map((t) => [t.name, t.id]));
+    const tally = new Map();
+    for (const i of items) if (ids.has(i.tag)) tally.set(i.tag, (tally.get(i.tag) || 0) + 1);
+    [...tally].sort((a, b) => b[1] - a[1]).slice(0, 6).forEach(([name]) => {
+      const chip = el('button', { className: 'fhchip', type: 'button' }, name);
+      chip.onclick = () => go('&tag=' + ids.get(name));
+      chips.append(chip);
+    });
+
+    let at = -1;
+    let timer = null;
+    const next = () => {
+      clearTimeout(timer);
+      if (!video.isConnected) return;
+      at = (at + 1) % items.length;
+      const item = items[at];
+      const fallback = `/media/scene/${item.sceneId}/marker/${item.id}/stream`;
+      video.onerror = () => {
+        if (video.getAttribute('src') !== fallback) video.src = fallback;
+        else next();
+      };
+      video.poster = `/media/scene/${item.sceneId}/marker/${item.id}/screenshot`;
+      video.src = `/media/marker/${item.id}/clip`;
+      video.play().catch(() => {});
+      caption.replaceChildren(
+        item.tag ? el('span', { className: 'fhtag' }, item.tag) : null,
+        el('span', { className: 'fhscene' }, item.scene?.title || ''),
+        el('span', { className: 'fhwho' }, (item.scene?.performers || []).map((p) => p.name).join(', '))
+      );
+      timer = setTimeout(next, TEASE_MS);
+    };
+    next();
+  }).catch(() => screen.remove());
+
+  return hero;
 }
 
 /* ------------------------------------------------------------------ news

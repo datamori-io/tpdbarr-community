@@ -44,7 +44,7 @@ Pictures are blurred on purpose — this is an adult library.
 
 ### Library
 
-**Overview — news, continue watching**
+**Overview — the Feed up top, then news and continue watching**
 
 ![Library — Overview — news, continue watching](../docs/screenshots/library-overview.jpg)
 
