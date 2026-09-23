@@ -56,11 +56,163 @@ Open it from **Feed** next to the name in the top bar, or go to `#/binge`.
 
 <br clear="right" />
 
-## Screenshots
+## What's in it
+
+Five tabs across the top: **Library**, **Stats**, **Find**, **Catalogue** and
+**Manage**. Pictures in the screenshots are blurred on purpose. It's an adult
+library.
+
+### Library — browsing what you have
+
+![Library overview](docs/screenshots/library-overview.jpg)
+
+- **Overview** opens with the Feed, then industry news from five publishers
+  merged into one stream, then Continue watching, New scenes, Recently released,
+  and new from your performers and studios.
+- **Every shelf uses one filter bar**: Scenes, Performers, Studios and Galleries
+  share the same search, dropdowns, sort, Clear and Random. The dropdown counts
+  update as you narrow.
+- **Hover a tile to preview it.** The scene's preview loop plays, and running
+  the mouse along the bottom scrubs the whole runtime off Stash's sprite sheet
+  without loading the video.
+- **The scene page is two columns.** On the left are the player and everything
+  you *do*: filed, rating, markers, description. On the right is everything you
+  *read*: links out, galleries, tags, file spec.
+  - Drag anywhere across the picture to scrub.
+  - A wide switch folds the right column away and dims the rest of the page.
+  - Picture-in-picture and fullscreen work on iPad too.
+- **Scale a file down** from the scene page: Keep, 1080p, 720p or 480p.
+  - It re-encodes and replaces the file, and only deletes the original once the
+    new one is checked: right height, same runtime, smaller.
+  - It can drop a `.fileflows-ignore` flag so FileFlows leaves your choice
+    alone.
+- **Performer and studio pages** show a facts grid beside the portrait or logo.
+  - Stash wins every field it has. Blanks are filled from IAFD for performers
+    and the ThePornDB mirror for studios, each marked with a small chip.
+  - One button writes only the gaps back to Stash.
+  - You can swap the photo or logo for your own.
+- **Categories** are shelves you arrange yourself. Each has a cover, a blurb,
+  scenes you hand-pick, and a rule that keeps adding new scenes as they arrive.
+  A **filmography** category tracks a director's work across whole studio
+  networks, owned or missing, with a *Send to Whisparr* on each missing tile.
+- **Movies** covers full-length features on your share, read from Emby's .nfo
+  files. A gap-filler finds the films Emby never matched and writes their .nfo
+  and poster, never overwriting.
+- **Galleries** are Stash galleries.
+  - Build one from pictures found on the web: find, choose, write.
+  - Crop the cover, tie the gallery to its scene, performer and studio, and
+    rate it.
+  - A *No pictures yet* row lists the people you have films of but no photos of.
+
+### Stats — how the collection is doing
+
+![Stats](docs/screenshots/stats.jpg)
+
+- **The pipeline** as one bar, left to right in the order files move:
+  downloaded, editing, encoding, filed, films.
+- **Small charts that each answer one question**: how much you added this
+  month, how much is 1080p or better, how much you've actually watched, how much
+  is identified and against which box, and which years you cover.
+- **Tidying Whisparr up** behind the pipeline. Once a scene is filed in Stash,
+  Whisparr holding it is leftover. Stats finds those and unmonitors them. In
+  Whisparr v3 it can also delete them after a fortnight.
+
+### Find — what you're missing
+
+![Find overview](docs/screenshots/find-overview.jpg)
+
+- **Overview**: what you collect, as one percentage across every catalogue you
+  track, followed by suggestions drawn from your own favourites on StashDB.
+- **Video**: search StashDB for scenes and send them to Whisparr v3. It also
+  covers ThePornDB for Whisparr v2.
+  - An **Indexers** band hand-searches Prowlarr for scenes neither catalogue
+    knows. Usenet grabs go to NZBGet and are dropped into your import folder
+    automatically.
+  - A **Monitored** tab lists everything either Whisparr still wants with no
+    file.
+- **Tracked**: follow a studio, performer or tag and see how much of it you
+  hold.
+  - Deciding is a queue, not pages. Each card gets **Want**, **Skip** or
+    **Have**, and the next batch loads itself.
+  - Rules skip the obvious no's, and your own library puts the likely yeses
+    first.
+- **Images**: pick a performer (the name is taken from StashDB) and get gallery
+  pages to look through.
+- **Integrations**: every service the portal talks to, whether it answered, and
+  the dated backups of the portal's own state.
+
+### Catalogue — fixing the records
+
+![Match](docs/screenshots/catalogue-match.jpg)
+
+- **Overview**: the piles of work. That's scenes with no stash id, no cover, not
+  organised or no markers, broken down by folder.
+- **Match** works through the piles.
+  - One find asks **every** stash-box and scene scraper at once, through the
+    same call Stash's own Identify makes. Each source keeps its own band and
+    nothing is merged.
+  - Tick several at once to file a StashDB id and a ThePornDB id together.
+  - Fingerprint-exact hits arrive pre-ticked. The picture pass also ticks
+    candidates whose artwork matches the scene's frames.
+  - An inline index sheet lays the scene's own frames above every candidate at
+    one size, with a similarity score. You can cut more frames if the first
+    ones show nothing useful.
+  - Scenes with no cover get a frame cut for them so you can recognise them,
+    and it's never written back to Stash.
+- **Wild Card** is for scenes no fingerprint knows, like DVD rips.
+  - Hand it URLs and keywords, and Stash's own installed scrapers read each one.
+  - Every answer comes back as a *contribution*. You build the record field by
+    field, choosing which source wins each field.
+- **Group Builder** finds films your loose scenes already add up to, using
+  ThePornDB's scene lists, DVD pages and IAFD breakdowns. It shows the evidence
+  for each and builds the group only when you say yes.
+- **Marker Builder** is a bench for cutting markers by hand, shaped like
+  LosslessCut.
+  - **The playhead stays still and the strip moves under it.** The strip is
+    Stash's sprite sheet laid along time: one image request, dragged as fast as
+    you like, and the video only seeks where you let go.
+  - **Drill down instead of scrubbing.** *Frames* (`g`) lays the whole scene out
+    a frame every 30 seconds. Click one and that stretch opens at ten times the
+    detail: 30s, then 3s, then 1s. Three clicks take you from the whole scene to
+    the exact second.
+  - **Sharpen strip adds detail to the sprite.** Stash cuts about 81 sprite
+    tiles per scene whatever its length, which is one every 17 seconds on a
+    23-minute scene. Sharpen cuts the scene its own sheet at one picture a
+    second, straight from the source file, so the strip is a real ruler and the
+    drill-down goes all the way to one second.
+  - **Keys are the interface**: `t` point, `i`/`o` in and out, arrows to step
+    (`shift` ×10, `alt` a tenth), `+`/`−` zoom. Tagging is a palette with your
+    most-used tags first.
+  - **Phone-friendly too**: every key has a button, pinch zooms the strip, and
+    the tag prompt becomes a bottom sheet.
+  - A **fetch panel** pulls markers from timestamp.trade and ThePornDB for you
+    to check before anything lands.
+  - New markers get their own **720p clip** for the Feed, cut from the source.
+
+### Manage — settings and long jobs
+
+![Manage › Stash](docs/screenshots/manage-stash.jpg)
+
+- **Connections** for Stash, both Whisparrs, Prowlarr, NZBGet and FileFlows.
+  StashDB and ThePornDB tokens are borrowed from Stash, never stored twice.
+- **Stash jobs**, each with its plan shown before anything runs:
+  - scan for new files
+  - walk the organised folder
+  - generate the missing fingerprints, previews and sprites
+  - rename and reorganise to `Studio/date.Title`
+  - write `.nfo` files and thumbnails beside each video for Emby and Kodi
+- **Catch up** fills blanks on scenes that already have a stash id: facts from
+  StashDB, then ThePornDB; markers from timestamp.trade, then ThePornDB. It
+  reads by id, never guesses by title, and never overwrites.
+- **Feed**, **Galleries**, **Catalog** and **Sending** hold each section's own
+  settings.
+
+<details>
+<summary><b>Every screenshot</b></summary>
 
 Pictures are blurred on purpose — this is an adult library.
 
-### Library
+#### Library
 
 **Overview — the Feed up top, then news and continue watching**
 
@@ -90,13 +242,13 @@ Pictures are blurred on purpose — this is an adult library.
 
 ![Library — Categories](docs/screenshots/library-categories.jpg)
 
-### Stats
+#### Stats
 
 **The pipeline and the library in numbers**
 
 ![Stats — The pipeline and the library in numbers](docs/screenshots/stats.jpg)
 
-### Find
+#### Find
 
 **What you are collecting**
 
@@ -118,7 +270,7 @@ Pictures are blurred on purpose — this is an adult library.
 
 ![Find — Integrations and backups](docs/screenshots/find-integrations.jpg)
 
-### Catalogue
+#### Catalogue
 
 **The piles**
 
@@ -140,7 +292,7 @@ Pictures are blurred on purpose — this is an adult library.
 
 ![Catalogue — Marker Builder](docs/screenshots/catalogue-markers.jpg)
 
-### Manage
+#### Manage
 
 **Connections**
 
@@ -153,6 +305,8 @@ Pictures are blurred on purpose — this is an adult library.
 
 The rest of this file documents the userscript; the portal has its
 [own README](portal/README.md).
+
+</details>
 
 ## Why this exists
 
