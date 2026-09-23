@@ -7,6 +7,22 @@ other half of the stack: TPDB instead of StashDB, Whisparr v2 instead of v3.
 
 No browser extension, no userscript, no TPDB account.
 
+## An overlay on Stash, not a replacement
+
+Stash stays your library. The portal sits on top of it and adds a different
+way to browse, find and tidy what is already there.
+
+- **It reads Stash live**, over Stash's own GraphQL API. There is no second
+  copy of your library and nothing to sync.
+- **What it changes goes back into Stash**: markers, galleries, metadata,
+  covers. Open Stash afterwards and it's all there.
+- **It plays files from the folders Stash already uses**, at the same paths.
+  Nothing gets moved into a library of its own.
+- **Its own state is small**: settings, the want and ignore lists, and the
+  catalogues you track, in one `config.json`.
+- **Stash keeps doing its job.** Scanning, identifying, scrapers and plugins all
+  stay in Stash. Stop the portal and Stash carries on exactly as before.
+
 ## Run it
 
 ```bash
