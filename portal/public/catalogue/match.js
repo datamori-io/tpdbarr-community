@@ -626,13 +626,13 @@ function matchPanel(params, mode, sources, picked, sites = [], onSources = null,
    */
   const said = (box && mode === 'unmatched'
     ? (nowSide === 'has'
-      ? `Every scene that already carries a ${box.label} id, whatever else it has. Not a pile of work — a way of seeing what is covered.`
-      : `Every scene with no ${box.label} id, including ones already matched somewhere else. Wider than the pile it replaces, and the “0” ids are not in it — a “0” is filed against no box at all.`)
+      ? `Every scene with a ${box.label} id.`
+      : `Every scene with no ${box.label} id, including ones matched elsewhere.`)
     : mode === 'unmatched'
-      ? 'Scenes with no usable stash-box id — including the ones a scraper filed a “0” against, unless you have already marked them organised.'
+      ? 'Scenes with no usable stash-box id, including “0” ids not yet organised.'
       : mode === 'nocover'
-        ? `Scenes with no cover, which means scenes you cannot see anywhere else in here. A match brings the picture with it.${box ? ` Narrowed to the ones that ${nowSide === 'has' ? 'have' : 'have no'} ${box.label} id.` : ''}`
-        : `Scenes Stash has not been told are finished. Tick the ones that belong together, tag them and call them done.${box ? ` Narrowed to the ones that ${nowSide === 'has' ? 'have' : 'have no'} ${box.label} id.` : ''}`)
+        ? `Scenes with no cover. A match brings the picture with it.${box ? ` Narrowed to the ones that ${nowSide === 'has' ? 'have' : 'have no'} ${box.label} id.` : ''}`
+        : `Scenes not marked organised. Tick, tag and mark them done.${box ? ` Narrowed to the ones that ${nowSide === 'has' ? 'have' : 'have no'} ${box.label} id.` : ''}`)
     + linkSaid;
 
   return el('section', { className: 'searchpanel' },
@@ -1188,7 +1188,7 @@ function fileAllBar(rows, box = null) {
   const asideNo = el('button', { className: 'chip', type: 'button', hidden: true }, 'Cancel');
 
   asideGo.title = where
-    ? `Set aside every row here that found nothing: you have looked and ${where} does not have them. They leave this pile and stay in the others.`
+    ? `Set aside every row that found nothing on ${where}. They stay in the other piles.`
     : 'Set aside every row here that found nothing. They leave every pile until you ask for them back.';
 
   const bar = el('div', { className: 'searchpanel fileallbar' },
@@ -1425,7 +1425,7 @@ function asideBit(scene, row, box = null, asideTag = '') {
     where ? `Not on ${where}` : 'Not on any box');
 
   put.title = where
-    ? `Set aside for ${where} only: you have looked and it does not have this. It leaves this pile and stays in the others.`
+    ? `Set aside for ${where} only. It stays in the other piles.`
     : 'Set aside: you have looked, and no stash-box has this. It leaves every pile until you ask for it back.';
 
   /*

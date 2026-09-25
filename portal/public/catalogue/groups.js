@@ -184,7 +184,7 @@ function groupPanel(shelf, found, params) {
     if (studio.note) say.push(el('span', { className: 'small' }, studio.note));
   } else {
     say.push(el('span', { className: 'muted small' },
-      'A scan reads the studio’s catalogue on ThePornDB, then IAFD’s scene breakdowns for the films TPDB cannot answer for. IAFD is asked one page at a time, so a big studio takes a while.'));
+      'Reads the studio on ThePornDB, then IAFD for the rest. A big studio takes a while.'));
   }
 
   /*
@@ -389,7 +389,7 @@ function proposalCard(proposal, refresh) {
         ? el('div', { className: 'muted small' },
             `${proposal.total - heldCount} not here. ` +
             (proposal.iafd?.unplaced
-              ? `Which ones is not clear — ${proposal.iafd.unplaced} of the scenes you hold could not be placed against IAFD’s breakdown.`
+              ? `${proposal.iafd.unplaced} of your scenes could not be placed against IAFD’s breakdown.`
               : 'IAFD does not say which.'))
         : null,
       proposal.returning
@@ -485,7 +485,7 @@ function renderAfterBuild(after, proposal, result) {
 
   if (result.coverFailed) {
     kids.push(el('div', { className: 'muted small' },
-      'Built without its cover — Stash could not fetch the poster. The Movies page can scrape one from the address on the group.'));
+      'Built without a cover — Stash could not fetch the poster. Scrape one from the Movies page.'));
   }
 
   if (!result.missing.length) {

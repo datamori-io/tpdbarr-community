@@ -218,7 +218,7 @@ export async function showAcquire(qs) {
     if (mine !== acquireRun) return;
     if (!results.available) {
       body.replaceChildren(el('div', { className: 'empty' },
-        'StashDB is not available — Stash has no StashDB stash-box with an API key, and that is where the token is borrowed from.'));
+        'StashDB is not available — add a StashDB stash-box with an API key in Stash.'));
       return;
     }
     renderResults(body, params, results);

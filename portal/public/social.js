@@ -82,12 +82,12 @@ function card(post) {
 
 function status(data) {
   if (data.running) {
-    return `Walking Reddit — ${data.walked} of ${data.total} followed. It goes slowly on purpose; the posts below fill in as it goes.`;
+    return `Walking Reddit — ${data.walked} of ${data.total} followed. Posts fill in as it goes.`;
   }
 
   if (data.blockedUntil) {
     const mins = Math.max(1, Math.round((data.blockedUntil - Date.now()) / 60000));
-    return `Reddit is rate limiting us. Backing off for about ${mins}m, then it carries on from ${data.walked} of ${data.total}.`;
+    return `Reddit is rate limiting. Resuming in about ${mins}m from ${data.walked} of ${data.total}.`;
   }
 
   if (!data.at) return `Nothing pulled yet — ${data.total} performers in the library have a Reddit address.`;
@@ -193,8 +193,8 @@ function render(session, data) {
     ? el('div', { className: 'redditgrid' }, data.posts.map(card))
     : el('div', { className: 'empty' },
         data.total
-          ? 'Nothing pulled yet. Pull from Reddit above — it fills in over the next few hours, and you can leave it to it.'
-          : 'No performer in the library has a Reddit address on them. Add one to a performer in Stash and it will be followed.');
+          ? 'Nothing pulled yet. Pull from Reddit above — it fills in over a few hours.'
+          : 'No performer has a Reddit address. Add one in Stash to follow it.');
 
   // replaceChildren does not drop a null the way el() does — it renders the
   // word. Nothing hand-followed means no strip at all.

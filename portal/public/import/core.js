@@ -130,7 +130,7 @@ export function renderSetup() {
     el('ol', {},
       el('li', {}, 'Stash URL. This is the library — everything you watch comes from here.'),
       el('li', {}, 'Whisparr v2 URL and API key, plus a quality profile and root folder. This is where TPDB scenes get added.'),
-      el('li', {}, 'Whisparr v3 — optional, and the same again. This is where StashDB scenes get added. Give it its own root folder.')
+      el('li', {}, 'Whisparr v3 — optional. StashDB scenes go here. Give it its own root folder.')
     ),
     open
   ));

@@ -332,7 +332,7 @@ function renderMovie(movie) {
    * the warning waits to be earned rather than being guessed up front.
    */
   const cannotPlay = el('p', { className: 'note', hidden: true },
-    'Your browser could not decode this file. It still streams — open it in a real player, or point something with ffmpeg at it.');
+    'Your browser could not decode this file. Open it in another player.');
   video.addEventListener('error', () => { cannotPlay.hidden = false; });
 
   const facts = [

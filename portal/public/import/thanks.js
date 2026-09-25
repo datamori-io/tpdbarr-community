@@ -35,7 +35,7 @@ const THANKS = [
     note: 'what exists, according to people who write it down for nothing',
     items: [
       { name: 'StashDB', url: 'https://stashdb.org',
-        role: 'The scene catalogue the search runs on. Its ids are the only ones that survive the whole trip — found here, added in Whisparr, still recognisable once the file is in Stash.' },
+        role: 'The scene catalogue the search runs on. Its ids follow a scene all the way into Stash.' },
       { name: 'ThePornDB', url: 'https://theporndb.net',
         role: 'Movies, artwork, fingerprints, and the wild card for anything StashDB has never heard of.' },
       { name: 'TMDB', url: 'https://www.themoviedb.org',
@@ -55,11 +55,11 @@ const THANKS = [
       { name: 'Whisparr v2', url: 'https://github.com/Whisparr/Whisparr',
         role: 'A Sonarr fork with sites as series. The only way in for a ThePornDB scene.' },
       { name: 'Whisparr v3 (Eros)', url: 'https://github.com/Whisparr/Whisparr',
-        role: 'A Radarr fork where a scene is a movie. The only way in for a StashDB scene, and how most of this library arrived.' },
+        role: 'A Radarr fork where a scene is a movie. How StashDB scenes arrive.' },
       { name: 'NZBGet', url: 'https://nzbget.com',
         role: 'The downloader underneath both of them.' },
       { name: 'FileFlows', url: 'https://fileflows.com',
-        role: 'Encodes what Whisparr grabs and moves it where Stash will find it. The step in the middle that everything waits on.' },
+        role: 'Encodes what Whisparr grabs and moves it where Stash will find it.' },
     ],
   },
   {
@@ -84,7 +84,7 @@ const THANKS = [
     note: 'a short list on purpose',
     items: [
       { name: 'Node.js', url: 'https://nodejs.org',
-        role: 'The whole app is the standard library. No framework, no bundler, no dependencies — which is why there is no lockfile in the repository.' },
+        role: 'The whole app is the standard library. No framework, no dependencies.' },
       { name: 'Docker', url: 'https://www.docker.com',
         role: 'Everything above, side by side, on one machine.' },
     ],

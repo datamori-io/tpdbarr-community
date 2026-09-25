@@ -341,7 +341,7 @@ export function indexerBand(initial, { heading = true, auto = false, forRow = nu
     heading && el('div', { className: 'feedhead' },
       el('h2', {}, 'Indexers'),
       el('span', { className: 'muted' },
-        'Prowlarr, by hand — usenet grabs go to NZBGet here, torrents to Prowlarr’s client; never to Whisparr, so the scene is built afterwards')
+        'Prowlarr, by hand — usenet to NZBGet, torrents to Prowlarr’s client, never to Whisparr')
     ),
     el('div', { className: 'toolbar' }, input, run,
       el('label', { className: 'check muted' }, any, ' any category')),

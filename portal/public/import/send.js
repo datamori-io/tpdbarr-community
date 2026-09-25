@@ -54,7 +54,7 @@ async function sendToV2(scene, trigger, label, redraw) {
   if (!scene.siteId) {
     trigger.disabled = false;
     trigger.textContent = label;
-    alert('StashDB has never heard of this scene, and ThePornDB has not said which site it belongs to — so there is nowhere to send it.');
+    alert('Neither StashDB nor ThePornDB can place this scene, so there is nowhere to send it.');
     return;
   }
 

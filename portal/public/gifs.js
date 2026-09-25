@@ -188,7 +188,7 @@ function render(session, data) {
     : el('div', { className: 'empty' },
         data.seeded
           ? 'Nothing pulled yet. Pull from RedGIFs above — it takes about a minute.'
-          : 'Nothing pulled yet. The first pull also works out which of your performers are RedGIFs creators, so it takes a few minutes.');
+          : 'Nothing pulled yet. The first pull takes a few minutes.');
 
   view.replaceChildren(...[bar, creators, tags, body].filter(Boolean));
 

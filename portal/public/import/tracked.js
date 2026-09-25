@@ -223,7 +223,7 @@ async function renderTracked(body, mine) {
     anyTracked
       ? null
       : el('div', { className: 'empty small' },
-        'Nothing tracked yet. Search for a performer, a studio or a tag above, then Track this — only what you track gets a percentage.'),
+        'Nothing tracked yet. Search for a performer, studio or tag above, then Track this.'),
     ...panels.values(),
   ].filter(Boolean));
 
@@ -441,7 +441,7 @@ function trackedCard(row) {
       ? coverageBar(row)
       : el('div', { className: 'trackloose muted small' },
         `${(row.undecided || 0).toLocaleString()} still to decide`,
-        el('span', { className: 'trackwhy', title: `StashDB has ${(row.total || 0).toLocaleString()} scenes here — too many to measure a percentage against, so this counts what is left to answer instead.` }, ' ?')
+        el('span', { className: 'trackwhy', title: `${(row.total || 0).toLocaleString()} scenes on StashDB — too many for a percentage, so this counts what is left to answer.` }, ' ?')
       );
 
   /*
@@ -539,7 +539,7 @@ function wantedBody(list, reload, { loose = true, onToggle = null } = {}) {
 
   const hidden = Math.max(0, (list.all || 0) - list.count);
 
-  const only = el('label', { className: 'check wantonly', title: 'Scenes whose studio and cast are not among the catalogues above. Tracked tags are not matched — a want record has never stored a scene’s tags.' },
+  const only = el('label', { className: 'check wantonly', title: 'Scenes whose studio and cast are not tracked above. Tags are not matched.' },
     tick,
     ' Only the ones nothing above covers',
     hidden ? el('span', { className: 'muted small' }, ` · ${hidden.toLocaleString()} hidden`) : null
