@@ -1,12 +1,6 @@
 /*
- * The library spine.
- *
- * Every other module in this portal is keyed on a TPDB UUID. This one is keyed
- * on the Stash scene id, because most of the library has no TPDB identity and
- * never will — over half of it was identified against StashDB, and a chunk of
- * it against nothing at all. Stash is the library of record, so browsing,
- * playing and filing all read from here. TPDB and StashDB are identities that
- * hang off a scene, not the spine.
+ * The library spine, keyed on the Stash scene id. Stash is the library of
+ * record; TPDB and StashDB ids hang off a scene.
  */
 
 import { gql } from './stash.mjs';
@@ -61,31 +55,10 @@ function resolution(height) {
   return height + 'p';
 }
 
+/* Headset (VR) footage, which the browser loads but can't play. */
 /*
- * A file shot for a headset rather than a screen.
- *
- * Equirectangular VR is 2:1 and very wide — the one that sent the reel black
- * was 4096x2048 h264, which the browser fetched happily and then never got a
- * frame out of. The width test is what keeps this off ordinary cinematic
- * scenes: /organized_scenes has a shelf of 1920x816 films at 2.35:1 that are
- * perfectly playable and must not be caught by an aspect rule alone.
- *
- * Two scenes in the library are VR today. The rule is written on the shape
- * rather than on their studio names so the next one is caught too.
- */
-/*
- * Named first, measured second.
- *
- * Shape alone is too fine a judgement to hang this on. Measured across the
- * filed library: twenty-odd ordinary 4K scenes are 4096x2160, which is 1.896,
- * and the equirectangular VR one is 4096x2048, which is 2.000. A rule cutting
- * between those two sits on a knife edge — one re-encode either way and it
- * starts throwing out scenes that play perfectly well.
- *
- * So the studio's name carries it, and the shape is only a backstop for
- * headset footage filed under a studio that does not say so. Every VR studio
- * in this library wears it in the name: ChinChinVR, VRHush, WankzVR,
- * VRCosplayX, POVR Premium.
+ * Mostly by studio name (every VR studio here says VR). Shape is only a
+ * backstop: 4K at 4096x2160 (1.9) is too close to VR's 4096x2048 (2.0).
  */
 const IMMERSIVE_WIDTH = 3000;
 const IMMERSIVE_MIN = 1.98;
@@ -98,11 +71,7 @@ export function immersive(file, studio) {
   const height = file?.height || 0;
   if (!width || !height) return false;
 
-  /*
-   * A band, not a floor. Equirectangular is 2:1; a 2.35 scope film is not
-   * headset footage and there is a 3840x1632 one here that a bare floor
-   * caught on the way past.
-   */
+  /* A band, not a floor: 2.35:1 scope films must not be caught. */
   const aspect = width / height;
   return width >= IMMERSIVE_WIDTH && aspect >= IMMERSIVE_MIN && aspect <= IMMERSIVE_MAX;
 }
@@ -118,14 +87,7 @@ export function card(scene) {
     // Worth showing: an untitled scene is one Stash never identified.
     untitled: !scene.title,
     date: scene.date || null,
-    /*
-     * What it is about, cut here rather than in the browser.
-     *
-     * The shelf read is the whole library in one go — a couple of megabytes
-     * already — and a Stash description runs to several paragraphs. The tile
-     * shows two clamped lines and nothing else here shows more, so carrying the
-     * rest across the wire would be a third of a megabyte nobody reads.
-     */
+    /* Trimmed here: the shelf read is the whole library, and tiles show two lines. */
     details: String(scene.details || '').replace(/\s+/g, ' ').trim().slice(0, 200),
     studio: scene.studio ? { id: scene.studio.id, name: scene.studio.name } : null,
     performers: (scene.performers || []).map((p) => ({ id: p.id, name: p.name, favorite: !!p.favorite })),
@@ -144,12 +106,7 @@ export function card(scene) {
     // Shot for a headset. The reel leaves these alone; the rest of the app
     // still lists them, because a page you choose to open is not a reel.
     immersive: immersive(file, scene.studio?.name),
-    /*
-   * When Stash first saw it, which is not the same question as `date`. `date`
-   * is when the scene was released and is the shelf's default order; this is
-   * when it landed here, and it is the only way to ask "what is new to me"
-   * about a back catalogue you have just imported.
-   */
+    /* When Stash first saw it, not the release date. For "what's new to me". */
     addedAt: scene.created_at || null,
     rating: scene.rating100 ?? null,
     oCount: scene.o_counter || 0,
@@ -175,15 +132,9 @@ export async function findScenes(config, { filter = {}, sort = 'date', direction
 }
 
 /*
- * Which of your own scenes Stash itself already credits to a director —
- * Stash's own `director` field on a scene, separate from StashDB's, filled in
- * by hand or by whichever scraper populates it (a GameLink scrape does).
- *
- * This is the one thing a filmography category can ask that StashDB cannot
- * answer about itself: StashDB has no way to find "everything this person
- * directed", but the scenes you have already identified as his are a seed —
- * their StashDB studio, and that studio's network, is where the rest of his
- * work most likely also lives. See categories.mjs's crawlDirector.
+ * Your scenes Stash credits to a director (its own `director` field).
+ * Seeds a filmography crawl, since StashDB can't search by director.
+ * See crawlDirector in categories.mjs.
  */
 export async function scenesDirectedBy(config, name) {
   const data = await gql(
@@ -199,18 +150,8 @@ export async function scenesDirectedBy(config, name) {
 }
 
 /*
- * The tracked studios and performers, as Stash ids.
- *
- * A tracked entry is a StashDB uuid — that is what the acquisition side
- * measures coverage against — and the library is keyed on Stash's own ids, so
- * the two have to be joined before anything can be filtered by one. The join
- * is the `stash_ids` Stash keeps against the StashDB endpoint.
- *
- * Falling back to the name is deliberate. A performer identified against
- * ThePornDB and never against StashDB carries no StashDB id at all, and there
- * are a lot of those here; without the fallback they would silently drop out
- * of a rail whose whole point is "the people I follow". A name collision costs
- * one wrong scene in a rail. Missing the id costs the person entirely.
+ * Tracked StashDB ids -> Stash ids, via `stash_ids`. Falls back to the name,
+ * because many performers were only identified against TPDB.
  */
 async function trackedStashIds(config, kind) {
   const entries = (kind === 'performer' ? config.tracked?.performers : config.tracked?.studios) || [];
@@ -240,12 +181,7 @@ async function trackedStashIds(config, kind) {
 export async function rails(config, { force = false } = {}) {
   if (!force && railCache && Date.now() - railCache.at < RAIL_TTL) return railCache.rails;
 
-  /*
-   * Only what you track, and only what has actually landed. These two answer
-   * "what have the people and the labels I follow put out that I now own" —
-   * which is a different question from the acquisition side's suggestions,
-   * where the whole point is the scenes you do *not* have.
-   */
+  /* Only what you track, and only what you hold. */
   const [trackedPerformers, trackedStudios] = await Promise.all([
     trackedStashIds(config, 'performer').catch(() => []),
     trackedStashIds(config, 'studio').catch(() => []),
@@ -274,11 +210,7 @@ export async function rails(config, { force = false } = {}) {
       // Scenes dated in the future are announcements, not files you can play.
       query: { filter: { date: { value: today(), modifier: 'LESS_THAN' } }, sort: 'date' },
     },
-    /*
-     * INCLUDES and not INCLUDES_ALL: a scene qualifies if it has any one of
-     * the tracked people on it. INCLUDES_ALL would ask for a scene starring
-     * every performer you follow, which is nothing.
-     */
+    /* INCLUDES, not INCLUDES_ALL: any one tracked performer qualifies. */
     trackedPerformers.length ? {
       key: 'tracked-performers',
       title: 'New from your performers',
@@ -314,39 +246,24 @@ export async function rails(config, { force = false } = {}) {
 
   const kept = built.filter((r) => r.scenes.length);
 
-  /*
-   * Every rail failing at once means Stash was not up, which happens on the
-   * first request after a restart. Caching that for five minutes turns a blip
-   * into an empty library, so a total miss is simply not kept.
-   */
+  /* Don't cache a total miss: it means Stash wasn't up yet. */
   if (kept.length) railCache = { rails: kept, at: Date.now() };
   return kept;
 }
 
-/* ------------------------------------------------------------ the stages
+/*
+ * ------------------------------------------------------------ the stages
  *
- * The folder a file sits in is a **status, not ownership**. Everything Stash
- * holds is available; the path only says how far along the pipeline it is:
+ * The folder is a status, not ownership. Everything in Stash is yours:
  *
- *   Whisparr /data/scenes  grabbed, not encoded — Stash cannot see it at all
- *   /pc-import             yours, being edited by hand before it moves on
- *   /Import Folder         yours, waiting on the encoder
- *   /organized_scenes      yours, filed
- *   /movies                yours, a feature film that came in through Emby
+ *   Whisparr /data/scenes  grabbed, not encoded — Stash can't see it
+ *   /pc-import             being edited by hand
+ *   /Import Folder         waiting on the encoder
+ *   /organized_scenes      filed
+ *   /movies                feature films, via Emby
  *
- * This replaces a scope that treated the first two as *not yours* and hid
- * 1080 scenes from every count in the app. A correction, 2026-09-01:
- * "Everything in Stash should be considered as available. These are more
- * statuses." So `inLibrary` is now empty and the browse is the whole of Stash.
- *
- * Measured 2026-09-01: 2106 scenes — 984 organized, 808 Import Folder,
- * 272 pc-import, 52 movies. Those add to 2116 because ten scenes have files
- * under two roots at once, which is why `stageOf` takes the furthest-along
- * path rather than the first one.
- *
- * The one stage Stash cannot report is the first: 236 files sat in Whisparr
- * v3's own root on the day this was written, with no Stash record of any kind.
- * That is counted on the Whisparr side, in tidy.mjs, not here.
+ * A scene with files under two roots counts at the furthest along.
+ * The first stage is counted on the Whisparr side, in tidy.mjs.
  */
 
 export const STAGES = [
@@ -366,17 +283,10 @@ export function stageOf(paths) {
 }
 
 /*
- * What counts as "in my library": all of it.
+ * "In my library" is everything. Kept as a constant for a future scope.
  *
- * Kept as a named constant that is spread into every browse rather than
- * deleted, because the scoping question comes back — a "filed only" toggle is
- * the obvious next ask — and this is the one place it would go.
- *
- * **If a scope ever returns here, nest it under one `AND`.** Stash reads a
- * top-level `OR` as OR-ing against *everything* beside it, so a flat
- * `{studios: X, path: A, OR: {path: B}}` means "(that studio AND A) OR
- * anything at all under B", which put all 52 films on every studio page in the
- * house the first time it was written flat.
+ * If a scope returns, nest it under one `AND`: Stash ORs a top-level `OR`
+ * against everything beside it.
  */
 const inLibrary = {};
 
@@ -388,22 +298,11 @@ const stillMoving = {
 };
 
 /*
- * The scenes whose *furthest-along* file is in this stage.
+ * Scenes whose furthest-along file is in this stage.
  *
- * This cannot be done as a path filter, and the attempt is worth recording.
- * Stash evaluates `path` per file and a scene can have several, so on a scene
- * with a copy in /pc-import and another in /organized_scenes, `EXCLUDES
- * /organized_scenes/` is still satisfied — by the other file. Ten scenes here
- * are in exactly that state, and a filter written that way had the bar saying
- * 226 editing and the page it opened showing 236.
- *
- * So the folder does the narrowing and `stageOf` does the deciding, which is
- * the same function the bar counts with. One source of truth, and the number
- * you click is the number you get.
- *
- * That means reading the whole stage rather than a page of it. The largest is
- * under a thousand scenes and the shelf already reads all 2105 in one go for
- * the filter bar, so this is the cheaper of the two reads on the page.
+ * Not a path filter: Stash matches `path` per file, so a scene with a second
+ * copy elsewhere slips through. The folder narrows, `stageOf` decides —
+ * the same function the bar counts with.
  */
 async function stageScenes(config, key) {
   const stage = STAGES.find((s) => s.key === key);
@@ -427,28 +326,14 @@ async function stageScenes(config, key) {
 }
 
 /*
- * One pass over the library, tallied three ways.
- *
- * Stash's own scene_count on a performer, a studio or a group counts every
- * file it has ever seen, including the ones still queued for import — which is
- * the exact number this half of the app is not supposed to show — or was,
- * until the folders became statuses on 2026-09-01. It still does not match
- * Stash's own totals, because Stash counts a performer once per record and
- * this counts them once per scene you hold, so the maps below are also what
- * every "N in your library" line reads from.
- *
- * The same pass tallies the pipeline stage, since it already has every path.
+ * One pass over the library, tallied several ways. Stash's own scene_count
+ * includes every file it has seen; these count scenes you hold. Also
+ * tallies the pipeline stages.
  */
 const INDEX_TTL = 5 * 60 * 1000;
 let indexCache = null;
 
-/*
- * The last N months, including the empty ones.
- *
- * A bar chart built only from the months that have data draws a flat wall and
- * hides the two months nothing arrived — which, on a chart about how fast the
- * library is growing, is the most informative bar on it.
- */
+/* The last N months, empty ones included. */
 function lastMonths(counts, n) {
   const out = [];
   const cursor = new Date();
@@ -460,12 +345,7 @@ function lastMonths(counts, n) {
     cursor.setUTCMonth(cursor.getUTCMonth() - 1);
   }
 
-  /*
-   * Trim the months before the library existed. This one is seven months old,
-   * so a fixed twelve draws five empty bars in front of it — which reads as
-   * five months of collecting nothing rather than as a Stash that had not been
-   * set up yet. Gaps *inside* the run are kept: those are real quiet months.
-   */
+  /* Trim months before the library existed; keep quiet months inside it. */
   const first = out.findIndex((m) => m.n > 0);
   return first > 0 ? out.slice(first) : out;
 }
@@ -499,14 +379,7 @@ export async function libraryIndex(config, { force = false } = {}) {
   const stages = Object.fromEntries(STAGES.map((stage) => [stage.key, 0]));
   let unplaced = 0;
 
-  /*
-   * The rest of this loop is the Overview's charts.
-   *
-   * All of it is tallied here rather than in four more queries because the one
-   * pass already has every scene in its hands. Reading 2106 scenes costs about
-   * two megabytes and five seconds of Stash's time; doing it five times over to
-   * draw five small charts would be the expensive way to be pretty.
-   */
+  /* The Overview's charts, tallied in the same pass. */
   const quality = { uhd: 0, hd: 0, sd: 0, unknown: 0 };
   const watched = { played: 0, untouched: 0 };
   const identity = { stashdb: 0, tpdb: 0, none: 0 };
@@ -560,21 +433,10 @@ export async function libraryIndex(config, { force = false } = {}) {
   return index;
 }
 
-/*
- * Stash answers every image request, even when it has no image: what comes back
- * is a Font Awesome placeholder with a viewBox and no intrinsic size, which an
- * <img> renders as a shrug. It flags those with default=true on the path, so
- * that is read here and the tile draws its own empty state instead.
- */
+/* Stash returns a placeholder for a missing image and marks it default=true. */
 const hasArt = (path) => Boolean(path) && !/[?&]default=true/i.test(path);
 
-/*
- * Everything Stash knows about but you hold nothing of — the other half of
- * each page. These are not failures: a performer arrives with a scene's cast
- * list and a group arrives with an identify run, so Stash accumulates records
- * for things you have never had. That is a want list you did not have to
- * write.
- */
+/* What Stash has records for but you hold nothing of. */
 
 export async function performersView(config) {
   const [index, data, endpoint] = await Promise.all([
@@ -627,11 +489,7 @@ export async function studiosView(config) {
 
 const byHeld = (a, b) => b.held - a.held || Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name);
 
-/*
- * Yours, but still moving: being edited by hand or waiting on the encoder.
- * Newest first, because the question this answers is "what have I got that has
- * not settled yet" — not "what am I missing", which it used to be read as.
- */
+/* In the pipeline: being edited or waiting on the encoder. Newest first. */
 export async function inFlight(config, { limit = 24, page = 1 } = {}) {
   return findScenes(config, {
     filter: stillMoving,
@@ -656,11 +514,7 @@ export async function stageList(config, key, { limit = 60, page = 1 } = {}) {
   };
 }
 
-/*
- * The overview. The rails you actually open the app for, what is still moving
- * through the pipeline, and one line of arithmetic per page so the tabs are
- * not a guess.
- */
+/* The overview: rails, what's in the pipeline, and counts per page. */
 export async function overview(config) {
   const [rail, moving, counts] = await Promise.all([
     rails(config).catch(() => []),
@@ -671,12 +525,7 @@ export async function overview(config) {
   return { rails: rail, inFlight: moving, counts };
 }
 
-/*
- * How many scenes sit at each stage of the pipeline. The library overview shows
- * these as folders; Integrations shows them as a queue. Same index, same
- * numbers — a second count computed a second way is two numbers waiting to
- * disagree in front of you.
- */
+/* Scenes per stage. Library and Integrations share this index. */
 export async function stageCounts(config, { force = false } = {}) {
   const index = await libraryIndex(config, { force });
   return { ...index.stages, unplaced: index.unplaced, total: index.total };
@@ -693,10 +542,7 @@ async function libraryCounts(config) {
     }`),
   ]);
 
-  // held = has at least one scene you actually hold; known = what Stash has a
-  // record for at all, which is the bigger and less useful number. Since
-  // 2026-09-01 "hold" means anywhere in Stash, so held has grown by the 1080
-  // scenes the old folder scope was hiding.
+  // held = has a scene you hold; known = any record in Stash.
   return {
     scenes: index.total,
     stages: index.stages,
@@ -721,20 +567,8 @@ const LISTS = {
 
 
 /*
- * The whole shelf in one read, for the Scenes page's filters.
- *
- * A filter bar whose dropdowns are built from the first sixty scenes would
- * offer you the wrong studios and lie about the counts, so this reads every
- * scene in the library at once and the browser does the filtering. That is
- * affordable exactly once — 1767 scenes is a couple of megabytes — so it is
- * cached here for the same five minutes as the rails.
- *
- * Tags come as bare names: the page filters on them and shows them, and
- * nothing on this side of the app links to a tag.
- *
- * `stash_ids` rides along too, for the one caller that needs to know which
- * StashDB uuid a shelf scene answers to — a filmography category, joining an
- * external want-list against what you actually hold. See categories.mjs.
+ * The whole shelf in one read; the browser filters it. Cached five minutes.
+ * Tags as bare names. `stash_ids` is for filmography categories.
  */
 const SHELF = CARD + '\n  tags { name }\n  stash_ids { endpoint stash_id }';
 
@@ -751,9 +585,7 @@ export async function shelf(config, { force = false } = {}) {
     { f: { ...inLibrary }, p: { per_page: -1, sort: 'date', direction: 'DESC' } }
   );
 
-  // The resolution flags, swept before the cards are drawn so a kept 4K file
-  // is not painted red for the life of this cache. A slow share is not worth
-  // holding the shelf for: after four seconds it draws with what it has.
+  // Sweep the resolution flags first, but don't wait more than four seconds.
   const paths = query.findScenes.scenes.flatMap((s) => (s.files || []).map((f) => f.path));
   await Promise.race([warmTargets(paths), new Promise((r) => setTimeout(r, 4000))]).catch(() => {});
 
@@ -789,32 +621,12 @@ export async function list(config, key, { page = 1, limit = 60 } = {}) {
 }
 
 /*
- * The reel.
- *
- * Two sources for one feed. Markers are the better unit and the default: they
- * are already short, already tagged, and Stash has generated a clip for each
- * one, so a reel of them is a reel rather than a half-hour scene reduced to a
- * thirty-second trailer. Scenes are the fallback for a library with few
- * markers, and play the scene preview instead.
- *
- * Both shuffle, and the shuffle has to survive paging: Stash reads a seed off
- * the sort value, so `random_4821` gives the same order on page 4 as it did on
- * page 1. A bare `random` reshuffles per query, which would show the same clip
- * twice and skip others as you scrolled.
+ * The reel. Markers by default (short, tagged, clipped); scenes play their
+ * preview. The shuffle uses a seeded sort (`random_4821`) so paging holds
+ * together; bare `random` reshuffles per query.
  */
 
-/*
- * What the reel is allowed to draw on.
- *
- * The two roots that are the library proper — /organized_scenes and /movies —
- * and not the encoder's queue or the editing folder, which hold work in
- * progress rather than things to watch. Measured 2026-09-02: 1400 of 1429
- * markers and 1037 of 2107 scenes.
- *
- * One regex rather than two criteria joined by OR, because Stash reads a
- * top-level OR as OR-ing against everything beside it — see the note on
- * inLibrary above, which is the scar from learning that.
- */
+/* Only /organized_scenes and /movies. One regex, not OR (see inLibrary). */
 const FILED = { path: { value: '(/organized_scenes/|/movies/)', modifier: 'MATCHES_REGEX' } };
 
 const MARKER = `
@@ -848,12 +660,7 @@ export async function markerReel(config, { seed = '1', page = 1, limit = 12, tag
        findSceneMarkers(scene_marker_filter: $f, filter: $p) { count scene_markers { ${MARKER} } }
      }`,
     {
-      /*
-       * One tag criterion carries both halves: `value` is what to keep,
-       * `excludes` is what to drop. They cannot be two criteria — a marker
-       * filter has no AND to join them with — but they do not need to be,
-       * because the criterion has an excludes field of its own.
-       */
+      /* One tag criterion: `value` keeps, `excludes` drops. Marker filters have no AND. */
       f: {
         ...(tag || exclude.length
           ? { tags: { value: tag ? [tag] : [], excludes: exclude, modifier: 'INCLUDES' } }
@@ -864,11 +671,7 @@ export async function markerReel(config, { seed = '1', page = 1, limit = 12, tag
     }
   );
 
-  /*
-   * Headset footage is dropped here rather than filtered in the query: Stash
-   * has no criterion for the shape of a file, and at two scenes in the library
-   * the count being a couple out is not worth a second round trip to correct.
-   */
+  /* Headset footage dropped here: Stash has no criterion for file shape. */
   const items = data.findSceneMarkers.scene_markers.map(markerCard).filter((item) => !item.scene.immersive);
 
   return {
@@ -901,11 +704,7 @@ export async function sceneReel(config, { seed = '1', page = 1, limit = 12 } = {
   };
 }
 
-/*
- * What the reel can be narrowed to. Only primary tags, and only ones with
- * enough behind them to be worth a whole reel — a tag on two markers is a
- * dead end you have to scroll back out of.
- */
+/* Primary tags with enough markers to fill a reel. */
 export async function reelTags(config, { min = 8 } = {}) {
   const data = await gql(
     config,
@@ -918,22 +717,8 @@ export async function reelTags(config, { min = 8 } = {}) {
   return { tags: (data.findSceneMarkerTags?.tags || []).map((t) => ({ id: t.id, name: t.name })) };
 }
 
-/*
- * One performer: their vitals, and their scenes.
- *
- * The vitals are read here rather than left to the card query because this is
- * the only screen that wants them — a shelf of two hundred faces has no room
- * for a hair colour, and asking for one on every rail would pay for it two
- * hundred times over.
- *
- * Everything is nullable. Stash fills a performer in from whatever scraper
- * found them, so a page that assumed a birthdate would be a page with holes in
- * it; the header drops what is missing instead of printing blanks.
- */
-/*
- * Everything the performer page reads. custom_fields is in here because the
- * IAFD fill treats one that is already set as an answer, the same as a column.
- */
+/* One performer: vitals and scenes. Every field is nullable. */
+/* custom_fields is read because the IAFD fill counts a set one as an answer. */
 const PERFORMER = `
   id name disambiguation gender birthdate death_date country ethnicity
   eye_color hair_color height_cm weight measurements fake_tits
@@ -975,9 +760,7 @@ const shapePerformer = (found) => ({
   favorite: !!found.favorite,
   rating: found.rating100 ?? null,
   knownScenes: found.scene_count || 0,
-  // Whether there is a photograph to lose, which is what decides whether
-  // replacing it is asked about twice. hasArt() because Stash answers with a
-  // generated placeholder rather than nothing.
+  // Whether there's a real photo, so replacing it asks twice.
   art: hasArt(found.image_path),
   stash_ids: found.stash_ids || [],
 });
@@ -996,10 +779,7 @@ export async function performerView(config, id, { page = 1, limit = 60 } = {}) {
   return { performer, page, perPage: limit, count, scenes };
 }
 
-/*
- * Age, counted to the death date when there is one — otherwise a performer who
- * died in 2009 goes on having birthdays.
- */
+/* Age stops at the death date. */
 function ageOf(birthdate, deathDate) {
   if (!birthdate) return null;
   const born = new Date(birthdate);
@@ -1013,17 +793,8 @@ function ageOf(birthdate, deathDate) {
 }
 
 /*
- * The same performer, read off IAFD.
- *
- * Its own request rather than part of performerView, because it leaves the
- * house: the page should draw from Stash straight away and let this arrive
- * late or not at all. A performer with no iafd.com address in their Stash
- * record has nothing to ask for, and that is the common case — this only
- * knows where to look because a scraper put the link there.
- *
- * `fill` is what the button offers: the gaps in Stash that this record could
- * close, worked out here rather than in the browser so that the list the page
- * shows and the list the write uses are the same list.
+ * The performer's IAFD record, if Stash has an iafd.com URL for them.
+ * Separate request so the page doesn't wait. `fill` lists Stash's gaps it could close.
  */
 export async function performerIafd(config, id) {
   const found = await findOne(config, id);
@@ -1033,15 +804,7 @@ export async function performerIafd(config, id) {
   return { url, iafd, fill: iafdProposal(found, iafd).rows };
 }
 
-/*
- * Those gaps, written.
- *
- * The proposal is rebuilt here from a fresh read rather than taken from the
- * browser: the page may have been sitting open since before something else
- * filled half of this in, and a button that writes what it was told to write
- * would undo that. Nothing is overwritten either way — see proposal() — so
- * the worst a stale click can do is nothing at all.
- */
+/* Write those gaps, rebuilt from a fresh read. Never overwrites. */
 export async function fillPerformerFromIafd(config, id) {
   const found = await findOne(config, id);
   const url = iafdUrlOf(found.urls || []);
@@ -1069,25 +832,12 @@ export async function fillPerformerFromIafd(config, id) {
   return { performer: shapePerformer(await findOne(config, id)), written: rows };
 }
 
-/* ------------------------------------------------------------- their picture
+/*
+ * ------------------------------------------------------------- their picture
  *
- * Replacing a performer's photograph or a studio's logo with one you uploaded.
- *
- * Into Stash, not into a folder here. Everywhere else the portal draws these
- * it draws Stash's copy, and a picture kept on this side would be a second
- * answer to a question the library of record already answers - visible in the
- * portal, missing in Stash, and wrong in whichever one you were not looking
- * at. See media.mjs, which proxies both straight through.
- *
- * **Stash keeps no copy of the one it replaces**, so this is the one write in
- * the app that cannot be undone from the app. Every other one is gaps-only by
- * design - see fillPerformerFromIafd - and this deliberately is not, because
- * replacing a picture you do not like is the entire point. The page asks twice
- * where there is already a picture to lose, which is the only guard that
- * honestly applies.
- *
- * A data URI because that is how Stash takes an image; there is no endpoint to
- * post bytes at. See artwork.mjs for what that costs.
+ * Replace a performer's photo or a studio's logo, in Stash. Stash keeps no
+ * copy of the old one, so this can't be undone; the page asks twice when
+ * there's one to lose. Sent as a data URI.
  */
 export async function setPerformerImage(config, id, image) {
   await gql(
@@ -1109,11 +859,10 @@ export async function setStudioImage(config, id, image) {
   return { id };
 }
 
-/* ------------------------------------------------------------------ studios
+/*
+ * ------------------------------------------------------------------ studios
  *
- * The same two calls the performer page has, against a different source.
- * ThePornDB's mirror rather than IAFD, for the reason in studiofacts.mjs, and
- * with the same rule: gaps only, so nothing here can argue with Stash.
+ * Studio facts from the TPDB mirror (see studiofacts.mjs). Gaps only.
  */
 
 const findStudioRecord = async (config, id) => {
@@ -1134,12 +883,8 @@ export async function studioFacts(config, id) {
 }
 
 /*
- * Those gaps, written. The proposal is rebuilt from a fresh read at the moment
- * of the click rather than taken from the open page — see the performer one.
- *
- * `urls` is replaced wholesale by studioUpdate, so the homepage is appended to
- * what is already there. Losing six database links to gain a front door would
- * be a poor trade. Same reasoning as setGroupUrl below.
+ * Write those gaps, from a fresh read. studioUpdate replaces `urls` whole,
+ * so the homepage is appended.
  */
 export async function fillStudioFromSite(config, id) {
   const found = await findStudioRecord(config, id);
@@ -1175,12 +920,8 @@ export async function fillStudioFromSite(config, id) {
 }
 
 /*
- * Attach an address to a group, so Stash can scrape it.
- *
- * Additive: `urls` is replaced wholesale by groupUpdate, so whatever the group
- * already pointed at is read first and kept. A timestamp.trade link is still
- * the only thing that can size some of these films — losing it to gain a
- * scrapeable one would trade a real number for a cover picture.
+ * Add a URL to a group so Stash can scrape it. groupUpdate replaces `urls`
+ * whole, so existing ones are kept.
  */
 export async function setGroupUrl(config, id, url) {
   const current = await gql(config, 'query($id: ID!) { findGroup(id: $id) { id urls } }', { id });
@@ -1198,14 +939,7 @@ export async function setGroupUrl(config, id, url) {
   return data.groupUpdate;
 }
 
-/*
- * What Stash's own scrapers can read off an address, without writing anything.
- *
- * Handed straight to the page so the covers and the synopsis can be looked at
- * before they land on the group — a scraper matching the wrong cut of a film
- * is a thing you want to catch by eye, and the images come back as data URLs
- * that an <img> renders as-is.
- */
+/* What Stash's scrapers read off a URL, unwritten, so the page can check it. */
 export async function scrapeGroup(config, url) {
   const data = await gql(
     config,
@@ -1223,14 +957,7 @@ export async function scrapeGroup(config, url) {
   return data.scrapeGroupURL;
 }
 
-/*
- * Apply it. `fields` is what the page ticked, so a scrape that got the covers
- * right and the title wrong can be taken in part — the dialog decides, not
- * this.
- *
- * Duration comes back as "1:26:00" or "138:00" depending on the scraper, and
- * Stash wants seconds.
- */
+/* Apply the ticked fields. Duration arrives as "1:26:00" or "138:00"; Stash wants seconds. */
 const DURATION = (value) => {
   if (!value) return null;
   const parts = String(value).split(':').map(Number);
@@ -1248,12 +975,7 @@ export async function applyScrape(config, id, fields) {
     if (fields[key]) input[key] = fields[key];
   }
 
-  /*
-   * These scrapers hand back whatever the page printed, and the older catalogue
-   * entries print a bare year — "1999" for Panty World 8. Stash wants
-   * YYYY-MM-DD and there is no honest way to invent the other two thirds of it,
-   * so a partial date is refused by name rather than posted and guessed at.
-   */
+  /* A bare year can't be a date; refuse it by name. */
   if (fields.date) {
     if (!/^\d{4}(-\d{2}-\d{2})?$/.test(fields.date)) {
       throw new Error(`"${fields.date}" is not a date Stash will take.`);
@@ -1276,16 +998,8 @@ export async function applyScrape(config, id, fields) {
 }
 
 /*
- * The order Stash itself keeps for a group, when it keeps one.
- *
- * `scene_index` is a field on the join rather than on the scene, so it cannot
- * come back with the cards — and in this library it is almost always null,
- * which is why the movie page has a naming rule to fall back on. It is asked
- * for anyway because when it *is* set it is the one answer nobody guessed.
- *
- * -> Map of scene id to index. An older Stash with no such field on the join
- * makes the whole query fail, and that is a missing ordering hint rather than
- * a missing group, so the caller swallows it.
+ * Stash's own scene order for a group, usually null. Lives on the join, so
+ * it needs its own query. An older Stash fails this query; the caller swallows it.
  */
 async function sceneIndexes(config, id) {
   const data = await gql(
@@ -1348,16 +1062,8 @@ export async function groupView(config, id, { page = 1, limit = 60 } = {}) {
 }
 
 /*
- * One studio, and the cast you hold it through.
- *
- * `performer` narrows the scenes without narrowing the header: "what did she
- * film for them" is a question about the shelf, and the shelf is still the
- * whole studio while you ask it. So the count beside the name comes from the
- * library index rather than from the filtered query.
- *
- * `cast` is skipped when only the scenes are wanted — paging and the cast
- * filter both come back here, and neither is a reason to read every scene in
- * the studio again.
+ * One studio and its cast. `performer` narrows the scenes, not the header
+ * count. `cast` is skipped when only scenes are wanted.
  */
 export async function studioView(config, id, { page = 1, limit = 60, performer = null, cast = true } = {}) {
   const data = await gql(
@@ -1410,15 +1116,7 @@ export async function studioView(config, id, { page = 1, limit = 60, performer =
   };
 }
 
-/*
- * Who is in this studio, counted in the library rather than in Stash.
- *
- * Read off the scenes themselves for the same reason libraryIndex is: a
- * performer's own scene_count includes files still sitting in the import
- * folder, and "12 here" has to mean twelve you can play. Their stash ids come
- * along raw — which of them is StashDB's is not a question this module knows
- * how to answer.
- */
+/* The studio's cast, counted from scenes you hold. */
 async function studioCast(config, id) {
   const data = await gql(
     config,
@@ -1454,14 +1152,7 @@ async function studioCast(config, id) {
   return [...seen.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
-/*
- * Type-ahead for the things a gallery can be tied to.
- *
- * Deliberately not the section views: those read every performer and every
- * studio in Stash to work out what you hold, which is the right answer for a
- * page and far too much for a search box. This asks Stash to do the matching
- * and takes twenty.
- */
+/* Type-ahead for gallery ties. Stash matches; twenty results. */
 const LOOKUPS = {
   performer: {
     query: `query($p: FindFilterType) {
@@ -1520,11 +1211,10 @@ export async function search(config, q, { limit = 60 } = {}) {
   return { q, count, scenes };
 }
 
-/* ------------------------------------------------------------ scene detail
+/*
+ * ------------------------------------------------------------ scene detail
  *
- * The landing page. Alongside the scene it carries which stash-box identified
- * it, because that is the hook the acquisition side hangs on: TPDB means
- * Whisparr v2, StashDB means v3, neither means there is nothing to search for.
+ * Carries which stash-box identified it: TPDB means v2, StashDB v3.
  */
 
 const STASHDB = /stashdb\.org/i;
@@ -1548,11 +1238,7 @@ export async function sceneView(config, id) {
   const file = scene.files?.[0] || null;
   const performerIds = (scene.performers || []).map((p) => p.id);
 
-  /*
-   * More like this: same studio, and the same cast. Deliberately two small
-   * rails rather than one merged list — the reason you would pick one is the
-   * reason it is there.
-   */
+  /* More like this: same studio, and same cast, as two rails. */
   const [fromStudio, withCast] = await Promise.all([
     scene.studio
       ? findScenes(config, {
@@ -1621,11 +1307,10 @@ export async function sceneView(config, id) {
   };
 }
 
-/* ----------------------------------------------------------------- writes
+/*
+ * ----------------------------------------------------------------- writes
  *
- * The light-touch half of a catalogue manager: the things you decide while
- * watching. Metadata surgery and identify runs stay in Stash, where the undo
- * lives — the same call as leaving retry and delete in Whisparr.
+ * What you decide while watching. Metadata surgery stays in Stash.
  */
 
 export async function saveActivity(config, id, { resume = null, played = null }) {

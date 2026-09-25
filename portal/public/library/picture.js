@@ -1,19 +1,9 @@
-/* ------------------------------------------------------------ their picture
+/*
+ * ------------------------------------------------------------ their picture
  *
- * Replacing a performer's photograph or a studio's logo with your own.
- *
- * The same control on both pages, for the same reason the facts grid is the
- * same on both: two layouts for one job read as two features.
- *
- * **It writes into Stash, and Stash keeps no copy of the one it replaces.**
- * That is the one thing here worth a sentence on screen. Everything else this
- * app writes to the library is gaps-only and the worst a mistaken press can do
- * is nothing; this one is a replacement by design, because replacing a picture
- * you do not like is the whole point of it.
- *
- * So it asks twice where there is a picture to lose, and once where there is
- * not — a studio with no logo has nothing to be careful about, and making you
- * confirm an empty frame would teach you to confirm without reading.
+ * Replace a performer's photo or studio's logo. Writes into Stash, which
+ * keeps no copy of the old one, so it asks twice when there's a picture to
+ * lose, once when there isn't.
  */
 
 import { el } from '../util.js';
@@ -32,9 +22,7 @@ export function pictureBox({ kind, id, has, name, onDone }) {
   const no = el('button', { className: 'act', type: 'button', hidden: true }, 'Cancel');
   const said = el('span', { className: 'muted small' }, '');
 
-  // Which of the two the confirmation is for. Both end at the same pair of
-  // buttons, and a press that ran the wrong one would be the worst bug this
-  // could have.
+  // Which action the confirmation is for.
   let pending = null;
 
   const reset = () => {

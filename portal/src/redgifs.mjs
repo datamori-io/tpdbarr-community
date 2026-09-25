@@ -1,29 +1,10 @@
 /*
- * RedGIFs.
+ * RedGIFs: creators and tags, pulled directly. All video, no account (the
+ * API hands out a temporary token), and more generous limits than Reddit —
+ * but a 429 is still a real answer and is told apart from "nothing there".
  *
- * This started as a way to read the RedGIFs links inside Reddit posts, and
- * then the numbers made the case for going straight to the source instead.
- * Summer Hart's Reddit feed carries 25 posts, a handful of them video; her
- * RedGIFs feed carries 485, all of it video. Of fourteen Reddit handles taken
- * off the library, eight were also RedGIFs creators.
- *
- * So this pulls creators and tags directly, and it is the better source in
- * every way that matters here:
- *
- *   - It is all video, which is what a reel wants.
- *   - There is no account and no credential. The API hands a temporary token
- *     to anyone who asks, and that token reaches creator feeds, tag search,
- *     trending and niches. An account would only add your own likes and
- *     follows, which is not worth a stored password.
- *   - It rate limits far more generously than Reddit. Fourteen calls at 400ms
- *     apart drew no complaint; a few hundred in a burst does earn a 429. So a
- *     pass takes minutes rather than Reddit's afternoon, but 429 is a real
- *     answer here and everything below is careful to tell it apart from
- *     "there is nothing there" — they look identical if you only count rows.
- *
- * Creators are seeded from the Reddit handles already on the library's
- * performers, each one verified before it is adopted. Tags are assigned by
- * hand: a tag is a search, and what it pulls is whatever is newest under it.
+ * Creators are seeded from Reddit handles on the library's performers,
+ * each verified first. Tags are added by hand.
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -39,21 +20,10 @@ const UA = 'tpdbarr/0.1';
 // Twenty is what the API returns per page whatever you ask for.
 const PER_PAGE = 20;
 
-/*
- * Pages per source per pass, twenty to a page. Twelve is two hundred and forty
- * of the newest from each — deep enough that a pass finds something new rather
- * than re-fetching the same shallow slice. At two, every creator sat at exactly
- * forty and a second pass added nothing at all, because it kept asking for the
- * same forty.
- */
+/* Pages per source per pass (twenty each), deep enough that passes find new clips. */
 const PAGES = 12;
 
-/*
- * What being turned away costs. ask() already retries twice within seconds,
- * which covers a blip; this is for the budget being properly spent, and it
- * waits on the source rather than skipping it — a skipped source is a source
- * that silently contributes nothing to a pass that then calls itself done.
- */
+/* On a rate limit, wait on the source rather than skip it. */
 const LIMIT_WAIT = 45000;
 const LIMIT_TRIES = 3;
 
@@ -70,11 +40,7 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 // ------------------------------------------------------------------- token
 
-/*
- * Temporary, anonymous, and good for about a day. Kept until something answers
- * 401 and then asked for again — which is the whole of the authentication
- * story here, and the reason there is no credential in this file.
- */
+/* Anonymous token, good for about a day. Refreshed on 401. */
 let token = null;
 
 export async function auth(force = false) {
@@ -91,14 +57,7 @@ export async function auth(force = false) {
   return token;
 }
 
-/*
- * Being turned away, as a value rather than an empty list.
- *
- * A rate-limited search and a search for something that does not exist both
- * come back with no rows. Treating them the same is how a valid tag gets
- * rejected as a typo, and how a pass quietly decides every creator has gone
- * away. So a refusal says so.
- */
+/* A rate limit as a value, so it isn't mistaken for "no results". */
 export const LIMITED = Symbol('redgifs rate limited');
 
 const RETRIES = 2;
@@ -128,10 +87,7 @@ async function ask(path, { auths = true, tries = RETRIES } = {}) {
   return res.json();
 }
 
-/*
- * One gif by id. reddit.mjs uses this to turn a RedGIFs link inside a post
- * into something playable, so the token lives here and there is only one of it.
- */
+/* One gif by id; reddit.mjs uses it for RedGIFs links in posts. */
 export async function gif(id) {
   const body = await ask('/gifs/' + id);
   if (body === LIMITED) return null;
@@ -182,11 +138,7 @@ export const forget = () => { state = null; };
 
 // --------------------------------------------------------------- allowlist
 
-/*
- * The same rule as everywhere else here: only a URL this module has already
- * put in front of you can be fetched through the proxy, so it is not an open
- * proxy onto the internet.
- */
+/* Only URLs this module offered can go through the proxy. */
 const MAX_KNOWN = 20000;
 const offered = new Set();
 
@@ -234,11 +186,7 @@ async function page(path) {
   return Array.isArray(body?.gifs) ? body.gifs : [];
 }
 
-/*
- * A page, and a wait if RedGIFs would rather we did not have it. Returns null
- * only once the waiting has been given up on, so a caller can tell "there is
- * no more" from "we were not allowed".
- */
+/* A page, waiting out rate limits. Null only once waiting is given up. */
 async function pageOrWait(path) {
   for (let attempt = 0; attempt <= LIMIT_TRIES; attempt += 1) {
     const gifs = await page(path);
@@ -262,16 +210,8 @@ async function pullCreator(name) {
 }
 
 /*
- * A tag is pulled by `tags=`, not by `search_text=`.
- *
- * They look interchangeable and are not: search_text is a text search over
- * whatever RedGIFs indexes, and searching it for "redhead" returned nineteen
- * clips of which none carried the Redhead tag — Amateur, Big Tits, Teen. The
- * `tags=` parameter returned twenty of twenty carrying it. So this pulls a
- * tag, not a phrase that resembles one.
- *
- * `latest` rather than `trending`, which returns almost nothing — the ordering
- * exists but the results behind it do not.
+ * Pull a tag with `tags=`, not `search_text=` (which returns loosely
+ * related clips). `latest`, since `trending` returns almost nothing.
  */
 async function pullTag(tag) {
   const out = [];
@@ -285,11 +225,7 @@ async function pullTag(tag) {
   return { gifs: out, limited: false };
 }
 
-/*
- * What RedGIFs would call the thing you typed. Their suggest endpoint answers
- * "redhead" with Redhead, Pale, Freckles — so it both proves a tag is real and
- * gives it the capitalisation the tag index actually uses.
- */
+/* RedGIFs' suggest endpoint confirms a tag and its capitalisation. */
 async function suggest(text) {
   const body = await ask(`/search/suggest?query=${encodeURIComponent(text)}`);
   if (body === LIMITED) return LIMITED;
@@ -308,15 +244,7 @@ export async function exists(name) {
   return total ? { name: String(name).toLowerCase(), gifs: total } : null;
 }
 
-/*
- * Seeding the creator list off the library.
- *
- * No performer in Stash carries a RedGIFs address, but sixty-seven carry a
- * Reddit one — and the same person usually uses the same name in both places.
- * So every Reddit handle is tried once, and the ones that turn out to be
- * creators are adopted. Tried once and remembered: a handle that is not a
- * creator today will not be one next week either.
- */
+/* Seed creators from the library's Reddit handles, each tried once. */
 export async function seed(handles = []) {
   const store = await load();
 
@@ -333,9 +261,7 @@ export async function seed(handles = []) {
     try {
       hit = await exists(name);
     } catch (err) {
-      // Rate limited part-way through. Stop rather than writing off every
-      // remaining handle as "not a creator" — seeded stays false, so the next
-      // pass picks the list up again.
+      // Rate limited: stop, stay unseeded, try again next pass.
       if (err.status === 503) return found;
       hit = null;
     }
@@ -348,12 +274,7 @@ export async function seed(handles = []) {
     await sleep(PACE);
   }
 
-  /*
-   * Only claim to be seeded if it actually found somebody. Finding nobody
-   * across sixty-seven handles is not a library with no RedGIFs creators in
-   * it — it is RedGIFs refusing to answer, which it does after a busy day. So
-   * that case stays unseeded and the next pass tries again.
-   */
+  /* Only mark seeded if someone was found; zero usually means refused. */
   if (handles.length && found) store.seeded = true;
   await save();
   return found;
@@ -369,12 +290,8 @@ async function pass(handles) {
   const store = await load();
 
   /*
-   * Seed when there is nothing to seed *from*, not merely when it has never
-   * been done. The `seeded` flag on its own was enough to lose every creator:
-   * a pass kicked off with no handles — which is what following a creator or
-   * adding a tag used to do — set the flag with an empty list, and after that
-   * nothing would ever fill it again. The pool fell from 1278 clips to 489,
-   * all of them tag-sourced, and the creator list read as empty.
+   * Re-seed when there are handles but no creators; a pass with no handles
+   * once set the flag on an empty list.
    */
   if (handles.length && !store.creators.length) store.seeded = false;
   if (!store.seeded) await seed(handles);
@@ -383,15 +300,7 @@ async function pass(handles) {
   let read = 0;
   let limited = 0;
 
-  /*
-   * Folded in and written after every source, not once at the end.
-   *
-   * A pass over twelve pages of twenty-two sources runs for a quarter of an
-   * hour, and anything that stops the process in that time — a rebuild, most
-   * often — used to throw away every clip it had gathered, because the only
-   * save was the last line. Three passes were lost that way before this was
-   * written. Now an interrupted pass keeps whatever it reached.
-   */
+  /* Saved after every source, so an interrupted pass keeps its clips. */
   const fold = async (gifs) => {
     if (!gifs.length) return;
 
@@ -423,11 +332,7 @@ async function pass(handles) {
   for (const creator of store.creators) await take(creator.name, () => pullCreator(creator.name));
   for (const tag of store.tags) await take(tag, () => pullTag(tag));
 
-  /*
-   * What the pass actually managed, so the page can say so. A pass that was
-   * turned away at every door used to record itself as a completed pass and
-   * leave you looking at "last pass just now" with nothing new in the pool.
-   */
+  /* What the pass managed, so the page can say so. */
   store.last = { at: Date.now(), read, limited, added: store.gifs.length - before };
   store.at = Date.now();
   await save();
@@ -480,11 +385,7 @@ export async function addTag(tag) {
   const store = await load();
   if (store.tags.some((t) => t.toLowerCase() === wanted.toLowerCase())) return { tag: wanted, already: true };
 
-  /*
-   * Asked of RedGIFs rather than guessed at, so a typo is caught here instead
-   * of sitting in the list pulling nothing every pass — and so the tag is
-   * stored the way their index spells it.
-   */
+  /* Check the tag with RedGIFs, catching typos and fixing spelling. */
   const hints = await suggest(wanted);
   if (hints === LIMITED) throw Object.assign(new Error('RedGIFs is rate limiting. Try again shortly.'), { status: 503 });
   if (!hints.length) throw Object.assign(new Error(`RedGIFs has no tag called "${wanted}".`), { status: 404 });
@@ -536,29 +437,15 @@ export async function view({ limit = 120 } = {}) {
   };
 }
 
-/*
- * RedGIFs in the reel. Same shape as the Reddit mix it replaces — one every
- * MIX_EVERY library clips, chosen by page so scrolling back finds the same
- * ones — except that every one of these is video.
- */
+/* RedGIFs in the reel: one per MIX_EVERY library clips. */
 const MIX_EVERY = 4;
 
 // How many followed creators get a turn before the wider site does.
 const CREATORS_PER_TAG = 3;
 
 /*
- * Three creators to one tag.
- *
- * A creator is someone in the library — their clip is here because you have
- * their scenes. A tag is a search of all of RedGIFs, and what floats to the top
- * of one is largely promotion: three tag-sourced slides on one page were the
- * same "GET MY VIP ONLYFANS is FREE" from three different accounts.
- *
- * Spending every creator first would have buried the tags something like a
- * hundred and forty pages down, which is the same as not having them. So the
- * two are woven instead, and the weave is what decides how often the wider site
- * gets a turn. Shared by the mix and the dedicated feed, so both get the same
- * balance.
+ * Three creators to one tag, so tag results (often promotion) get a turn
+ * without taking over. Shared by the mix and the dedicated feed.
  */
 function weave(store) {
   const withVideo = store.gifs.filter((item) => item.video);
@@ -584,22 +471,10 @@ export async function mixInto(base, { page: at = 1, take: want = 0, offset = 0, 
 
   if (!usable.length) return base;
 
-  /*
-   * How many of these a page gets. Given explicitly when more than one source
-   * is riding along, so that turning a second one on shares the space out
-   * rather than doubling how much of the page is not the library.
-   */
+  /* Per-page count, shared out when several sources ride along. */
   const take = want || Math.max(1, Math.round(base.items.length / MIX_EVERY));
 
-  /*
-   * Dealt from the visit's seed rather than sliced off the front of the list.
-   *
-   * This used to be `usable.slice((at - 1) * take, at * take)`, which is not a
-   * weak shuffle — it is no shuffle. The weave above is stable, so page one of
-   * every session was the same clips in the same order, for every session. The
-   * library half had reshuffled on a fresh seed the whole time; these two never
-   * saw it. See shuffle.mjs.
-   */
+  /* Dealt from the visit's seed (see shuffle.mjs), not sliced off the front. */
   const slice = pageOf(usable, seed, at, take);
   if (!slice.length) return base;
 
@@ -615,12 +490,7 @@ export async function mixInto(base, { page: at = 1, take: want = 0, offset = 0, 
   return { ...base, items };
 }
 
-/*
- * One stored gif as the reel draws it. Pulled out of mixInto so that a feed of
- * nothing but these can use the same shape — two copies would be two slides
- * that drift apart, and the reel would start rendering RedGIFs differently
- * depending on which page it came from.
- */
+/* One gif as the reel draws it, shared by the mix and the feed. */
 function toItem(item) {
   return {
     kind: 'redgifs',
@@ -641,13 +511,7 @@ function toItem(item) {
   };
 }
 
-/*
- * A reel of nothing but RedGIFs, for the dedicated feed.
- *
- * Same pool, same weave, same seeded deal as the mix — only without a library
- * page to thread through. `count` is the whole pool rather than a page, so the
- * client knows how far it can scroll before the deck is dealt again.
- */
+/* The RedGIFs-only feed. `count` is the whole pool. */
 export async function feed({ page: at = 1, take = 12, seed = '1' } = {}) {
   const store = await load();
   const usable = weave(store);

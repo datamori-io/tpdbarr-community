@@ -1,9 +1,7 @@
-/* ============================================================== the search
+/*
+ * ============================================================== the search
  *
- * The acquisition side is a search area, so its controls get the top of the
- * page and the results get everything below. The panel is one block rather
- * than a scattering of chips so that "what am I asking" is answerable at a
- * glance before you look at a single result.
+ * Controls at the top in one panel, results below.
  */
 
 .searchpanel {
@@ -118,10 +116,10 @@
 .metalink { color: var(--text-2); border-bottom: 1px dotted var(--line-hi); }
 .metalink:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
 
-/* ------------------------------------------------------------ the percentage
+/*
+ * ------------------------------------------------------------ the percentage
  *
- * Attached to the studio or performer it is about — a table of percentages off
- * to one side is a number nobody can act on.
+ * On the studio or performer it's about.
  */
 
 .subject { margin-bottom: 18px; }
@@ -149,14 +147,7 @@
    catalogue at once — so it takes the same panel without the poster column. */
 .subject.pooled .subjectbody { grid-template-columns: 1fr; }
 .subject.pooled .subjectbody p { margin: 4px 0 6px; }
-/*
- * Tracked, and how to stop.
- *
- * The state used to be a green-outlined button, which was the only green
- * control in the app — everywhere else "this one is on" is the accent wash
- * the view switches and the pass chips use. So it wears that instead, and it
- * is a label rather than a button because pressing it is not how you stop.
- */
+/* Tracked state: an accent-wash label, not a button. Untrack is separate. */
 .subjecttrack { display: grid; gap: 6px; justify-items: stretch; align-content: center; }
 
 .trackedis {
@@ -210,10 +201,7 @@
   .subjectbody button { grid-column: 2; justify-self: start; }
 }
 
-/* A performer photo is a portrait and cropping it to fit is right. A studio
-   image is a logo — usually wide, often with the name in it — and cropping one
-   is how you end up with half a word. So each gets the box it deserves: the
-   performer fills a tall one, the studio sits whole inside a wide one. */
+/* Performer photos crop to a tall box; studio logos sit whole in a wide one. */
 .tracked .crow { grid-template-columns: 96px 1fr auto; align-items: start; }
 .tracked .crow img.art, .tracked .crow .noposter { width: 96px; border-radius: 8px; }
 .tracked .crow img.performer, .tracked .crow .noposter.performer {
@@ -243,10 +231,10 @@
 }
 .subjectbody:has(img.studio), .subjectbody:has(.noposter.studio) { grid-template-columns: 128px 1fr auto; }
 
-/* ------------------------------------------------------- list or grid
+/*
+ * ------------------------------------------------------- list or grid
  *
- * Results read two ways. The grid's column width is a live custom property so
- * the slider can scale it while you drag, without rebuilding a single card.
+ * The grid's column width is a custom property the slider scales live.
  */
 
 /* The head is baseline-aligned for its title and note; the tools are not text
@@ -268,15 +256,8 @@
 /* Under the shelf's heading, saying which of its two shelves you are reading. */
 .viewswitch.shelfviews { margin: 2px 0 12px; }
 
-/* Four steps, and the class is the whole of the change — no card is rebuilt to
-   resize the wall. S drops the meta line: at that width there is no room for it
-   and a truncated studio name reads worse than none. */
-/*
- * Sized off the same scale as every other wall in the app rather than a private
- * one of its own. It used to carry .scale-s/m/l/xl classes driven by a second
- * size control that lived only on this page — so the app-wide control set a
- * multiplier this grid did not read, and clicking it did nothing here.
- */
+/* Four sizes by class; S drops the meta line. */
+/* Sized off the app-wide tile scale. */
 .resultgrid { grid-template-columns: repeat(auto-fill, minmax(var(--tile-lg), 1fr)); }
 .resultgrid .cardstate { flex-wrap: wrap; }
 
@@ -284,10 +265,10 @@
   .viewswitch.sizes { display: none; }
 }
 
-/* ------------------------------------------------------------ studio page
+/*
+ * ------------------------------------------------------------ studio page
  *
- * The library page that carries a catalogue: a logo, a percentage, three views
- * of one shelf, and the cast as a filter rather than as a set of links.
+ * Logo, percentage, three views, cast as a filter.
  */
 
 /* A logo is not a portrait. Contained and wide, or the crop takes the name off
@@ -335,13 +316,7 @@
 .feedhead.sub h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
 
 
-/*
- * The two answers you can give a whole stretch at once — see renderDecide().
- *
- * Under the queue rather than over it, because the sentence they finish is
- * "I have scrolled through this and": you reach them by getting to the bottom,
- * which is the same gesture as having looked.
- */
+/* Bulk skip buttons, under the queue (see renderDecide()). */
 .decidebulk {
   display: flex;
   align-items: center;
@@ -355,9 +330,7 @@
 .decidebulk .chip { padding: 7px 14px; }
 
 @media (pointer: coarse) {
-  /* Both of these throw work away in bulk, so they are the last controls on
-     the page that should be easy to hit by accident — full-size targets, but
-     with room between them. */
+  /* Spaced apart: both skip in bulk. */
   .decidebulk { gap: 14px; }
   .decidebulk .chip { min-height: 44px; }
 }
@@ -371,51 +344,31 @@
 .badge.looksame { background: rgba(46, 160, 67, 0.18); color: #7ee787; }
 .badge.looksame[hidden] { display: none; }
 
-/* ---------------------------------------------------------------- job line
+/*
+ * ---------------------------------------------------------------- job line
  *
- * A job card's button and the sentence saying what it does, on one line.
- *
- * `.controls` wraps, which is right for a row of filters and wrong here: it
- * meant the length of the sentence decided the shape of the card. Fingerprints
- * kept its note beside the button and Previews and sprites pushed its own onto
- * a second line, so six cards doing the same thing read as six different
- * cards.
- *
- * The button keeps its width and the sentence takes the rest, wrapping inside
- * its own column rather than under the button. `min-width: 0` is what lets it
- * — without it a flex item refuses to shrink below its longest word and the
- * row overflows the card instead.
+ * Button and sentence on one line; the sentence wraps in its own column.
+ * `min-width: 0` lets it shrink.
  */
 .jobline { flex-wrap: nowrap; align-items: flex-start; }
 .jobline > button { flex: none; }
 .jobline > .muted {
   flex: 1;
   min-width: 0;
-  /* The first line of the sentence on the button's own line, not the top of
-   * its box. A button is taller than a line of 13px text, so top-aligning the
-   * two puts the sentence above the label it belongs to. */
+  /* Align the sentence's first line with the button label. */
   padding-top: 6px;
 }
 
-/* Narrow enough that a button and a paragraph side by side leaves the
- * paragraph in a column two words wide. There the stack is the readable
- * shape, which is what .controls did all along. */
+/* Narrow screens: stack. */
 @media (max-width: 620px) {
   .jobline { flex-wrap: wrap; }
   .jobline > .muted { flex: 1 1 100%; }
 }
 
-/* ----------------------------------------------------------------- job row
+/*
+ * ----------------------------------------------------------------- job row
  *
- * The three asks — scan, fingerprints, previews — side by side above the
- * piles they act on.
- *
- * Equal columns rather than auto ones, so the row does not re-proportion
- * itself every time a sentence changes: these cards say different things at
- * different lengths depending on what Stash is doing, and a layout that moves
- * while you read it is worse than one that leaves a gap.
- *
- * The cards carry their own bottom margin, which is the wrong axis in here.
+ * Three job cards side by side, equal columns.
  */
 .jobrow {
   display: grid;
@@ -423,23 +376,13 @@
   gap: 14px;
   margin-bottom: 18px;
 }
-/*
- * Same height, ragged bottoms being the one thing three cards side by side
- * cannot get away with — their sentences are different lengths by nature and
- * the row would step down twice across the page. The content sits at the top
- * of each and the slack goes underneath.
- */
+/* Equal heights, content at the top. */
 .jobrow > .searchpanel {
   margin-bottom: 0;
   align-content: start;
 }
 
-/*
- * A third of a row is too narrow for a button and a paragraph beside each
- * other — the paragraph ends up a column two words wide. So inside this row
- * the sentence goes back under the button, which is the readable shape at
- * this width and the one .controls had all along.
- */
+/* In a third of a row, the sentence goes under the button. */
 .jobrow .jobline { flex-wrap: wrap; }
 .jobrow .jobline > .muted { flex: 1 1 100%; padding-top: 0; }
 

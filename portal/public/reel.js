@@ -11,30 +11,18 @@ export { leave } from './reel/core.js';
 export async function show(query = '') {
   leave();
 
-  /*
-   * What was left set last time, fetched before the session is built so that
-   * every default below can consult it. The address still wins wherever it
-   * says anything — see remembered().
-   */
+  /* Load the saved settings first; the address still wins (see remembered()). */
   await loadKept();
 
   const params = new URLSearchParams(query);
   const session = {
-    /*
-     * Kept because older links carry it and the request still sends it, but it
-     * is no longer something you set: the feed decides. See SOURCE_OF.
-     */
+    /* Still read for older links; the feed decides now (see SOURCE_OF). */
     source: params.get('source') === 'scenes' ? 'scenes' : 'markers',
     tag: params.get('tag') || null,
     // Tags kept out of the reel. A list, unlike the include picker, because
     // there is usually one thing you want and several you never do.
     exclude: (params.get('ex') || '').split(',').filter(Boolean),
-    /*
-     * How every slide is framed. `auto` lets each take the shape of what it
-     * holds — the band for a 16:9 scene, the phone for a portrait clip. The
-     * other two impose one shape on everything, and the button cycles the
-     * three round without ever leaving the clip you are watching.
-     */
+    /* Framing: `auto` fits each slide to its own shape; the button cycles. */
     crop: CROPS.includes(params.get('crop')) ? params.get('crop') : remembered('crop', 'auto'),
 
     // Advance by itself when a clip has been round once, or a still has been
@@ -44,41 +32,19 @@ export async function show(query = '') {
     // Whether the captions are shown. Off gives the picture their room back.
     info: params.has('info') ? params.get('info') !== '0' : remembered('info', true),
 
-    /*
-     * What a marker plays. The rendered clip is small and instant — 640x360,
-     * a megabyte, no seeking — and the source is the scene itself at full
-     * resolution, seeked to the moment, which costs a range request into a
-     * file of a couple of gigabytes.
-     */
+    /* What a marker plays: the small rendered clip, or the source seeked to the moment. */
     play: params.has('play') ? (params.get('play') === 'source' ? 'source' : 'clip') : remembered('play', 'clip'),
-    /*
-     * What the reel is made of, as percentages — library, RedGIFs, Reddit.
-     * Both off-library sources ride along by default now: RedGIFs is all
-     * video, and Reddit brings the performers you already follow.
-     */
+    /* The mix as percentages: library, RedGIFs, Reddit. */
     ratio: params.has('ratio') ? readRatio(params.get('ratio')) : readRatio((remembered('ratio', RATIO_DEFAULT) || []).join(',')),
 
-    /*
-     * Which feed. Swiping sideways moves between them, and the ratio only
-     * means anything on the mixed one — the other three are a single source.
-     */
-    /*
-     * Markers by default, not the mix. The reel is a library thing first — the
-     * two off-library feeds are for when you want them, and starting on a mix
-     * of everything meant the page opened on somebody else's clip as often as
-     * your own.
-     */
+    /* Which feed. The ratio only applies to mixed. */
+    /* Markers by default. */
     feed: FEEDS.includes(params.get('feed')) ? params.get('feed') : remembered('feed', 'library'),
     // A fresh shuffle each visit, so the reel is not the same one twice —
     // unless the address carries one, which is what Shuffle writes.
     seed: (params.get('seed') || '').replace(/\D/g, '').slice(0, 9) || String(Math.floor(Math.random() * 1e9)),
 
-    /*
-     * Whether the seed stays in the address. It does if it was there when you
-     * arrived — Shuffle put it there, or you kept the link — and the buttons
-     * that rewrite the address in place must not quietly drop it, or a refresh
-     * after hiding the captions deals you a different reel.
-     */
+    /* Keep the seed in the address if it arrived with one. */
     pin: Boolean(params.get('seed')),
     page: 0,
     count: 0,
@@ -109,20 +75,10 @@ export async function show(query = '') {
 
   view.replaceChildren(el('div', { className: 'empty' }, 'Loading the reel…'));
 
-  /*
-   * Shape is a class on the track rather than on every slide, so a slide built
-   * an hour ago follows a choice made a moment ago. Without it each slide takes
-   * the shape of what it holds — the band for the library, the phone for
-   * Reddit — which is the default and usually right.
-   */
+  /* Framing is a class on the track, so existing slides follow it. */
   session.track = el('div', { className: 'reel crop-' + session.crop + (session.info ? '' : ' noinfo') });
 
-  /*
-   * The slide that owns the screen is the one most of the screen is showing.
-   * A single threshold is enough with snap scrolling — two slides are only
-   * both past 0.6 in the moment between snaps, and the last one to cross wins,
-   * which is the one being scrolled towards.
-   */
+  /* The active slide is the one past 0.6 visible; with snapping, the last to cross wins. */
   session.observer = new IntersectionObserver(
     (entries) => {
       if (session.dead) return;
@@ -167,11 +123,7 @@ export async function show(query = '') {
   session.keys = (e) => {
     if (session.dead || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 
-    /*
-     * Left and right change feed, the same as a sideways swipe. A keyboard has
-     * no gesture, and reaching for the mouse to move between four feeds is the
-     * thing the swipe exists to avoid.
-     */
+    /* Left/right keys change feed. */
     const sideways = e.key === 'ArrowRight' || e.key === 'l' ? 1 : e.key === 'ArrowLeft' || e.key === 'h' ? -1 : 0;
     if (sideways) {
       e.preventDefault();
@@ -199,11 +151,7 @@ export async function show(query = '') {
 
   document.addEventListener('keydown', session.keys);
 
-  /*
-   * The browser pauses video in a hidden tab and does not start it again when
-   * you come back, which for a reel reads as it having died while you were
-   * away. Unless you paused it yourself, in which case it stays paused.
-   */
+  /* Resume playback when the tab comes back, unless you paused. */
   session.wake = () => {
     if (session.dead || document.hidden || session.paused) return;
     const video = session.slides[session.current]?.querySelector('video');
@@ -223,19 +171,12 @@ export async function show(query = '') {
   session.unswipe = swipeable(session, strip.querySelector('.reelfeeds'));
   fitFills();
 
-  /*
-   * The band below the bar is measured, not guessed: the bar wraps to two rows
-   * on a narrow screen and the picture has to start under it either way.
-   */
+  /* Measure the bar's height (it wraps on narrow screens). */
   const measureBar = () => {
     const height = Math.round(strip.getBoundingClientRect().height);
     if (height) session.track.style.setProperty('--reel-bar', height + 'px');
 
-    /*
-     * And the caption, for the same reason: in the band the picture stops
-     * above it, and how tall it is depends on whether there is a cast row and
-     * how far the title wraps. Taken from the slide on screen.
-     */
+    /* And the caption's, from the slide on screen. */
     if (!session.info) {
       session.track.style.removeProperty('--reel-cap');
       return;

@@ -3,25 +3,11 @@
 import { api, el } from '../util.js';
 import { SECTION_OF, painterFor, show, state } from '../import/core.js';
 
-/* ============================================================== catalogue
+/*
+ * ============================================================== catalogue
  *
- * The landing page for the work on scenes you already hold.
- *
- * Each of the three tools under this tab answers one question well, and none
- * of them can tell you whether it is today's question. Match shows you a pile
- * and cannot say the pile is nearly done. Wild Card is one scene at a time by
- * design. Marker Builder does not know that two thousand scenes have never had
- * a marker on them. So this is the page that says which one to open.
- *
- * **Everything here is counted, not estimated.** It matters more than it
- * sounds. The phash gap was called a pc-import problem all morning on the
- * strength of one page of results, and counting it properly put the larger
- * share in /organized_scenes. A landing page whose numbers are indicative is a
- * landing page that sends you to the wrong tool.
- *
- * It is deliberately not a dashboard. There are no charts, nothing updates on
- * a timer, and every number is a link to the thing that fixes it — the Stats
- * tab is where the library is admired, and this is where it is worked on.
+ * The landing page for work on scenes you hold: which tool to open. Every
+ * number is counted and links to what clears it. No charts, no timers.
  */
 
 export async function showCatalogue() {
@@ -46,13 +32,7 @@ export async function showCatalogue() {
 const n = (v) => (typeof v === 'number' ? v.toLocaleString() : '—');
 
 function draw(body, { totals, folders }) {
-  /*
-   * "Done" is the four things that make a scene usable everywhere else in the
-   * portal: it knows what it is, it can be seen, somebody has said it is
-   * finished, and its frames are known. Markers are deliberately not in it —
-   * a scene without markers is complete, just not indexed, and counting two
-   * thousand of those as unfinished would make the number say nothing.
-   */
+  /* "Done": has an id, a cover, is organised, has a phash. Markers don't count. */
   const short = totals.noId + (totals.noCover || 0) + totals.unorganised + totals.noPhash;
 
   const head = el('div', { className: 'feedhead' },
@@ -72,13 +52,7 @@ function draw(body, { totals, folders }) {
   );
 }
 
-/*
- * The piles, as the tool that clears them names them.
- *
- * Each is a link rather than a number with a link beside it: the count *is*
- * the button, because there is exactly one thing you would want to do having
- * read it.
- */
+/* The piles; each count is the link. */
 function jobs(totals) {
   const JOBS = [
     ['No stash id', totals.noId, '#/catalogue/match?mode=unmatched',
@@ -101,11 +75,7 @@ function jobs(totals) {
   );
 }
 
-/*
- * Records that exist but say almost nothing. These are Wild Card's, not
- * Match's — a scene with an id and no title is not unidentified, it is
- * undescribed, and no amount of matching will fill it in.
- */
+/* Records with an id but almost no description: Wild Card's job. */
 function thin(totals) {
   const BITS = [
     ['no title', totals.noTitle],
@@ -125,14 +95,7 @@ function thin(totals) {
   );
 }
 
-/*
- * Where the work actually is.
- *
- * The table that changes what you do. "Unmatched scenes" is a number you act
- * on the same way wherever they are; "261 of pc-import's 551 have no id, and
- * only 60 of organized_scenes' 2,917 do" tells you which folder is the job and
- * which is background noise.
- */
+/* Where the work is, by folder. */
 function where(folders) {
   const rows = folders.filter((f) => f.scenes);
   if (!rows.length) return null;

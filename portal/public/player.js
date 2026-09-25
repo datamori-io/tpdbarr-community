@@ -1,16 +1,8 @@
 /*
- * The player chrome.
- *
- * The browser's own controls are one bar with a hairline seek track, and on a
- * phone that track is three pixels of tap target you are meant to hit with a
- * thumb. Everything here exists to fix that: a scrub row tall enough to grab,
- * a handle that stays under your finger, the sprite thumbnails Stash already
- * generated shown while you drag, and the scene's markers drawn on the track
- * so you can see what you are dragging past.
- *
- * The <video> stays the caller's. This wraps it and takes its native controls
- * away; resume, progress reporting and teardown are none of its business and
- * stay where they were.
+ * The player chrome: a tall scrub row with a handle, Stash's sprite
+ * thumbnails while dragging, and markers on the track. Wraps the caller's
+ * <video> and removes native controls; resume, progress and teardown stay
+ * with the caller.
  */
 
 import { el } from './util.js';
@@ -37,19 +29,12 @@ const parseTime = (text) => {
 };
 
 /*
- * Stash writes one vtt per scene whose every cue points at a rectangle of a
- * single sprite sheet — sheet.jpg#xywh=160,90,160,90. So the whole strip is
- * one image request and one text request, however long the scene is.
+ * Stash's vtt: every cue is a rectangle of one sprite sheet
+ * (sheet.jpg#xywh=160,90,160,90).
  *
- * -> every cue, in time order, or null if this scene never had its sprite
- * generated. Not having thumbnails is ordinary rather than an error: the rest
- * of the bar works without them.
- *
- * The list and the lookup below it are separate because they are wanted for
- * different things. A scrub bar asks "what was on screen at this second" and
- * wants the lookup; the marker builder's timeline lays every tile out along a
- * strip and wants them all. Parsing a vtt twice to answer both would be the
- * only other way.
+ * -> every cue in time order, or null if the scene has no sprites (the bar
+ * works without them). Kept apart from the lookup below: the marker
+ * builder wants all cues, a scrub bar wants one per second.
  */
 export async function thumbnailCues(url) {
   if (!url) return null;
@@ -90,9 +75,7 @@ export async function thumbnailCues(url) {
   return cues;
 }
 
-/*
- * -> a lookup taking seconds to a cue, or null if there are none.
- */
+/* -> a lookup from seconds to a cue, or null. */
 export async function thumbnailStrip(url) {
   const cues = await thumbnailCues(url);
   if (!cues) return null;
@@ -144,21 +127,11 @@ const SPEEDS = [1, 1.25, 1.5, 2, 0.5, 0.75];
 /*
  * -> the node to put on the page, with `video` inside it.
  *
- * `thumbnails` is a url to a sprite vtt; `markers` is [{ seconds, title }];
- * `duration` is what the caller already knows, used until the file itself
- * says otherwise — a stream reports NaN for its duration for a moment and the
- * bar should not collapse every time it does.
- *
- * `onWide` is the page saying it has room to give: pass one and the bar grows
- * a switch that calls it with true or false. What that means is the page's
- * business — this only draws the switch and remembers which way it is.
- *
- * `onMark` is the same arrangement for marking a moment. Pass one and the bar
- * grows a button that pauses, hands it the current second, and puts whatever
- * comes back on the track — so a marker made while watching appears under the
- * scrub bar without the page redrawing. Writing it is the page's business;
- * what this owns is that the moment marked is the frame on screen, which
- * means pausing before asking.
+ * `thumbnails`: sprite vtt url. `markers`: [{ seconds, title }].
+ * `duration`: used until the file reports one (streams briefly report NaN).
+ * `onWide`: draw the wide switch and call it with true/false.
+ * `onMark`: draw a mark button that pauses, passes the current second, and
+ * adds whatever comes back to the track.
  */
 export function withControls(video, { thumbnails = null, markers: given = [], duration = 0, onWide = null, onMark = null } = {}) {
   // Reassigned when a marker is made from the bar below, so it is a binding of
@@ -175,10 +148,8 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   const track = el('div', { className: 'vtrack' }, buffered, played, marks, handle);
 
   /*
-   * Two nodes, because a sprite tile has to be cropped at its natural size and
-   * shown at a bigger one. A percentage background-size would scale the sheet
-   * to the card rather than to itself, so the tile is cut at 1:1 and the whole
-   * thing is scaled by transform inside a window that clips it.
+   * Two nodes: the tile is cut at 1:1 and scaled with a transform inside a
+   * clipping window (a percentage background-size would scale the wrong thing).
    */
   const tile = el('div', { className: 'vshottile' });
   const shot = el('div', { className: 'vshot' }, tile);
@@ -224,10 +195,8 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   const flash = el('div', { className: 'vflash', hidden: true });
 
   /*
-   * The layer that makes the whole picture a seek bar. It is a node over the
-   * video rather than handlers on the video itself because the taps below are
-   * its business too, and a video that is sometimes covered and sometimes not
-   * would answer a tap differently depending on what else was drawn that day.
+   * A layer over the video that makes the whole picture a seek surface and
+   * handles taps.
    */
   const surface = el('div', { className: 'vsurface' });
 
@@ -241,11 +210,7 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   let lookup = null;
   if (thumbnails) thumbnailStrip(thumbnails).then((found) => { lookup = found; });
 
-  /*
-   * Markers can only be placed once there is a duration to place them against,
-   * which on a fresh load arrives with the metadata. Drawing and placing are
-   * separate because a resize moves them without rebuilding them.
-   */
+  /* Markers need a duration to place against. Drawn once, moved on resize. */
   const inRange = () => markers.filter((m) => m.seconds > 0 && m.seconds < runtime());
 
   function drawMarks() {
@@ -297,12 +262,7 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
     scrub.setAttribute('aria-valuetext', `${stamp(at)} of ${stamp(total)}`);
   }
 
-  /*
-   * The preview is what a thumb is actually steering by, so it does the work a
-   * live seek would otherwise do: dragging moves this and nothing else, and
-   * the file is only asked for a new position when the finger lifts. Seeking a
-   * 3GB file on every pointermove would spend the whole drag buffering.
-   */
+  /* Dragging moves the preview only; the file seeks when the finger lifts. */
   function showPreview(seconds) {
     const total = runtime();
     if (!total) return;
@@ -348,9 +308,7 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
     if (!runtime()) return;
     dragging = true;
     dragTime = ratioAt(e.clientX) * runtime();
-    // Capture is what keeps the drag alive once the finger leaves the bar,
-    // which on a 40px row it does constantly. Not every pointer can be
-    // captured, and a drag that works only over the bar beats no drag at all.
+    // Pointer capture keeps the drag alive off the bar. Not always available.
     try { scrub.setPointerCapture(e.pointerId); } catch {}
     wrap.classList.add('scrubbing');
     showPreview(dragTime);
@@ -441,11 +399,7 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   video.addEventListener('progress', () => {
     const total = runtime();
     if (!total || !video.buffered.length) return;
-    /*
-     * Only the range the playhead is sitting in. The others are places you
-     * seeked past, and drawing them makes the bar claim to have loaded far
-     * more of the file than it has.
-     */
+    /* Only the buffered range the playhead is in. */
     for (let i = 0; i < video.buffered.length; i++) {
       if (video.buffered.start(i) <= video.currentTime && video.buffered.end(i) >= video.currentTime) {
         buffered.style.width = `${(video.buffered.end(i) / total) * 100}%`;
@@ -476,16 +430,9 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   });
 
   /*
-   * Two APIs for the same button. Everywhere but Safari it is
-   * requestPictureInPicture(); WebKit has never shipped that one and puts the
-   * video into a presentation mode instead — which is why an iPad had a
-   * pop-out button that did nothing. The webkit path is tried first, because
-   * where both are claimed it is the one Safari actually honours.
-   *
-   * Whether it is offered can change once the file is open: Safari answers
-   * webkitSupportsPresentationMode against a video it has metadata for, and
-   * this bar is built before there is any. So it is asked again on load
-   * rather than once, when the honest answer is still "no idea".
+   * Picture-in-picture: Safari uses webkitSetPresentationMode, others
+   * requestPictureInPicture(); webkit tried first. Re-checked on load, since
+   * Safari only answers once it has metadata.
    */
   const webkitPip = () =>
     typeof video.webkitSetPresentationMode === 'function' &&
@@ -508,12 +455,8 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   };
 
   /*
-   * An iPhone will not put an arbitrary element into fullscreen — only the
-   * video itself, and once it is there the controls are Apple's rather than
-   * these. That is the worse player — no markers, no thumbnails, and none of
-   * the buttons on this bar, the pop-out included — so it is the fallback and
-   * not the route. An iPad will take the wrapper, but only under the
-   * webkit-prefixed name, which is why that is asked for before giving up.
+   * An iPhone only fullscreens the video element (Apple's controls, none of
+   * ours), so that's the fallback. An iPad takes the wrapper under the webkit name.
    */
   const fullscreenNode = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 
@@ -554,16 +497,8 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   }
 
   /*
-   * Marking a moment while watching it.
-   *
-   * Paused first, and deliberately: the moment being marked is the frame on
-   * screen, and a video that carries on playing while the tag is being chosen
-   * marks a second that has already gone past. The time is read once, before
-   * anything is asked, for the same reason.
-   *
-   * What comes back goes straight onto the track. The marks are drawn once and
-   * then only moved, so a new one means clearing them and letting drawMarks
-   * build the row again — which is cheap: it is a handful of empty divs.
+   * Mark a moment: pause first so the frame on screen is what's marked, and
+   * read the time once. The result goes straight onto the track.
    */
   if (markBtn) {
     markBtn.onclick = async () => {
@@ -600,11 +535,8 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
   bar.addEventListener('pointerdown', wake);
 
   /*
-   * Tapping the video means two different things on the two kinds of screen.
-   * With a mouse it plays and pauses, because that is what clicking a video
-   * has always done. With a thumb it shows the bar, because the bar is what
-   * you were reaching for — and a second tap on the same side inside the
-   * double-tap window jumps ten seconds, the way every phone player does it.
+   * Tap: with a mouse, play/pause; with touch, show the bar, and a double tap
+   * on one side jumps ten seconds.
    */
   let lastTap = 0;
   let lastSide = null;
@@ -631,16 +563,11 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
     else wrap.classList.add('idle');
   }
 
-  /* ------------------------------------------------ the picture as a bar
+  /*
+   * ------------------------------------------------ the picture as a bar
    *
-   * A drag anywhere across the video moves the playhead, with the same reach
-   * the bar has: the full width is the full runtime. It is relative rather
-   * than absolute — where you started is where you were, not where you
-   * pressed — because the same surface still has to answer a tap, and a tap
-   * that jumped you somewhere would be the worse trade.
-   *
-   * Like the bar, it moves the preview and nothing else until you let go. A
-   * 3GB file seeked on every pointermove spends the whole drag buffering.
+   * Drag anywhere on the video to move the playhead: full width = full
+   * runtime, relative to where you started (so taps still work). Seeks on release.
    */
 
   // Far enough that an unsteady thumb is still a tap, and read against the
@@ -730,17 +657,11 @@ export function withControls(video, { thumbnails = null, markers: given = [], du
 
   window.addEventListener('resize', placeMarks);
 
-  /* ------------------------------------------------- the next file along
+  /*
+   * ------------------------------------------------- the next file along
    *
-   * The movie page plays a group's scenes back to back through one bar, so
-   * the chrome cannot be rebuilt between them: fullscreen, the volume, the
-   * speed and the wide switch all belong to this node, and a new one drops
-   * every one of them on the floor mid-film.
-   *
-   * So what is per-file is handed back in — that scene's markers, its sprite
-   * sheet, and the runtime to draw against until the file itself reports one.
-   * Setting the video's src stays the caller's business, the same way the
-   * first one was.
+   * Swap per-file state (markers, sprites, duration) without rebuilding the
+   * chrome, for a group played back to back. The caller sets the src.
    */
   wrap.reload = ({ thumbnails: sheet = null, markers: next = [], duration: runs = 0 } = {}) => {
     markers = next;

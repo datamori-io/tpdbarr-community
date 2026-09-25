@@ -1,23 +1,15 @@
-/* ============================================================ the Overview
+/*
+ * ============================================================ the Overview
  *
- * Two pages out of one file. The Overview is a video hub: a rule, a small grey
- * label, one item given room to be read, and the rest of that section beside
- * it small. The Stats tab keeps the original motif — the library is a
- * pipeline; the flow bar is the whole of it at a glance and the cards under it
- * are the questions you would ask next.
- *
- * The colour rule holds everywhere in the Stats half. Grey is upstream — not
- * yours yet as far as Stash is concerned. Text-colour is yours. Coral is
- * whatever the mark is actually about, and never more than one thing per
- * chart.
+ * The Overview is a video hub; the Stats tab keeps the pipeline and charts.
+ * In Stats: grey is upstream, text colour is yours, coral is the subject
+ * (one thing per chart).
  */
 
-/* ----------------------------------------------------------- the hub
+/*
+ * ----------------------------------------------------------- the hub
  *
- * A section is a rule, a small grey label and a MORE, over either a row of
- * news cards or a scrolling shelf of scenes. MORE is not the same offer as the
- * scroll: the scroller carries the two dozen the server sent, MORE opens the
- * shelf that holds three thousand.
+ * A section: rule, label, MORE, then news cards or a scrolling shelf.
  */
 
 .editorial { margin: 0 0 34px; }
@@ -61,9 +53,7 @@
 .edmore span { display: inline-block; transition: transform 0.15s; }
 .edmore:hover span { transform: translateX(3px); }
 
-/* The thumbnail-size control lands in the first section rule that has a shelf
-   under it. MORE has already claimed the free space, so this sits beside it
-   rather than taking an `auto` of its own and splitting the row in two. */
+/* The size control sits beside MORE. */
 .edhead .sizepick { margin-left: 14px; }
 
 /* One card, whatever it is holding: art, then the words. The three shapes
@@ -405,11 +395,11 @@ a.metric:hover { border-color: var(--accent-hi); }
 .candbody .act { justify-content: center; }
 
 
-/* ------------------------------------------------------------ the feed
+/*
+ * ------------------------------------------------------------ the feed
  *
- * The one thing on the Overview drawn big and in colour: the Feed, sold with
- * itself. A screen of live marker clips on the left, the pitch on the right,
- * stacked on a phone with the screen first — that is where it gets used.
+ * The Feed: live marker clips on the left, the pitch on the right,
+ * stacked on a phone.
  */
 .feedhero {
   display: grid;

@@ -1,7 +1,4 @@
-/*
- * Sending something to a downloader. Two Whisparrs answer here and they take
- * different catalogues, so which one a button talks to is never implied.
- */
+/* Sending to a downloader. Which Whisparr a button talks to is never implied. */
 
 import { api, el } from '../util.js';
 
@@ -9,16 +6,8 @@ export const postAdd = (siteId, sceneIds) =>
   api('/api/add', { method: 'POST', body: JSON.stringify({ siteId, sceneIds }) });
 
 /*
- * Adding one scene, StashDB first.
- *
- * Which route a scene takes is decided by which catalogue can identify it, not
- * by where you happened to find it: StashDB and Whisparr v3 when the scene
- * exists there, ThePornDB and v2 when it does not. That way the id that comes
- * back into Stash is the one v3 indexes on, whichever page you started from.
- *
- * A fingerprint match is acted on without asking — it cannot be a coincidence.
- * A title match is shown and asked about, because the cost of being wrong is a
- * download of something you did not want.
+ * Add one scene, StashDB first: v3 when StashDB has it, else TPDB and v2.
+ * A fingerprint match goes straight through; a title match asks.
  */
 export async function addOne(scene, trigger, redraw) {
   const label = trigger.textContent;
@@ -70,11 +59,7 @@ async function sendToV2(scene, trigger, label, redraw) {
   }
 }
 
-/*
- * The probable match, put to you rather than acted on. Both answers are real
- * answers: v3 gets you the id that survives into Stash, v2 gets you the scene
- * ThePornDB is certain about.
- */
+/* The probable match, put to you: v3 or v2. */
 function askWhich(found, scene, trigger, label, redraw) {
   const candidate = found.scene;
   const others = found.others?.length || 0;
@@ -100,11 +85,7 @@ function askWhich(found, scene, trigger, label, redraw) {
   no.onclick = () => { panel.remove(); sendToV2(scene, trigger, label, redraw); };
 }
 
-/*
- * The scenes in one movie can span more than one site — a compilation does —
- * and Whisparr's add is per site, so this is one request per site rather than
- * one for the lot.
- */
+/* One request per site (Whisparr adds per site). */
 export async function addMissing(scenes, trigger, redraw) {
   const missing = scenes.filter((s) => s.status === 'absent' && !s.stash && s.siteId);
   if (!missing.length) return;

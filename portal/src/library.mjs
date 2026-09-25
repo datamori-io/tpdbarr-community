@@ -1,7 +1,4 @@
-/*
- * Merges the three views of a site: what TPDB has, what Whisparr has, and what
- * Stash already holds.
- */
+/* A site's TPDB, Whisparr and Stash views, merged. */
 
 import * as metadata from './metadata.mjs';
 import * as whisparr from './whisparr.mjs';
@@ -70,11 +67,10 @@ export async function siteView(config, siteId) {
   };
 }
 
-/* ------------------------------------------------------- the detail pages
+/*
+ * ------------------------------------------------------- the detail pages
  *
- * A scene and a performer, each merged with what Whisparr and Stash know. Both
- * come from TPDB rather than the metadata mirror, because the mirror has no
- * per-scene artwork and no performer records at all.
+ * A scene and a performer from TPDB, merged with Whisparr and Stash state.
  */
 
 export async function sceneView(config, guid) {
@@ -96,27 +92,11 @@ export async function performerView(config, uuid) {
   return { performer, scenes, counts: tally(scenes) };
 }
 
-/*
- * The performers section.
- *
- * Everyone in your library that a stash-box knows about. Stash-first on
- * purpose: a name is here because you have files of them, and the number under
- * it is what you hold — not what exists.
- *
- * Either stash-box will do. It used to be ThePornDB only, on the reasoning that
- * there was nowhere for a click to go without a TPDB uuid — but the acquisition
- * side runs on StashDB now, so a StashDB id has somewhere to go too. The old
- * rule quietly hid performers with dozens of scenes on the shelf whose only id
- * was the one the rest of the page actually uses.
- */
+/* The Creators page: everyone in your library a stash-box knows (either one). */
 export async function creatorsView(config) {
   if (!stashConfigured(config)) return { creators: [], stash: { enabled: false }, counts: { total: 0, favourites: 0 } };
 
-  /*
-   * High enough to hold the whole cast (930 here). The wall is filtered by name
-   * in the browser, over what was rendered — so a cap that bites is not a
-   * shorter page, it is a name the filter cannot find.
-   */
+  /* High enough for the whole cast; the page filters in the browser. */
   const { performers, total } = await stash.libraryPerformers(config, { limit: 1000 });
 
   return {
@@ -130,10 +110,7 @@ export async function creatorsView(config) {
   };
 }
 
-/*
- * Shared by both pages: fill in Whisparr and Stash state for a handful of
- * scenes that may span any number of sites.
- */
+/* Whisparr and Stash state for scenes from any number of sites. */
 export async function annotateScenes(config, scenes) {
   if (!scenes.length) return;
 

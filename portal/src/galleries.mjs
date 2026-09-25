@@ -1,22 +1,9 @@
 /*
- * Galleries — the still half of the library.
+ * Galleries, keyed on Stash ids. TPDB has no photo sets, so there's no acquisition side.
  *
- * Same spine as stashlib.mjs: keyed on Stash ids, because a gallery has no
- * TPDB identity and never will. TPDB carries no photo sets at all, so nothing
- * here has an acquisition side — a gallery is something you already have, or
- * it does not exist.
- *
- * Three ties matter, and Stash only gives two of them directly. A gallery
- * carries its own `scenes` and `performers`, so those are read off the record.
- * A movie is a Stash **group**, and the Gallery type has no group field in
- * 0.31.1 — so the movie tie is made through the gallery's scenes instead, the
- * same way the acquisition side answers a movie scene by scene rather than
- * pretending the group knows.
- *
- * Scenes are deliberately *not* scoped to /organized_scenes here. That folder
- * is where FileFlows puts a file it has encoded, and nothing in that pipeline
- * touches images — a photo set is imported once and stays where it landed. So
- * scoping galleries to the video library folder would hide all of them.
+ * Scene and performer ties come off the gallery. The Gallery type has no
+ * group field (0.31.1), so movies are tied through the gallery's scenes.
+ * Not scoped to /organized_scenes: images never move through FileFlows.
  */
 
 import { gql } from './stash.mjs';
@@ -75,14 +62,7 @@ export function card(gallery) {
   };
 }
 
-/*
- * The focal point, as "x y" in percentages on a custom field.
- *
- * A card crops its cover to a square and a portrait cover loses a head to
- * that, so this says which part to keep. It is display-only — the picture on
- * disk is never touched — which is the whole reason it lives here rather than
- * in a cropped copy of the file.
- */
+/* Cover focal point, "x y" percentages in a custom field. Display only. */
 const FOCUS_FIELD = 'tpdbarr_focus';
 
 function readFocus(fields) {
@@ -126,9 +106,8 @@ async function find(config, { filter = {}, sort = 'date', direction = 'DESC', pa
 }
 
 /*
- * The section. Everything Stash holds, newest first, plus the one number the
- * empty state needs: a Stash with images but no galleries has been scanned
- * with the wrong folder rules, which is a different problem from an empty one.
+ * All galleries, newest first, plus whether Stash has images at all (to
+ * tell wrong folder rules from an empty library).
  */
 export async function galleriesView(config) {
   const [{ count, galleries }, totals] = await Promise.all([
@@ -163,11 +142,8 @@ export async function images(config, galleryId, { page = 1, limit = PAGE } = {})
 }
 
 /*
- * One gallery: the record, its images, and the three things it is tied to.
- *
- * The scenes are re-read as full cards rather than used as the {id, title}
- * pairs the gallery record carries, so they draw as the same tile as anywhere
- * else. The groups fall out of those scenes — see the note at the top.
+ * One gallery: record, images, and ties. Scenes re-read as full cards;
+ * groups come from those scenes.
  */
 export async function galleryView(config, id, { page = 1 } = {}) {
   const data = await gql(
@@ -214,12 +190,7 @@ export async function galleryView(config, id, { page = 1 } = {}) {
   };
 }
 
-/*
- * The gallery's scenes as library tiles, carrying the groups they belong to.
- *
- * By `ids` and not a filter: SceneFilterType.id is an IntCriterionInput and
- * takes one number, so a handful of specific scenes is the argument's job.
- */
+/* Scenes as tiles, by `ids` (the id filter takes only one number). */
 async function sceneCards(config, ids) {
   const data = await gql(
     config,
@@ -243,11 +214,7 @@ async function sceneCards(config, ids) {
   }));
 }
 
-/*
- * The other direction: what a scene, a performer or a movie has hanging off
- * it. Asked for by the page that is already drawn, so a Stash with no
- * galleries costs a row that never appears rather than the page.
- */
+/* Galleries attached to a scene, performer or movie. Asked after the page draws. */
 export async function attached(config, { scene = null, performer = null, group = null } = {}) {
   if (scene) return find(config, { filter: { scenes: { value: [scene], modifier: 'INCLUDES' } }, sort: 'date' });
   if (performer) return find(config, { filter: { performers: { value: [performer], modifier: 'INCLUDES' } }, sort: 'date' });
@@ -264,10 +231,10 @@ export async function attached(config, { scene = null, performer = null, group =
   return { count: 0, galleries: [] };
 }
 
-/* ----------------------------------------------------------------- writes
+/*
+ * ----------------------------------------------------------------- writes
  *
- * The same light touch as the scene page: the things you decide while looking
- * at it, and nothing else. Metadata surgery stays in Stash.
+ * Filed and rating only. Metadata surgery stays in Stash.
  */
 
 export async function setOrganized(config, id, organized) {
@@ -291,11 +258,7 @@ export async function rename(config, id, title) {
   return data.galleryUpdate;
 }
 
-/*
- * Which picture fronts the gallery. Stash owns this properly — an ordinary
- * cover, the same one its own UI shows — so no copy of the image is made and
- * nothing is written into the folder.
- */
+/* Set the cover image, Stash's own setting. No copy made. */
 export async function setCover(config, id, imageId) {
   if (!imageId) {
     const reset = await gql(
@@ -314,11 +277,7 @@ export async function setCover(config, id, imageId) {
   return { cover: String(imageId) };
 }
 
-/*
- * Where to crop that cover from, kept as a custom field on the gallery rather
- * than as a second, cropped file. Passing null clears it and the card goes
- * back to centring.
- */
+/* Save the crop focus. Null clears it. */
 export async function setFocus(config, id, focus) {
   const custom_fields = focus
     ? { partial: { [FOCUS_FIELD]: `${clamp(focus.x)} ${clamp(focus.y)}` } }
@@ -333,14 +292,7 @@ export async function setFocus(config, id, focus) {
   return { focus: readFocus(data.galleryUpdate.custom_fields) };
 }
 
-/*
- * What it belongs to, changed after the fact.
- *
- * A build sets these from the page you built on — the scene page knows its own
- * scene — but a gallery that arrived any other way has nobody to ask, and a
- * tie is the whole point of having galleries in here. Each list replaces
- * rather than appends, because the dialog sends the state it is showing.
- */
+/* Change what a gallery is tied to. Each list replaces. */
 export async function setTies(config, id, { sceneIds, performerIds, studioId } = {}) {
   const input = { id };
   if (Array.isArray(sceneIds)) input.scene_ids = sceneIds.map(String);
@@ -364,11 +316,7 @@ export async function setTies(config, id, { sceneIds, performerIds, studioId } =
   return data.galleryUpdate;
 }
 
-/*
- * Where one gallery's pictures live, as Stash sees it. Asked for on its own
- * because adding a picture needs the folder and nothing else about the
- * gallery, and galleryView() reads its images and scenes to answer.
- */
+/* A gallery's folder as Stash sees it. */
 export async function folderOf(config, id) {
   const data = await gql(
     config,
@@ -386,12 +334,8 @@ export async function folderOf(config, id) {
 }
 
 /*
- * Taking pictures out of a gallery.
- *
- * The files go with them, and that is the only honest option: leave a picture
- * on disk and the next scan of that folder puts it straight back, so a
- * record-only delete would undo itself the way a record-only gallery delete
- * would. The caller asks for it by name all the same.
+ * Remove pictures. Files go too, or the next scan brings them back; the
+ * caller asks by name.
  */
 export async function removeImages(config, ids, { files = false } = {}) {
   const list = (Array.isArray(ids) ? ids : []).map(String).filter(Boolean);
@@ -407,12 +351,8 @@ export async function removeImages(config, ids, { files = false } = {}) {
 }
 
 /*
- * Deleting one.
- *
- * The files go with it unless told otherwise, and that is not overcaution the
- * other way: leaving the folder behind means Stash makes the gallery again on
- * its next scan, so a record-only delete quietly undoes itself. The caller
- * still has to ask for the files by name.
+ * Delete a gallery. Files go too unless told otherwise, or the next scan
+ * rebuilds it. The caller asks by name.
  */
 export async function destroy(config, id, { files = false } = {}) {
   const data = await gql(
@@ -436,17 +376,8 @@ export async function setRating(config, id, rating) {
 }
 
 /*
- * Who has nothing to look at.
- *
- * Every other page in this half ends with a thin row of what you do not have;
- * this is that row for pictures. Everyone you hold films of whose name is on
- * no gallery, ordered by how much of them you hold — the person you have
- * twenty scenes of is the one worth a photo set, and their own page already
- * carries the button that builds it.
- *
- * Counted from the galleries themselves rather than from a performer's
- * gallery_count, for the same reason the rest of this half counts what is in
- * the library rather than what Stash has a record of.
+ * People you hold scenes of with no gallery, most scenes first. Counted
+ * from the galleries themselves.
  */
 export async function withoutPictures(config, { limit = 60 } = {}) {
   const [people, mine] = await Promise.all([performersView(config), find(config, {})]);

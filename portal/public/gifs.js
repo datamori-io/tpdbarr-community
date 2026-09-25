@@ -1,14 +1,6 @@
 /*
- * What RedGIFs is pulling, and the two lists that decide it.
- *
- * Creators seed themselves from the Reddit handles already on the library's
- * performers — eight of the first fourteen tried turned out to be creators —
- * so this page usually has something on it before anyone has typed anything.
- * Tags are the part you assign: a tag is a search, and what it pulls is
- * whatever is newest under it.
- *
- * Unlike the Reddit page, a pass here takes about a minute rather than an
- * afternoon, so this does not have to be careful about looking hung.
+ * What RedGIFs is pulling: creators (seeded from performers' Reddit
+ * handles) and tags (added by hand). A pass takes about a minute.
  */
 
 import { api, el } from './util.js';
@@ -40,11 +32,7 @@ const ago = (at) => {
 
 const proxied = (url) => '/media/social?url=' + encodeURIComponent(url);
 
-/*
- * The poster rather than the clip. A wall of forty autoplaying videos is a
- * wall of forty open connections, and the reel is where these are meant to be
- * watched — this page is for seeing what got pulled.
- */
+/* Posters, not playing clips. */
 function card(gif) {
   const shot = el('a', {
     className: 'redditshot',
@@ -76,11 +64,7 @@ function status(data) {
 
   const base = `${data.held} clips held · ${data.creators.length} creators · ${data.tags.length} tags · last pass ${ago(data.at)}`;
 
-  /*
-   * What the pass actually managed, when it did not manage everything. A pass
-   * that RedGIFs turned away at every door still finishes, and without this it
-   * reads as a good one that happened to add nothing.
-   */
+  /* What the pass managed, when it didn't get everything. */
   if (!data.last) return base;
   if (data.last.limited) {
     return `${base} — read ${data.last.read} of ${data.last.read + data.last.limited}, added ${data.last.added}. RedGIFs was rate limiting the rest; try again in a while.`;
@@ -162,11 +146,7 @@ function render(session, data) {
       )
     : null;
 
-  /*
-   * Seeded creators and hand-followed ones in one strip, newest interest
-   * first: the ones you added yourself lead, because those are the ones you
-   * are likely to be pruning.
-   */
+  /* Creators in one strip, hand-added first. */
   const ordered = [...data.creators].sort((a, b) => (b.byHand ? 1 : 0) - (a.byHand ? 1 : 0));
 
   const creators = data.creators.length

@@ -1,22 +1,10 @@
 /*
- * The last check before anything is handed to a Whisparr: does Stash already
- * have it?
+ * Last check before anything goes to a Whisparr: does Stash already have it?
+ * A server-side backstop for every page and job.
  *
- * Every page that offers Add or Send to v3 is meant to have asked this before
- * it drew the button. Several did not, or asked only part of the question, and
- * one of them fetched a scene that was already on the shelf (2026-09-22,
- * through the Monitored tab). The pages are fixed; this is the backstop, so the
- * next page that forgets cannot cause the same thing. It sits on the server,
- * in front of the writes, so every page and every job goes through it.
- *
- * Refusing is a 409 that names what Stash holds and where. The browser's api()
- * asks whether to go ahead, and a yes sends the same request again with
- * `force: true`. "Get me another copy" has its own route (askAgain) and is not
- * guarded, because a second copy is the point of it.
- *
- * It fails open. If Stash is down or slow, the add goes through as it always
- * did: a backstop that blocks every add while Stash restarts is worse than
- * one that sometimes lets a duplicate past.
+ * Refuses with a 409 naming what Stash holds; the browser asks, and a yes
+ * resends with `force: true`. askAgain isn't guarded. Fails open if Stash
+ * is down.
  */
 
 import * as metadata from './metadata.mjs';

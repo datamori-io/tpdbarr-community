@@ -25,17 +25,8 @@ export async function showPerformer(id) {
 }
 
 /*
- * A performer, and how far along you are with them.
- *
- * The studio page's shape, asked about a person: the three views of one shelf
- * — what you hold, what you said you wanted and have not got, and what StashDB
- * has at all — over the same catalogue measurement. There is no cast rail,
- * because on this page the cast is the subject.
- *
- * Nothing here is in the address, for the same reason it is not on the studio:
- * which view is open is how you are reading this page rather than which page
- * it is, and re-reading the performer on every change of mind would cost a
- * pass over their whole shelf.
+ * A performer: the studio page's three views, asked of a person. No cast
+ * rail. The view isn't in the address.
  */
 function performerPage(id, data, galleryRow, mine) {
   const state = { subject: SUBJECTS.performer, data, view: 'have', performer: null };
@@ -98,12 +89,7 @@ function performerPage(id, data, galleryRow, mine) {
     await readCoverage();
   };
 
-  /*
-   * Only the number is re-read. The shelf has not changed because a percentage
-   * arrived, and a measurement in flight fills itself in rather than waiting
-   * for a reload — tracking someone and watching nothing happen reads as a
-   * button that did not work.
-   */
+  /* Re-read only the number; a pending measurement fills itself in. */
   const readCoverage = async () => {
     const { rows } = await api('/api/acquire/tracked');
     if (!holds(mine)) return;
@@ -117,10 +103,7 @@ function performerPage(id, data, galleryRow, mine) {
   const laterCoverage = () =>
     setTimeout(() => { if (holds(mine)) readCoverage().catch(() => {}); }, 4000);
 
-  /*
-   * The want list changed under a card. Only the list and the number on the
-   * chip are re-read — the card that did it has already relabelled itself.
-   */
+  /* The want list changed: re-read the list and the chip count. */
   const refreshWanted = async () => {
     const { stashdbId } = state.data.performer;
     if (!stashdbId) return;
@@ -130,12 +113,7 @@ function performerPage(id, data, galleryRow, mine) {
     paintBar();
   };
 
-  /*
-   * The bar goes directly under the record, the way the studio's does: it is
-   * the switch for the shelf under it and reads as part of the header. The
-   * still half follows the moving one — what you came to a performer for is
-   * their scenes, and the pictures filed against them are the footnote.
-   */
+  /* The bar goes directly under the record; galleries after the scenes. */
   shell('#/library/performers',
     header,
     bar,
@@ -155,12 +133,7 @@ function performerPage(id, data, galleryRow, mine) {
   draw();
   if (state.data.coverage?.pending) laterCoverage();
 
-  /*
-   * IAFD after the fact, never before it. It is behind Cloudflare and can
-   * take three tries or come back with nothing, and none of that is a reason
-   * to hold up a page whose facts are already on screen. A failure is
-   * silent: what you get is the page you would have got anyway.
-   */
+  /* IAFD after the page draws; failures are silent. */
   api(`/api/library/performers/${id}/iafd`)
     .then(({ iafd, fill }) => {
       if (!iafd || !holds(mine)) return;
@@ -170,19 +143,13 @@ function performerPage(id, data, galleryRow, mine) {
 }
 
 /*
- * The header, and the tracked bar under it. Repainted when the number lands,
- * which is why the IAFD box is passed in rather than rebuilt — redrawing it
- * here would throw away whatever IAFD had already filled in.
+ * Header and tracked bar, repainted when the number lands. The IAFD box is
+ * passed in so it isn't rebuilt.
  */
 function performerHead(id, state, box, track) {
   const { performer, count, coverage, tracked } = state.data;
 
-  /*
-   * The line under the name says how much of them you hold, not what is
-   * recorded about them — that is the grid below. The second number is
-   * Stash's own count, so a scene still moving through /pc-import shows as
-   * one you have without claiming it has landed. See STAGES in stashlib.
-   */
+  /* How many you hold; the second number is Stash's own count. See STAGES in stashlib. */
   const held = performer.knownScenes > count
     ? `${count} of ${performer.knownScenes} in your library`
     : `${count} in your library`;

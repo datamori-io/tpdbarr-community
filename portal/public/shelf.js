@@ -16,16 +16,13 @@ export const showLibrary = () => showOverview();
 
 // --------------------------------------------------------------- flat grids
 
-/* ------------------------------------------------------------------ routing
+/*
+ * ------------------------------------------------------------------ routing
  *
- * -> true if this hash belonged to the library, so app.js knows to stop.
+ * -> true if the hash belonged to the library.
  */
 export function route(hash) {
-  /*
-   * Stats is a tab of its own in the topbar rather than a section of the
-   * library, but it is drawn from the same library reads and torn down by the
-   * same claim — so it is claimed here, where that machinery lives.
-   */
+  /* Stats is its own tab but uses the library's machinery. */
   if (hash === '#/stats') { showStats(); return true; }
 
   const scene = hash.match(/^#\/library\/scene\/(\d+)$/);
@@ -36,9 +33,7 @@ export function route(hash) {
   const movie = hash.match(/^#\/library\/movie\/([0-9a-f]{12})$/);
   if (movie) { showMovie(movie[1]); return true; }
 
-  // A group is a release cut into scene files, and its page plays them as one
-  // film — see library/group.js. Its id is a plain number, which is what keeps
-  // it apart from the 12-hex id of a feature on the share above.
+  // A group: a numeric id, unlike a share feature's 12-hex id.
   const group = hash.match(/^#\/library\/group\/(\d+)$/);
   if (group) { showGroup(group[1]); return true; }
 
@@ -54,18 +49,13 @@ export function route(hash) {
   const list = hash.match(/^#\/library\/list\/([a-z]+)$/);
   if (list) { showList(list[1]); return true; }
 
-  // A category. Its slug is made once at creation and never follows a rename,
-  // so this address outlives whatever the category ends up being called. It
-  // carries a filter bar now, so it carries its state on the end like the four
-  // sections below do.
+  // A category, by slug, with filter state in the query.
   const category = hash.match(/^#\/library\/category\/([a-z0-9-]+)(?:\?(.*))?$/);
   if (category) { showCategory(category[1], category[2] || ''); return true; }
   if (hash === '#/library/categories') { showCategories(); return true; }
 
 
-  // The five sections. Overview is the landing, so #/library keeps its meaning.
-  // The four that carry a filter bar carry its state in the address too, so
-  // they are matched with a query string on the end.
+  // The five sections; the four with filter bars carry a query string.
   const shelves = hash.match(/^#\/library\/(scenes|performers|studios|galleries)(?:\?(.*))?$/);
   if (shelves) {
     const query = shelves[2] || '';

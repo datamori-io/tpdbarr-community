@@ -1,23 +1,9 @@
 /*
- * The gap-filler.
- *
- * Emby wrote a .nfo and artwork beside almost every film on the share. Almost:
- * a handful it never matched, and those folders hold a video file and nothing
- * else. This finds them on ThePornDB and writes the missing pieces in, in the
- * shape Emby already uses, so Emby picks them up on its next scan.
- *
- * This is the only code in the portal that writes to the media share, and it is
- * deliberately timid about it:
- *
- *   - it never overwrites. A file that exists is left exactly as it is, so a
- *     bad guess here cannot destroy something Emby got right.
- *   - it never picks. Matching is on a title someone typed into a folder name
- *     years ago; the candidates go to the UI and a person chooses.
- *   - it stays inside the film's own folder, checked against the resolved path
- *     rather than trusted.
- *
- * If the share is mounted read-only the writes fail at the kernel and the error
- * says so, which is the correct outcome rather than something to work around.
+ * The gap-filler: for film folders Emby never matched, find the film and
+ * write the .nfo and artwork Emby expects. The only code that writes to the
+ * media share. It never overwrites, never picks (a person chooses), and
+ * stays inside the film's folder (checked on the resolved path). A read-only
+ * mount fails at the kernel, as it should.
  */
 
 import { writeFile, access } from 'node:fs/promises';
@@ -30,16 +16,7 @@ import { findMovie, moviesRoot, forgetMovies } from './moviefiles.mjs';
 // Artwork is a poster or a backdrop; anything much bigger is not one.
 const MAX_IMAGE = 25 * 1024 * 1024;
 
-/*
- * Candidate posters live on the studios' own hosts — members areas, DVD shops,
- * hotlink-protected CDNs — so the browser cannot load them directly and they go
- * through the portal instead.
- *
- * That proxy is an obvious way to turn this app into an open relay into the
- * LAN, so it is not one: only URLs this module has actually handed out as
- * candidate artwork can be fetched. An allowlist of things we already chose to
- * show, rather than a filter trying to guess what is safe.
- */
+/* Candidate artwork is proxied; only URLs this module offered can be fetched. */
 const knownArt = new Set();
 const MAX_KNOWN = 2000;
 
@@ -65,11 +42,7 @@ const strip = (text) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
-/*
- * How much of the folder's title the candidate accounts for, word by word.
- * Crude on purpose — it only has to sort eight results, and the person looking
- * at the posters makes the actual decision.
- */
+/* Share of the folder title the candidate covers, word by word. Only for sorting. */
 function similarity(a, b) {
   const left = new Set(strip(a).split(' ').filter(Boolean));
   const right = new Set(strip(b).split(' ').filter(Boolean));
@@ -96,22 +69,12 @@ function score(movie, candidate) {
 }
 
 /*
- * What to ask TPDB, in the order worth asking.
- *
- * TPDB's search wants something close to its own title and gives up entirely
- * rather than degrading: "The Submission of Emma Marx 2 - Boundaries" returns
- * nothing, while the same words without the sequence number return the film
- * and its three sequels. So the exact folder title is tried first — it is right
- * often enough and gives the tightest results — and only then the loosened
- * versions.
+ * What to ask TPDB: the exact folder title first, then looser versions.
+ * TPDB returns nothing rather than a near match.
  */
 /*
- * The folder's year is deliberately NOT passed to either search as a filter.
- * These folder names carry the year someone filed the film under, which is
- * routinely a year out from the source's release date — TMDB dates Emma Marx
- * "Boundaries" to 2015 where the folder says 2016, and filtering on that hides
- * the right answer entirely. The year is far better used the way score() uses
- * it: to rank, not to exclude.
+ * The folder's year isn't used as a filter (often a year out); score()
+ * uses it to rank.
  */
 function queries(title) {
   const attempts = [title];
@@ -132,15 +95,7 @@ function queries(title) {
   return attempts;
 }
 
-/*
- * `only` names one source and skips the hierarchy.
- *
- * Worth having because "TPDB answered" is not the same as "TPDB was right": for
- * a film catalogued as normal cinema, TPDB often returns a near-miss and TMDB
- * has the real record with a better poster. Falling back only on silence would
- * mean the TMDB key never gets used for anything. So the hierarchy stays the
- * default and this is the override.
- */
+/* `only` picks one source, skipping the hierarchy. */
 export async function candidates(config, movieId, { only = null } = {}) {
   const movie = await findMovie(movieId);
   if (!movie) throw new Error('No movie with that id.');
@@ -178,17 +133,9 @@ export async function candidates(config, movieId, { only = null } = {}) {
   }
 
   /*
-   * TPDB, then TMDB, then IMDB — in that order, stopping at the first source
-   * that answers.
-   *
-   * TPDB first because this is an adult library and TPDB is the one that knows
-   * the studios, the performers and the release dates for it. TMDB second
-   * because the films TPDB misses are the ones catalogued as normal cinema — a
-   * 1976 feature, a parody with a mainstream cast — and TMDB has those. IMDB
-   * last and differently: it has no search API anyone can use, so what it
-   * contributes is an *id*, taken from the .nfo Emby already wrote, and
-   * resolved through TMDB. That makes it exact rather than a guess, which is
-   * why it is worth having even at the bottom of the list.
+   * TPDB, then TMDB, then IMDB, stopping at the first that answers. TPDB
+   * knows adult releases; TMDB has mainstream-catalogued films; IMDB gives
+   * an id from Emby's .nfo, resolved through TMDB.
    */
   let found = [];
   let asked = null;
@@ -220,11 +167,7 @@ export async function candidates(config, movieId, { only = null } = {}) {
   return shapeResult(movie, found, source, asked, config);
 }
 
-/*
- * Which source answered, and what it was asked. A result set that looks
- * surprising is then explainable — "TPDB had nothing, so this is TMDB on a
- * shortened title" — instead of just looking wrong.
- */
+/* Which source answered and what it was asked, so odd results are explainable. */
 function shapeResult(movie, found, source, asked, config) {
   const seen = new Set();
   const unique = found.filter((c) => c.id && !seen.has(c.id) && seen.add(c.id));
@@ -263,11 +206,8 @@ const element = (name, value) =>
   value === null || value === undefined || value === '' ? null : `  <${name}>${escape(value)}</${name}>`;
 
 /*
- * Kodi/Emby movie.nfo. Matches the shape of the ones already in this library
- * closely enough for Emby to read it, minus two things it writes and we should
- * not: <lockdata>, which would stop Emby correcting us, and <art>, whose paths
- * in the existing files are absolute paths on a machine that is not this one.
- * Emby finds poster.jpg and fanart.jpg by convention anyway.
+ * Kodi/Emby movie.nfo, without <lockdata> (would stop Emby correcting) and
+ * <art> (Emby finds poster.jpg and fanart.jpg itself).
  */
 function buildNfo(movie, film) {
   const year = movie.date ? String(movie.date).slice(0, 4) : film.year || null;
@@ -305,12 +245,7 @@ function buildNfo(movie, film) {
 
 const exists = (path) => access(path).then(() => true, () => false);
 
-/*
- * Every path this module writes goes through here. The folder name comes from
- * the scan rather than the request, but the check is on the resolved path
- * regardless — a filename is not something to take on trust just because the
- * id that produced it looked reasonable.
- */
+/* Every write goes through this check on the resolved path. */
 function inside(root, folder, name) {
   const base = resolve(join(root, folder));
   const target = resolve(join(base, name));
@@ -341,17 +276,8 @@ async function writeNew(path, data, what, wrote, skipped) {
   wrote.push(what);
 }
 
-/*
- * Write the chosen match into the folder. Returns what it did and what it left
- * alone, which the UI repeats back — "wrote poster.jpg, left the .nfo alone" is
- * the sentence that makes this safe to use twice.
- */
-/*
- * The two sources describe a film differently — TPDB has a site and performer
- * uuids, TMDB has production companies and character names — so both are folded
- * into one shape before anything is written. The .nfo writer never learns which
- * one it came from, beyond the id it stamps.
- */
+/* Write the chosen match. Returns what was written and what was left alone. */
+/* TPDB and TMDB results folded into one shape before writing. */
 function normalise(source, raw) {
   if (source === 'tpdb') {
     return {
@@ -402,13 +328,7 @@ export async function apply(config, movieId, { source = 'tpdb', id }, { nfo = tr
   const skipped = [];
   const failed = [];
 
-  /*
-   * Artwork lives on the studios' own hosts and a good share of them refuse a
-   * hotlink — HTML instead of an image, or a 470. That must not take the whole
-   * operation down with it: the .nfo is the valuable half and it has already
-   * been written by this point. So a dead image is recorded and the call still
-   * succeeds, and the UI can offer the other source for the picture alone.
-   */
+  /* A refused image (HTML or 470) is recorded, not fatal: the .nfo is already written. */
   const tryArt = async (url, name) => {
     try {
       await writeNew(inside(root, film.folder, name), await fetchImage(url), name, wrote, skipped);
@@ -424,13 +344,7 @@ export async function apply(config, movieId, { source = 'tpdb', id }, { nfo = tr
     await writeNew(path, buildNfo(movie, film), `${base}.nfo`, wrote, skipped);
   }
 
-  /*
-   * Artwork is skipped when the folder already has some, under whatever name it
-   * happens to use — Emby writes folder.jpg and a title.jpg as often as
-   * poster.jpg, and writing a second poster beside a perfectly good one is not
-   * filling a gap, it is just adding a file. The scan already worked out which
-   * names count, so that answer is reused rather than guessed at again.
-   */
+  /* Skip artwork when the folder already has some under any name. */
   if (poster && movie.poster) {
     if (film.poster) skipped.push(`poster already there (${film.poster})`);
     else await tryArt(movie.poster, 'poster.jpg');

@@ -1,22 +1,7 @@
 /*
- * A shuffle that is random every visit and identical within one.
- *
- * The reel needs both halves of that. Paging has to hold together — page two
- * must not re-deal the cards page one was dealt from, or you get the same clip
- * twice and miss another entirely — but arriving tomorrow has to give a
- * different order, or it is not a shuffle at all.
- *
- * So: the client picks a seed once per visit and sends it with every page. The
- * library reel already worked this way, passing the seed into Stash's own sort.
- * RedGIFs and Reddit did not — they took `slice((page - 1) * take, page * take)`
- * off a list in insertion order, with no seed anywhere near them. That is not a
- * weak shuffle, it is no shuffle: the first clips of the first page were the
- * same first clips every session, for every session, which is exactly what it
- * looked like from the sofa.
- *
- * mulberry32 rather than anything cleverer. It is thirty characters of integer
- * arithmetic, it has no state to keep between calls, and the quality needed
- * here is "does not visibly repeat", not cryptographic.
+ * A shuffle that differs per visit and holds within one. The client picks
+ * a seed per visit and sends it with every page. mulberry32: small,
+ * stateless, good enough.
  */
 
 // A seed arrives as a string of digits from a query parameter. Anything that is
@@ -45,11 +30,7 @@ export function rng(seed) {
   };
 }
 
-/*
- * Fisher-Yates, on a copy. The caller's array is usually a cache that outlives
- * the request, so shuffling it in place would reorder what everybody else sees
- * and make the next request's "deterministic" order a different one.
- */
+/* Fisher-Yates on a copy; the input is usually a shared cache. */
 export function shuffled(list, seed) {
   const out = [...list];
   const next = rng(seed);
@@ -63,14 +44,8 @@ export function shuffled(list, seed) {
 }
 
 /*
- * The page of a shuffled list, for a source that is mixed into something else.
- *
- * Wraps rather than running out. These pools are small next to a library —
- * a few hundred clips against a few thousand markers — so a long sitting will
- * reach the end of one while the library still has pages to give. Wrapping with
- * a re-shuffle on each lap means it keeps offering clips instead of quietly
- * dropping out of the mix, and the second lap is not in the same order as the
- * first.
+ * One page of a shuffled list for a mixed-in source. Wraps with a fresh
+ * shuffle each lap, since these pools are smaller than the library.
  */
 export function page(list, seed, at, take) {
   if (!list.length || take <= 0) return [];

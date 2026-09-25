@@ -1,7 +1,4 @@
-/*
- * The visual vocabulary of the library: a scene as a tile, anything else as a
- * facet, the rails they sit in, and the filter bar every shelf wears.
- */
+/* Tiles, facets, rails, and the shared filter bar. */
 
 import { clock, el, folderLine } from '../util.js';
 import { blurb } from '../catalogue.js';
@@ -9,13 +6,8 @@ import { heading, hoverPreview, initial, loading, onTeardown } from './core.js';
 
 export function tile(scene) {
   /*
-   * Through the portal's own thumbnail rather than straight at Stash's, so the
-   * setting that fills a missing cover reaches the shelves too. It was only
-   * ever Match and Wild Card that did this, and a scene with no cover is just
-   * as invisible here — a grey placeholder in a wall of pictures.
-   *
-   * Costs nothing on a scene that has a cover: the answer is remembered and
-   * comes back as a redirect to this same address.
+   * Through the portal's thumbnail route, so missing covers get a cut frame.
+   * A scene with a cover is a remembered redirect.
    */
   const art = el('div', { className: 'tileart' },
     el('img', { src: `/media/scene/${scene.id}/thumb`, loading: 'lazy', alt: '' })
@@ -24,23 +16,18 @@ export function tile(scene) {
   const marks = el('div', { className: 'tilemarks' });
 
   /*
-   * Bottom left: the resolution, then where the scene stands, in one colour.
-   *
-   * The colour is about the file against what it is meant to end up at — the
-   * target, which is 720 unless a choice was made on the scene page:
+   * Bottom left: resolution and status, one colour against the target
+   * (720 unless the scene page chose otherwise):
    *
    *   red     bigger than the target, so an encode is still owed
    *   yellow  at or under it, but not finished
    *   green   at or under it, filed in /organized_scenes and organised
    *
-   * The words are about the folder and Stash's organised box:
-   *
    *   Waiting to import  still in /Import Folder or /pc-import
    *   Needs organizing   filed, but not ticked organised in Stash
    *   Filed              filed and organised
    *
-   * Films sit in /movies, outside this pipeline: they are always at target, so
-   * never red, and carry the resolution but no status word.
+   * Films (/movies) are always at target: resolution, no status word.
    */
   const filed = scene.stage === 'library' || scene.stage === 'film';
   const tone = !scene.height || !scene.target ? ''
@@ -72,12 +59,7 @@ export function tile(scene) {
       el('div', { className: 'tileprogressbar', style: `width:${Math.round(scene.progress * 100)}%` })));
   }
 
-  /*
-   * What it is about, in the same words and cut by the same rule as the
-   * StashDB card — a tile is narrower, so it asks for less of it. The hover
-   * title stays the cast: a tile you are pointing at is one you are trying to
-   * recognise, and the description is already on the tile to be read.
-   */
+  /* The blurb, cut like the StashDB card's. The hover title stays the cast. */
   const about = blurb(scene.details, scene.title, 140);
 
   const node = el('article', { className: 'tile' },
@@ -154,11 +136,7 @@ export function entityTile(spec) {
   );
   if (spec.favorite) art.append(el('span', { className: 'fav', title: 'Favourite in Stash' }, '★'));
 
-  /*
-   * How much of a film you hold. Sits on the art like the star does, and
-   * carries its own certainty in the class: an exact denominator came off a
-   * scene list, a probable one off a name match and nothing better.
-   */
+  /* How much of a film you hold; the class says how sure the count is. */
   if (spec.badge) {
     art.append(el('span',
       { className: 'holdbadge ' + (spec.badge.match || 'probable'), title: spec.badge.title || '' },
@@ -179,11 +157,7 @@ export function entityTile(spec) {
     )
   );
 
-  /*
-   * A tile either goes somewhere or does something. The cast rail on a studio
-   * page does something — it filters the shelf underneath it — and a tile with
-   * neither is a picture, so it stops looking clickable.
-   */
+  /* A tile links, acts, or neither (then it doesn't look clickable). */
   if (spec.href) {
     node.onclick = () => { location.hash = spec.href; };
   } else if (spec.onPick) {
@@ -195,11 +169,7 @@ export function entityTile(spec) {
   return node;
 }
 
-/*
- * The missing row. A rail rather than a grid on purpose: it is the smaller
- * half of the question, and a wall of six hundred people you own nothing of
- * would bury the two hundred you do.
- */
+/* The "missing" row, as a rail so it doesn't bury what you hold. */
 function sideRail(spec) {
   const track = el('div', { className: 'railtrack' }, spec.items);
 
@@ -230,13 +200,7 @@ function sideRail(spec) {
 
 export const missingRail = (spec) => sideRail({ ...spec, className: 'missing' });
 
-/*
- * The same object, at the other end of the page. Both are a thin row *about*
- * the shelf rather than part of it, which is why they share the mechanics — but
- * this one opens a page instead of closing it, and it answers a question you
- * asked rather than one the shelf asks you. So it is drawn as a panel, and the
- * shelf underneath stays plain.
- */
+/* The same rail, as a panel that opens a page. */
 export const trackedRail = (spec) => sideRail({ ...spec, className: 'monitored' });
 
 // A name filter over a grid that is already rendered. Hides rather than
@@ -265,23 +229,14 @@ function nameFilter(grid, total) {
   return el('div', { className: 'toolbar' }, box, shown);
 }
 
-/* =============================================================== the shelf bar
+/*
+ * =============================================================== the shelf bar
  *
- * One bar, three shelves: scenes, performers and studios all ask the same kind
- * of question of what you hold — search it, narrow it down a few ways, order
- * it, start again — so they ask it with one piece of furniture rather than
- * three that drift apart. The Movies page has its own, older and film-shaped;
- * this is the same bar wearing the same clothes.
+ * One bar for scenes, performers and studios: search, dropdowns, sort, the
+ * address and paging. Each page supplies its items, facets, sorts and card.
  *
- * What every page brings: its items, its dropdowns, its sorts and how to draw
- * one card. What the bar does: the search, the counting, the ordering, the
- * address and the paging.
- *
- * **Every dropdown counts against every filter but its own**, so its numbers
- * say what picking it would give you rather than what you have already got.
- * And each is built from the items on the shelf, so nothing is offered that
- * would come back empty and nothing Stash knows about but you hold no file of
- * is listed at all.
+ * Each dropdown counts against every other filter, and lists only values
+ * on the shelf.
  */
 
 const WALL = 120;
@@ -296,10 +251,8 @@ function sifted(items, facets, state, skip = null) {
 }
 
 /*
- * Filters live in the address, the same way the search page's do, so opening
- * one thing and coming back lands you on the shelf you had rather than on the
- * whole library. Changing one rewrites the address without navigating — a
- * hashchange here would tear the page down and rebuild it on every keystroke.
+ * Filters live in the address, rewritten in place (a hashchange would
+ * rebuild the page on every keystroke).
  */
 function readFilters(facets, query, fallback) {
   const from = new URLSearchParams(query || '');
@@ -321,12 +274,7 @@ function writeFilters(section, facets, state, fallback) {
 const isFiltered = (facets, state, fallback) =>
   Boolean(state.q.trim()) || facets.some((f) => state[f.key]) || state.sort !== fallback;
 
-/*
- * A dropdown is refilled rather than replaced, so the one you are holding open
- * with the keyboard stays where it is. A chosen value the other filters have
- * squeezed to nothing keeps its place in its own list — dropping it would
- * silently widen the shelf you are looking at.
- */
+/* Refill dropdowns in place. A chosen value squeezed to nothing keeps its place. */
 function fillFacet(select, facet, items, state) {
   const counts = new Map();
   for (const item of items) {
@@ -346,12 +294,8 @@ function fillFacet(select, facet, items, state) {
 }
 
 /*
- * -> the nodes a shelf page is made of: its heading, its bar, its wall and the
- * button under it. Whatever else the page has — a gap rail, the row of things
- * Stash knows about but you hold nothing of — it appends itself.
- *
- * The first sort in the list is the page's own order and the one Clear goes
- * back to, so it is also the one left out of the address.
+ * -> the page's nodes: heading, bar, wall, Show more. Extra rows are the
+ * page's own. The first sort is the default, left out of the address.
  */
 export function shelfPage(spec) {
   const { section, title, items, facets, sorts, order, card, wall: wallClass = 'tiles' } = spec;
@@ -380,10 +324,8 @@ export function shelfPage(spec) {
   const clear = el('button', { className: 'act', type: 'button' }, 'Clear');
 
   /*
-   * Shuffle. A sort like the others — it survives narrowing the shelf, and it
-   * is in the address so coming back to the page keeps you in a shuffle — but
-   * not the same shuffle: the order is thrown, not stored. Pressing it again
-   * throws again, which is the whole point of the button.
+   * Random is a sort: kept when narrowing and in the address, but reshuffled
+   * each time.
    */
   const dice = new Map();
   const roll = (item) => {
@@ -428,9 +370,7 @@ export function shelfPage(spec) {
       ? `${items.length} ${spec.note}`
       : `${showing.length} of ${items.length}`;
 
-    // Always there, greyed when there is nothing to clear: a button that comes
-    // and goes moves everything beside it, and it is the one you reach for
-    // without looking.
+    // Clear is always shown, greyed when there's nothing to clear.
     clear.disabled = !isFiltered(facets, state, fallback);
     shuffle.classList.toggle('on', state.sort === 'random');
     // The sort dropdown grows a Random entry while the shelf is shuffled, so it
@@ -473,17 +413,12 @@ export function shelfPage(spec) {
   ];
 }
 
-/* ------------------------------------------------------- people and studios
+/*
+ * ------------------------------------------------------- people and studios
  *
- * The same bar as the shelf, asked of who is on it and whose it is. What a
- * person or a studio can be narrowed by comes from the scenes you hold rather
- * than from their Stash record: the studios they actually turn up on, the
- * years, the kinds. Stash's own scene_count includes files still queued for
- * import, which is the one number this half of the app must not show.
- *
- * The row of names Stash knows about but you hold nothing of stays below,
- * unfiltered. It is a different question and it answers it the same way it
- * always did.
+ * Facets come from the scenes you hold, not Stash's records (whose
+ * scene_count includes queued imports). The "nothing held" row stays below,
+ * unfiltered.
  */
 
 const NOTHING = { held: 0, studios: new Set(), performers: new Set(), years: new Set(), kinds: new Set(), latest: '' };
@@ -525,11 +460,7 @@ export function shaped(item, index) {
   };
 }
 
-/*
- * One order for both pages: how much of them you hold, their name, or how
- * recently something of theirs landed. "Most scenes" first because that is the
- * shelf's own order — the people you have collected are the point of the page.
- */
+/* Most scenes, name, or newest. */
 export const PEOPLE_SORTS = [
   ['held', 'Most scenes'],
   ['name', 'Name'],

@@ -1,17 +1,8 @@
 /*
- * What the two Whisparrs are still looking for, as a list to search by hand.
- *
- * A scene monitored for weeks with no file is one Whisparr's own searches have
- * not found — usually because the release is named in a way its parser does
- * not tie back to the scene. A person reading the indexer can often see it
- * where Whisparr cannot, so this lists them with a query already built for the
- * Indexers band: studio squashed the way release names write it, and the
- * first performer. Tried against the live indexers: "HouseholdFantasy Elly
- * Clutch" finds releases where "HouseholdFantasy.25.05.30" finds nothing.
- *
- * v3 records carry no cast, so the StashDB scenes are read in batches for it —
- * a couple of dozen requests for the whole list, and cached, because the list
- * only changes when something is found or added.
+ * What both Whisparrs are still looking for, to search by hand. Each row
+ * gets a query for the Indexers band: squashed studio plus first performer
+ * (finds releases a dated query misses). v3 has no cast, so StashDB is
+ * read in batches, cached.
  */
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
@@ -93,18 +84,9 @@ async function fromV2(config) {
 }
 
 /*
- * Whisparr's "monitored, no file" is not "missing". The pipeline files a scene
- * into Stash and Whisparr is only told afterwards — v2 never unmonitors on its
- * own, and the tidy-up on #/stats is a button. So a scene can sit here for
- * weeks after it is on the shelf, and a hand search from this list then grabs
- * it a second time. Stash is the library of record: every row is checked
- * against it on every request, not once per cache fill, and anything it holds
- * leaves the list.
- *
- * Also marked, and kept: what Whisparr is downloading right now, and what was
- * already grabbed by hand from this list — a manual grab lands unnamed in the
- * Import Folder and Stash cannot recognise it until it is built, so without
- * that note the row looks untouched for however long the build takes.
+ * Checked against Stash on every request: Whisparr isn't told when a scene
+ * is filed, so held scenes are dropped. Also marks what's downloading and
+ * what was already hand-grabbed from this list.
  */
 async function annotate(config, key, rows, { force = false } = {}) {
   const [owned, titles, queued, grabbed] = await Promise.all([
@@ -158,10 +140,7 @@ export async function list(config, from = 'v3', { force = false } = {}) {
   return { from: key, at: held.at, ...(await annotate(config, key, held.rows, { force })) };
 }
 
-/*
- * Hand grabs made from this list, keyed "<v2|v3>:<whisparr id>". Written by
- * the grab route when the band was opened from a row; read on every list.
- */
+/* Hand grabs from this list, keyed "<v2|v3>:<whisparr id>". */
 async function readGrabs() {
   try {
     return JSON.parse(await readFile(GRABBED_PATH, 'utf8'));

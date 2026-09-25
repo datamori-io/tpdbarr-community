@@ -1,6 +1,6 @@
 /*
- * The search, and the decide queue that shares its address. StashDB only —
- * ThePornDB is the wild card at the bottom and never blended in.
+ * The search and the decide queue, on one address. StashDB only; ThePornDB
+ * is the separate wild card.
  */
 
 import * as shelf from '../shelf.js';
@@ -13,16 +13,8 @@ import { showMonitored } from './monitored.js';
 import { chip, siteRow } from './site.js';
 
 /*
- * One box, three sources, and each block drawn the moment its own source
- * answers. What you already own comes first, because most searches are "where
- * is that scene" rather than "who else made one"; StashDB comes next because it
- * is the one that decides what you should have; ThePornDB last, for what
- * StashDB has never heard of.
- *
- * They are nowhere near equally fast — ThePornDB's site search can sit for
- * twenty seconds on a phrase — so none of them waits on the others. Holding the
- * front door shut until the slowest has finished is how a search that already
- * has its answer still looks broken.
+ * One box, three sources, each block drawn when its source answers: your
+ * library, StashDB, then ThePornDB (which can take twenty seconds).
  */
 export async function showSearch(query) {
   const paint = painterFor();
@@ -89,27 +81,12 @@ export async function showSearch(query) {
     .catch((err) => settled(false, err.message));
 }
 
-/* ================================================================= the search
+/*
+ * ================================================================= the search
  *
- * The acquisition side is a search area now, not a feed. Every filter is
- * StashDB's own — the query goes to StashDB whole, so the count beside a
- * filtered search is the count of the match and not of the two dozen cards on
- * screen, and paging through it is paging through the real result.
- *
- * Three things worth knowing before changing anything here.
- *
- * **The filters live in the address.** A search is a place: it can be
- * bookmarked, sent to yourself, and walked back out of with the back button.
- * Nothing about a search is held in a variable that a refresh would lose.
- *
- * **The default is what you do not have.** Scenes already in Stash are dropped
- * from the results and the number dropped is reported, with a switch that
- * brings them back — because a search that hides things without saying so is
- * worse than one that shows everything.
- *
- * **One date bound, on purpose.** StashDB's date criterion carries one value
- * and no second — after, before, or on. A from-and-to pair would have to be
- * half a real filter and half a lie about the count.
+ * Every filter goes to StashDB, so counts and paging are real. Filters live
+ * in the address. Scenes you already have are hidden by default, with the
+ * count and a switch to show them. One date bound: StashDB has no BETWEEN.
  */
 
 const SORT_CHOICES = [
@@ -127,15 +104,7 @@ const DATE_CHOICES = [
   ['EQUALS', 'released on'],
 ];
 
-/*
- * How many at a time. StashDB's own page size, so the number chosen is the
- * number asked for rather than a slice taken here — and 60 is its ceiling,
- * not ours.
- *
- * It means two things on one page and they are the same thing: a page of
- * results, and a batch of the decide queue. Both are "how much do I want in
- * front of me before I have to ask for more".
- */
+/* Page size, passed to StashDB (60 is its max). Also the decide batch size. */
 const PER_CHOICES = ['24', '36', '48', '60'];
 const PER_DEFAULT = '24';
 
@@ -181,12 +150,7 @@ export const nextAcquireRun = () => (acquireRun += 1);
 export async function showAcquire(qs) {
   const params = new URLSearchParams(qs || '');
 
-  /*
-   * One page, two catalogues. Scenes are StashDB's and go to Whisparr v3;
-   * movies are ThePornDB's and are containers whose scenes go to v2. It is the
-   * same act — looking for something to bring in — so they share a page and say
-   * which is which, rather than living two tabs apart.
-   */
+  /* Scenes (StashDB, to v3) and movies (ThePornDB, scenes to v2) share the page. */
   if (params.get('kind') === 'movie') return showMovies(qs);
   if (params.get('kind') === 'monitored') return showMonitored(qs);
 
@@ -262,11 +226,7 @@ function acquirePanel(params) {
   );
 }
 
-/*
- * The three type-aheads. Asked of StashDB rather than filtered in the browser,
- * because StashDB matches aliases — a performer's old name finds them under the
- * new one, and that is exactly the search you cannot do against a local list.
- */
+/* Filter type-aheads, asked of StashDB so aliases match. */
 function facetLine(params) {
   return el('div', { className: 'facetsearch' }, FACETS.map(([kind, label]) => facet(params, kind, label)));
 }
@@ -340,11 +300,7 @@ function facet(params, kind, label) {
   return wrap;
 }
 
-/*
- * The active filters, as removable chips. The ids come out of the address and
- * the names come from StashDB, so a bookmarked search says "Riley Reid" rather
- * than a UUID — filled in when the answer arrives rather than blocking the page.
- */
+/* Active filters as removable chips; names fill in from StashDB after drawing. */
 function chipLine(params) {
   const row = el('div', { className: 'chips filterchips' });
   const ids = {
@@ -454,14 +410,7 @@ function controlLine(params) {
     else p.delete('have');
   }));
 
-  /*
-   * The dispositioning pass, as one chip rather than two more checkboxes.
-   *
-   * "Still to decide" is the whole workflow behind tracking a catalogue: what
-   * has this studio put out that I have neither got, nor asked for, nor said no
-   * to. "Ignored" is the way back to the ones you said no to — kept as a place
-   * you can go, so that a decision is undoable without being in your way.
-   */
+  /* Still to decide, or Ignored (the way back to what you skipped). */
   const showing = params.get('show') || 'open';
 
   const pass = (mode, label, tip) => {
@@ -499,10 +448,8 @@ function renderResults(body, params, results) {
   let onScreen = scenes.length;
 
   /*
-   * Two numbers, and they are different numbers. The heading is StashDB's
-   * answer to the search; the line under it is what is actually on this page
-   * after the skipped and the held have been taken out — and that one moves
-   * when you move it.
+   * The heading is StashDB's count; the line under it is what's on this page
+   * after skipped and held are removed.
    */
   const paintNote = () => {
     note.textContent = [
@@ -536,24 +483,12 @@ function renderResults(body, params, results) {
   body.replaceChildren(...kids.filter(Boolean));
 }
 
-/* ------------------------------------------------------------- the queue
+/*
+ * ------------------------------------------------------------- the queue
  *
- * Working through a catalogue is not browsing it, so this has no pages.
- *
- * It could not have them honestly anyway: StashDB counts the whole catalogue,
- * and what reaches the screen is what is left once the skipped, the held and
- * the already-wanted come out — so a page number pointed at a list that no
- * longer existed, every answer reshuffled which survivors landed where, and
- * emptying a page left the page behind. One queue instead: answer a card and it
- * goes, the count above comes down, and when the batch runs out the next one
- * loads itself.
- *
- * Cards by default, because a queue is one decision at a time and the still is
- * most of what the decision is made on. Rows are offered all the same: a
- * catalogue you are mostly saying no to is read down a column of titles and
- * dates faster than it is looked at, and that is a real way to work through
- * one. The switch is the same one the results use and remembers the same
- * choice, so the page does not change shape when you cross between them.
+ * No pages: filtered-out scenes make page numbers meaningless. Answer a
+ * card and it goes; the next batch loads itself. Cards by default, rows
+ * available, using the results' remembered view switch.
  */
 function renderDecide(body, params, first) {
   const cards = el('div', {});
@@ -565,22 +500,11 @@ function renderDecide(body, params, first) {
   let outstanding = first.outstanding ?? null;
   let answered = 0;
   let filling = false;
-  /*
-   * What the standing rules took out of the batches read so far. Counted and
-   * said rather than left to be noticed: a queue that quietly drops half of
-   * what it reads is indistinguishable from one that is broken.
-   */
+  /* Scenes the standing rules took out, counted and shown. */
   let ruled = first.ruled || 0;
-  // The pooled queue counts itself: the measurements the tracked page holds
-  // add up to the size of the whole job, so it arrives with the batch instead
-  // of being asked for afterwards.
+  // The pooled queue arrives with its total.
   const pooled = Boolean(first.pooled);
-  /*
-   * Whether this queue is still the page. The sweep below polls on a timer,
-   * and a timer outlives the address that started it — without this, leaving
-   * for another studio mid-sweep would have the old queue writing its progress
-   * into a page about something else.
-   */
+  /* Whether this queue is still the page, so a sweep's timer stops writing when you leave. */
   const mineDecide = acquireRun;
   let sweeping = false;
 
@@ -590,9 +514,7 @@ function renderDecide(body, params, first) {
 
   const paintHead = () => {
     const here = onScreen();
-    // The catalogue's own number where there is one, so the heading is the
-    // whole job rather than the handful in front of you. It can only ever be
-    // as low as what is on screen.
+    // The catalogue's own count where known, never less than what's on screen.
     const left = outstanding == null ? here : Math.max(here, outstanding - answered);
 
     headline.textContent = left === 1 ? '1 still to decide' : `${left.toLocaleString()} still to decide`;
@@ -604,19 +526,8 @@ function renderDecide(body, params, first) {
   };
 
   /*
-   * The two answers you give to a whole stretch at once.
-   *
-   * The queue is one card at a time because deciding is one decision at a
-   * time, and that stays true right up until it does not: a catalogue you have
-   * scrolled through saying no to everything, or a studio with two thousand
-   * scenes and nothing in it for you. Giving the same answer two thousand
-   * times is not a decision, it is a chore, and a chore is what a button is
-   * for.
-   *
-   * Both are Skip and mean exactly what the card's own Skip means — out of the
-   * results and out of both halves of the fraction. Both are bounded by the
-   * filters on screen: the first by what those filters have put in front of
-   * you, the second by everything they have left to say.
+   * Skip everything on screen, or everything remaining. Both mean the same
+   * as a card's Skip, bounded by the current filters.
    */
   const skipAll = el('button', { className: 'chip quiet', type: 'button' });
   const skipRest = el('button', { className: 'chip quiet', type: 'button' });
@@ -634,11 +545,7 @@ function renderDecide(body, params, first) {
     skipRest.textContent = 'Skip all remaining';
     skipRest.disabled = sweeping;
     skipRest.title = 'Say “not for me” to everything these filters still have to offer, to the end of the catalogue.';
-    /*
-     * Not offered on the pooled queue. "Everything remaining" there is every
-     * scene of every catalogue you follow — a button whose promise is too big
-     * to be sure you meant it, and the per-catalogue one is still a click away.
-     */
+    /* Not on the pooled queue: too broad. */
     skipRest.hidden = pooled;
 
     bulk.hidden = !here && !sweeping;
@@ -661,11 +568,7 @@ function renderDecide(body, params, first) {
     );
   };
 
-  /*
-   * On screen: one request, one write. The cards go on the way out rather than
-   * on the way in — a queue that emptied before the answer landed would be
-   * lying about what had been decided if the write failed.
-   */
+  /* Skip on screen: one request, one write. Cards go after the answer lands. */
   skipAll.onclick = async () => {
     const here = [...cards.querySelectorAll('[data-scene]')];
     const ids = here.map((card) => card.dataset.scene).filter(Boolean);
@@ -692,12 +595,7 @@ function renderDecide(body, params, first) {
     }
   };
 
-  /*
-   * The rest of it is a job on the server: every page from here to the end of
-   * the catalogue, off StashDB, checked against Stash and written in batches.
-   * So this starts it and then watches, rather than waiting on one request
-   * that would time out long before a big studio finished.
-   */
+  /* Skip the rest runs as a server job; this starts it and polls. */
   let sweepTimer = null;
 
   const watchSweep = () => {
@@ -717,11 +615,7 @@ function renderDecide(body, params, first) {
 
         if (found.running) { paintBulk(); watchSweep(); return; }
 
-        /*
-         * Finished. What is on screen was undecided when it was drawn and is
-         * not any more, so the queue is emptied and asked again rather than
-         * left showing cards the sweep has already answered for.
-         */
+        /* Finished: clear the screen and ask again. */
         answered += onScreen();
         held = [];
         groups.clear();
@@ -786,43 +680,15 @@ function renderDecide(body, params, first) {
     if (!cards.childElementCount) fill();
   };
 
-  /*
-   * What is on screen, as scenes rather than as nodes.
-   *
-   * Only switching between rows and cards needs it: the same scenes have to be
-   * drawn again in the other shape, and asking StashDB a second time would
-   * reshuffle the queue under somebody who pressed a view button. Everything
-   * else still reads the nodes — a card that has left cannot be answered for
-   * by a button that has not noticed.
-   */
+  /* What's on screen as scenes, so switching rows/cards can redraw without refetching. */
   let held = [];
 
-  /* ------------------------------------------------------------- blocks
+  /*
+   * ------------------------------------------------------------- blocks
    *
-   * The grain most answers actually come at.
-   *
-   * One card at a time is right for a decision and wrong for a foregone
-   * conclusion, and between "this one" and "everything remaining" there was
-   * nothing. But a backlog is not a flat list of scenes — it is a studio's
-   * whole 2011, a guest appearance on a site you do not follow, a run of
-   * twelve from one shoot. Those are one answer each, and this is the button
-   * for it.
-   *
-   * **What a block is depends on what you already filtered to.** The first cut
-   * grouped by studio and year together and it was wrong on the queue people
-   * actually use: a performer's backlog is one or two scenes each across forty
-   * studios, so sixty cards came out as thirty-nine blocks of one. A block of
-   * one is a card with a heading on it.
-   *
-   * So the dimension is whichever one is still varying. On a studio's queue
-   * the studio is fixed and the year is the question — blocks are years. On a
-   * performer's, or on a search, the studio is the question — blocks are
-   * studios, all years together, which is how "everything she did for Brazzers"
-   * becomes one press.
-   *
-   * Blocks are built in the order the scenes arrive, so the sort you chose is
-   * still the order you read in — the first block is the newest thing the
-   * catalogue has, not the studio whose name sorts first.
+   * Group cards so one press answers a group. The grouping is whatever still
+   * varies: years on a studio's queue, studios on a performer's or a search.
+   * Blocks keep arrival order.
    */
   const groups = new Map();
   const byYear = params.getAll('studio').length > 0;
@@ -910,14 +776,7 @@ function renderDecide(body, params, first) {
     return (groups.get(blockKey(scene)) || makeBlock(blockKey(scene))).grid;
   };
 
-  /*
-   * Blocks in the order their best scene earns.
-   *
-   * Ranking and blocks would otherwise pull against each other — the server
-   * hands back the batch best-first and the blocks put it straight back into
-   * studio order. A block is worth what its best card is worth, which is also
-   * how you read one: the studio with the scene you want is the block you open.
-   */
+  /* Order blocks by their best card. */
   const reorderBlocks = () => {
     if (params.get('rank') !== '1') return;
 
@@ -936,18 +795,12 @@ function renderDecide(body, params, first) {
         onDispose: () => retire(card),
       };
       const card = isGrid() ? stashdbCard(scene, answers) : stashdbRow(scene, answers);
-      /*
-       * Why this one is where it is. On the card rather than in a legend
-       * somewhere: a ranking you cannot interrogate is a ranking you end up
-       * not trusting. The reasons are the server's own words for it.
-       */
+      /* Why this card ranked where it is, in the server's words. */
       if (scene.taste?.why?.length) {
         card.title = scene.taste.why.join('\n');
         if (scene.taste.score >= 25) card.classList.add('likely');
       }
-      // What "skip all on screen" sends. Read off the nodes rather than kept
-      // in a list beside them, so a card that has already left cannot be
-      // skipped by a button that has not noticed.
+      // Read by "skip all on screen" from the nodes.
       card.dataset.scene = scene.id;
       if (scene.taste) card.dataset.score = String(scene.taste.score);
       held.push(scene);
@@ -959,11 +812,7 @@ function renderDecide(body, params, first) {
     paintFoot();
   };
 
-  /*
-   * The same scenes, the other way round. Redrawn from what is held rather
-   * than refetched, so nothing already answered comes back and nothing waiting
-   * is lost.
-   */
+  /* Redraw the other shape from what's held. */
   const reshape = () => {
     const again = held;
     held = [];
@@ -978,17 +827,8 @@ function renderDecide(body, params, first) {
 
   const headRow = el('div', { className: 'feedhead' });
 
-  /*
-   * The blocks on or off, next to the shape of the cards, because they are the
-   * same kind of question: how do you want to read this. Remembered the same
-   * way, and it redraws what is held rather than asking StashDB again — the
-   * queue would otherwise reshuffle under somebody who pressed a view button.
-   */
-  /*
-   * Likeliest yes first, which is a different question from how the cards are
-   * shaped — so it reloads the queue rather than redrawing it. The scoring is
-   * the server's: what is in the library already, counted. See taste.mjs.
-   */
+  /* Blocks on or off; redraws what's held. */
+  /* Likeliest yes first (taste.mjs). Reloads the queue. */
   function rankSwitch() {
     const on = params.get('rank') === '1';
     const chip = el('button', { type: 'button', className: 'chip' + (on ? ' on' : '') }, 'Best first');
@@ -1043,11 +883,7 @@ function renderDecide(body, params, first) {
       ruled += res.ruled || 0;
       add(res.scenes || []);
 
-      /*
-       * An empty batch is still progress: the cursor walked past a stretch of
-       * scenes you had already answered for. So it asks again rather than
-       * reporting the end of a catalogue it has not reached.
-       */
+      /* An empty batch is progress; ask again. */
       if (!cards.childElementCount && cursor != null) return fill(rounds + 1);
       paintFoot();
     } catch (err) {
@@ -1061,14 +897,8 @@ function renderDecide(body, params, first) {
   if (!cards.childElementCount) fill();
 
   /*
-   * What the coverage says is outstanding. Asked for separately and allowed to
-   * fail: it is the difference between a heading that counts the job and one
-   * that counts the screen, and the screen is drawn either way.
-   *
-   * A catalogue measured in the background comes back pending, which is not an
-   * answer and is not a no either — so it asks again a few times rather than
-   * settling for the handful of cards in front of it. That is the state right
-   * after a restart, which is exactly when you are most likely to be here.
+   * The coverage's outstanding count, allowed to fail. Pending (e.g. just
+   * after a restart) is retried a few times.
    */
   const subject = params.get('studio') || params.get('performer');
 

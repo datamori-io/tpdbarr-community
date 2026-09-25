@@ -1,49 +1,15 @@
 /*
- * GameLink, for the films IAFD has never heard of.
+ * GameLink (the AdultEmpire catalogue), for films IAFD doesn't have.
  *
- * This is the AdultEmpire catalogue — same company, same box art, same scene
- * indexes, 150,000-odd films — reached at the one address of theirs that is
- * open. That is the whole reason it exists as a separate module from the two
- * either side of it.
- *
- * **What it can say, and what it cannot.** A GameLink movie page lists its
- * scenes with the cast of each and a set of attributes, and it does **not**
- * name them. So this is the same class of evidence IAFD gives — a scene is
- * matched when its cast is exactly a row's cast — and it lands in the same
- * *probable* tier, with the same ambiguity when two rows share a cast. It is
- * not a better answer than IAFD. It is the same answer about far more films,
- * and it costs one page instead of two.
+ * Movie pages list each scene's cast and attributes, no titles, so this is
+ * the *probable* tier like IAFD — same evidence, more films, one page.
  *
  * ------------------------------------------------------------------ manners
  *
- * **Checked, not assumed, and the checks came out differently from
- * AdultEmpire's.** Two things kept AdultEmpire out of this builder: every one
- * of its search paths is disallowed in robots.txt, and every page redirects to
- * an age wall. GameLink shares the second and not the first.
- *
- *   robots.txt — `/account/`, `/cart/`, `/buy/`, `/AllSearch/Search` and the
- *   error paths are disallowed. `/adult-movies/` is not; they publish
- *   `/adult-movies/sitemap` inviting exactly this. The one page this module
- *   fetches is an `/adult-movies/` page, and nothing here touches a disallowed
- *   path — the site's own search is `/AllSearch/Search`, which is why the
- *   searching is not done here at all (see below).
- *
- *   the age gate — answered, and by the person it asks about. Stash's GameLink
- *   scraper already carries the same `ageConfirmed` cookie and runs on this
- *   machine for this user; this is the same consent from the same person on
- *   the same machine, and the gate asks one question to which the answer here
- *   is genuinely yes. That is different from AdultEmpire only in that nothing
- *   else about AdultEmpire was permitted either.
- *
- * **The search is Stash's, not ours.** Finding which film this is happens
- * through Stash's own GameLink scraper — a NAME scrape that already exists,
- * already carries the cookie, and returns movie addresses. So this module does
- * not crawl a search at all: it is handed an address and fetches one page.
- * That is a better arrangement than a searching crawler on every count, and it
- * keeps this module to a single request per film.
- *
- * One request at a time, 1.2 seconds apart, the figure iafd.mjs and bang.mjs
- * both use. Nothing here writes to Stash and nothing follows a link it found.
+ * robots.txt allows `/adult-movies/`; this fetches only those pages.
+ * The age gate is answered with the same cookie Stash's GameLink scraper
+ * uses on this machine. Searching is done by Stash's scraper, so this
+ * module fetches one page per film. 1.2s apart, one at a time.
  */
 
 import { gql } from './stash.mjs';
@@ -65,12 +31,7 @@ async function polite() {
   nextAllowed = Date.now() + CRAWL_DELAY;
 }
 
-/*
- * The only shape of address this will fetch: a film page, on either host.
- * Checked here rather than at the call site, so "it only ever reads a movie
- * page" is a fact about the module and not a hope about its callers. Every
- * path robots.txt disallows fails this by construction.
- */
+/* The only address shape this will fetch: a film page on either host. */
 const MOVIE = /^https:\/\/(?:www|gay)\.gamelink\.com\/adult-movies\/[^/]+\/\d+\/[^/?#]+$/;
 
 async function page(url) {
@@ -109,11 +70,7 @@ const unescapeHtml = (text) => String(text || '')
   .replace(/\s+/g, ' ')
   .trim();
 
-/*
- * Two titles are the same title. Same rule bang.mjs uses, and for the same
- * reason — DVD numbering is written four ways for one film and the punctuation
- * is never the disagreement.
- */
+/* Same title? Same rule as bang.mjs. */
 export const flatten = (text) => String(text || '')
   .toLowerCase()
   .replace(/&/g, ' and ')
@@ -121,13 +78,10 @@ export const flatten = (text) => String(text || '')
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
-/* ------------------------------------------------------------- which film
+/*
+ * ------------------------------------------------------------- which film
  *
- * Asked of Stash, which already has the scraper and the cookie.
- *
- * GameLink answers a search it has no answer for with whatever was closest, so
- * the result is never taken on its position — only one whose title flattens to
- * the title asked for is used.
+ * Asked of Stash's GameLink scraper. Only a result whose title matches is used.
  */
 async function addressFor(config, title) {
   const wanted = flatten(title);
@@ -149,19 +103,13 @@ async function addressFor(config, title) {
   return null;
 }
 
-/* --------------------------------------------------------- one film's scenes
+/*
+ * --------------------------------------------------------- one film's scenes
  *
- * The page draws each scene as a `movie__scenes__scene__*` block carrying a
- * `scene_id`, a `Starring:` run of performer links, and an `Attributes:` run of
- * category links. There is no title anywhere on it — which is the single fact
- * that decides where this tier sits.
+ * Scene blocks carry `scene_id`, a `Starring:` run and an `Attributes:` run. No titles.
  */
 function readScenes(html) {
-  /*
-   * Cut at the scene ids rather than at a wrapper class. The blocks are built
-   * out of several sibling divs that share no single container, and the id is
-   * the one thing every scene has exactly once.
-   */
+  /* Cut at the scene ids; the blocks share no container. */
   const marks = [...html.matchAll(/scene_id='(\d+)'/g)];
 
   const order = [];
@@ -193,11 +141,7 @@ function readScenes(html) {
 
 /*
  * -> { url, title, studio, date, scenes: [{ no, id, performers, attributes }] }
- *
- * The film's own facts come off the same `<li><strong>Label:</strong> value`
- * list the Stash scraper reads, and they are read the careful way: anchored on
- * the `li`, never on "anything containing the word", which is the mistake that
- * had the scraper returning the whole page as a release date.
+ * Facts read from the `<li><strong>Label:</strong>` list, anchored on the li.
  */
 export async function film(config, title, { year = null } = {}) {
   const url = await addressFor(config, title);
@@ -217,10 +161,7 @@ export async function film(config, title, { year = null } = {}) {
   const when = li('Released');
   const date = Date.parse(when) ? new Date(Date.parse(when)).toISOString().slice(0, 10) : '';
 
-  /*
-   * A year that disagrees is a different film with the same name, which DVD
-   * series produce constantly. Only checked when both ends have one.
-   */
+  /* A different year is a different film. Checked only when both have one. */
   if (year && date && Math.abs(Number(date.slice(0, 4)) - Number(year)) > 1) return null;
 
   return { url, title, studio: li('Studio'), date, scenes };

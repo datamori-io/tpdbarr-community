@@ -3,22 +3,11 @@
 import { el } from '../util.js';
 import { paint, painterFor } from './core.js';
 
-/* ================================================================== thanks
+/*
+ * ================================================================== thanks
  *
- * What this portal is standing on.
- *
- * Almost nothing here is original. The catalogues are other people's work,
- * kept up by volunteers; the downloaders and the encoder are other people's
- * software; the library itself is Stash. This portal is a way of pointing them
- * at each other, and a page that says so is the least it can do.
- *
- * The list is grouped by what a thing is *for* rather than alphabetically,
- * because the interesting question about a source is which question it answers
- * — and several of these are only here because another one could not answer it.
- *
- * Kept honest by being built from what the code actually reaches: every host in
- * here appears in src/. If something is added to the app and not to this list,
- * the list is wrong.
+ * What this portal stands on, grouped by what each is for. Every host here
+ * appears in src/; keep the list in step with the code.
  */
 
 const THANKS = [

@@ -1,20 +1,10 @@
 /*
- * A movie, played as a movie.
+ * A group played as one film: the scene page's layout, with a player that
+ * walks through the parts in order.
  *
- * A Stash group is a release cut into scene files, and a list of those files
- * is not what a film is. So this page is the scene page's shape — player,
- * what it is, a rail of what you read — with one difference that is the whole
- * point: the player holds the whole group. It starts on the first part and
- * walks into the next when one ends, so a five-part release plays through
- * once you press play.
- *
- * The order is the hard part. Stash keeps a scene_index on the join and
- * almost nothing here sets it, so the names are what is left — and the names
- * in this library are consistent enough to read: "pt. 2", "- Scene 4",
- * "Act III", "Ep 3". What is read is the part of the title that is *not* the
- * group's own name, because half these releases carry a volume number —
- * "Lindsey in Barely Legal #2" — and that number is the film, not the place
- * in it.
+ * Order: Stash's scene_index is rarely set, so it's read from the part of
+ * each title that isn't the group's name ("pt. 2", "- Scene 4", "Act III").
+ * A volume number in the name is the film, not the part.
  */
 
 import { api, clock, el } from '../util.js';
@@ -29,11 +19,7 @@ const escaped = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
 
-/*
- * Only numbers wearing a word that says what they count. A bare number in one
- * of these titles is nearly always the volume — #17, Vol. 8 — and ordering
- * five scenes by the volume they all share is worse than not trying.
- */
+/* Only numbers with a word saying what they count; a bare number is usually the volume. */
 const PLACES = [
   /\bscenes?\s*#?\s*(\d{1,2})\b/i,
   /\bp(?:ar)?ts?\.?\s*#?\s*(\d{1,2})\b/i,
@@ -67,12 +53,8 @@ export function placeOf(title, groupName) {
 }
 
 /*
- * -> the scenes in the order they should play.
- *
- * Whatever place can be read comes first; everything unreadable falls to the
- * back in date order, which is the order a serial came out in and the least
- * wrong answer for a compilation. The position it arrived in is the last
- * tiebreak, so the sort never shuffles equals about.
+ * -> scenes in play order: readable places first, the rest by date, then
+ * arrival order.
  */
 export function ordered(scenes, groupName) {
   const keyed = scenes.map((scene, at) => ({
@@ -97,14 +79,11 @@ export function ordered(scenes, groupName) {
   return keyed.map((k) => k.scene);
 }
 
-/* -------------------------------------------------------- what was watched
+/*
+ * -------------------------------------------------------- what was watched
  *
- * The same contract the scene page keeps, moved along as the film moves: a
- * play counted once per part, real elapsed time rather than seek distance,
- * and the position written back to Stash — so "continue watching" is the same
- * list whether you watched this here, on the scene page, or in Stash itself.
- *
- * The part being left is reported before the next one starts.
+ * Same as the scene page: a play per part, real elapsed time, position
+ * written to Stash. The part being left is reported before the next starts.
  */
 const REPORT_EVERY = 15000;
 
@@ -159,17 +138,12 @@ function tracking(video) {
 
   return {
     /*
-     * `at` is where the part being left got to, which on a part that ran out
-     * is its runtime rather than wherever the video element now sits: a
-     * browser can fire `ended` a fraction short, and a part left four seconds
-     * from the end comes back forever as unfinished.
+     * `at` is where the part got to; a part that ended counts as its full
+     * runtime (`ended` can fire a fraction short).
      */
     move(next, at = video.currentTime) {
       report(at);
-      // Onto the card as well as into Stash. The cards are what the chapter
-      // list draws its bars from and what a part picks up from when you come
-      // back to it, and within one sitting this page is the only thing that
-      // knows a part has moved on.
+      // On the card too, for the chapter bars and resuming.
       if (scene) scene.resume = at;
       scene = next;
       counted = false;
@@ -212,12 +186,7 @@ function play(scenes, onScene) {
     },
   });
 
-  /*
-   * A part's markers and its sprite sheet are not on the cards this page was
-   * handed, so they are asked for as each part starts and given to the bar.
-   * One small request per part, and a part that answers nothing plays with a
-   * plain bar rather than not playing.
-   */
+  /* Fetch each part's markers and sprites as it starts. */
   const dress = (scene) => {
     api(`/api/library/scenes/${scene.id}`)
       .then(({ scene: full }) => {
@@ -232,11 +201,7 @@ function play(scenes, onScene) {
       .catch(() => {});
   };
 
-  /*
-   * Moving to a part. `from` is where the part being left got to; `resume` is
-   * whether this one picks up where it was stopped, which is true when you
-   * open the film and false when the one before it just ran out.
-   */
+  /* Go to a part. `from`: where the last got to. `resume`: pick up where it stopped. */
   const go = (next, { resume = true, autoplay = true, from = null } = {}) => {
     if (next < 0 || next >= scenes.length) return;
 
@@ -291,12 +256,10 @@ function play(scenes, onScene) {
   };
 }
 
-/* ----------------------------------------------------------- the chapters
+/*
+ * ----------------------------------------------------------- the chapters
  *
- * Under the player, where the scene page keeps its markers and for the same
- * reason: it is the list of places in what you are watching. Each row says
- * where that part starts in the film as a whole rather than in its own file,
- * because that is the number a person means by "about an hour in".
+ * The parts, each with its start time in the whole film.
  */
 // How far through a part you are. Read off the card rather than off the
 // `progress` the shelf worked out, because the card moves as the film plays.
@@ -382,9 +345,7 @@ export async function showGroup(id) {
     const cast = new Map();
     for (const scene of scenes) for (const p of scene.performers) cast.set(p.id, p);
 
-    // The film is as long as its parts. `group.duration` is what a scraper was
-    // told the release runs to, which is the right thing to fall back on and
-    // the wrong thing to trust over the files actually here.
+    // The film's length is the sum of its parts; the scraped duration is the fallback.
     const film = scenes.reduce((sum, s) => sum + (s.duration || 0), 0) || group.duration || 0;
 
     let list = null;

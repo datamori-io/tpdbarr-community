@@ -1,22 +1,10 @@
 /*
- * One shelf for everything that is a film.
+ * One shelf for films: Stash groups (releases built from scene files) and
+ * features (one long file), flattened into one shape.
  *
- * Two things in Stash mean "a film" and they are different objects. A **group**
- * is a release assembled from several scene files. A **feature** is one long
- * file that is the whole release by itself. Stash has no single type for that
- * idea, so this module makes one: it reads both, flattens them into the same
- * shape, and lets the page treat them alike while still saying which is which.
- *
- * Merged in memory rather than by query, and that is a deliberate ceiling.
- * Groups and scenes take different filter types — a GroupFilterType cannot ask
- * about performers the way a SceneFilterType can — so any server-side combined
- * filter would either be two half-filters pretending to be one, or a lie about
- * the count. At fifty-odd films the whole set fits in one response and the page
- * filters instantly with no round trip. If this ever reaches thousands, that is
- * the assumption to revisit, and it will need real paging rather than tuning.
- *
- * A group's cast is the union of its scenes' casts, because a group carries a
- * performer_count and no performers of its own.
+ * Merged in memory, not by query: groups and scenes take different filter
+ * types. Fine at dozens of films; thousands would need real paging.
+ * A group's cast is the union of its scenes' casts.
  */
 
 import { gql } from './stash.mjs';
@@ -131,14 +119,7 @@ function resolution(height) {
 
 // ------------------------------------------------------------------ facets
 
-/*
- * What the filter bar can offer, counted from what is actually on the shelf.
- *
- * Built from the films themselves rather than from Stash's full tag and
- * performer lists: offering all 1286 performers when eleven of them are in a
- * film here would make the control useless. A filter should only ever suggest
- * something that changes what you see.
- */
+/* Filter options counted from the films on the shelf. */
 function facetsFrom(films) {
   const tally = (pick) => {
     const seen = new Map();
@@ -184,15 +165,7 @@ export async function filmsView(config) {
 
 // ------------------------------------------------------------------ writing
 
-/*
- * Removing one.
- *
- * The file is left alone unless asked for explicitly, and the asking has to
- * come from the caller rather than being inferred: everything else in this app
- * can be undone by running something again, and this cannot. A group destroyed
- * takes no files with it in any case — it is a record about scenes, not a
- * thing on disk.
- */
+/* Remove one. The file only goes if the caller asks. Deleting a group takes no files. */
 export async function remove(config, kind, id, { deleteFile = false } = {}) {
   if (kind === 'group') {
     await gql(config, 'mutation($id: ID!) { groupDestroy(input: {id: $id}) }', { id });
@@ -208,10 +181,7 @@ export async function remove(config, kind, id, { deleteFile = false } = {}) {
   return { removed: 'film', id, fileDeleted: Boolean(deleteFile) };
 }
 
-/*
- * Artwork. A group keeps its cover in front_image, a scene in cover_image, and
- * both take the same data URL — so the only thing that differs is the field.
- */
+/* Cover: front_image on a group, cover_image on a scene. Same data URL. */
 export async function setCover(config, kind, id, dataUrl) {
   if (!/^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)) {
     throw new Error('That is not an image this can set.');
@@ -234,19 +204,11 @@ export async function setCover(config, kind, id, dataUrl) {
   return { id, kind };
 }
 
-/* ------------------------------------------------------------ rescanning
+/*
+ * ------------------------------------------------------------ rescanning
  *
- * Stash's own scrapers, not TMDB.
- *
- * TMDB barely knows this catalogue, whereas data18, Adult Empire, Bang and
- * AdultFilmDatabase return a full record and both covers from one address —
- * and Stash walks through the age gates and captchas that turn a plain fetch
- * away, which is why the reading is asked of Stash rather than done here.
- *
- * The film scrapers are *group* scrapers, because a release is what they
- * describe. That is right for both kinds: a single-file feature is a release
- * that happens to be one file, so the same record maps onto it — the name
- * becomes the title, the synopsis the details, the front image the cover.
+ * Via Stash's group scrapers (data18, Adult Empire, Bang, AdultFilmDatabase),
+ * which get past age gates and captchas. Group records map onto features too.
  */
 
 const SCRAPED_TO_SCENE = {
@@ -273,11 +235,7 @@ export async function scrapeFrom(config, url) {
   return data.scrapeGroupURL;
 }
 
-/*
- * `fields` is what the dialog ticked, so a scrape that got the cover right and
- * the title wrong can be taken in part. Studio is never sent: the scraper knows
- * a name and Stash wants an id.
- */
+/* Apply the ticked fields. Studio is never sent (name vs id). */
 export async function applyScraped(config, kind, id, fields, { url = null } = {}) {
   const input = { id };
 

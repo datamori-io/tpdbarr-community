@@ -1,27 +1,11 @@
 /*
- * Identifying the feature films from the .nfo files already beside them.
+ * Fill the feature films in Stash from their Emby .nfo files. Stash
+ * doesn't read .nfo; moviefiles.mjs does.
  *
- * The 51 films arrived in Stash by a plain scan, which means empty titles and
- * folder-derived nothing: no date, no studio, no cast. Stash does not read
- * Emby's .nfo. But the portal already does — moviefiles.mjs has parsed these
- * for the Films shelf since the day it was written — so the answers are on disk
- * and re-scraping fifty-one films by hand would be the wrong way round.
+ * Joined by folder: both containers mount the share at /movies.
  *
- * The join is the folder. Both containers mount the same share at /movies, so
- * a Stash file at /movies/<folder>/<file> and a portal scan of <folder> are the
- * same film by construction, not by guesswork. That is the one thing here that
- * is certain, and everything else is built on it.
- *
- * **Two rules this will not break.**
- *
- * Nothing is created. A cast name that matches no performer in Stash is
- * reported and skipped, never added — 1286 performers is a curated list, and
- * quietly seeding it with names off a scraped .nfo is how it stops being one.
- * Same for studios.
- *
- * Nothing is overwritten. Only fields Stash currently has empty are filled, so
- * running this twice is safe and running it after you have corrected something
- * by hand does not undo you.
+ * Nothing is created (unknown cast and studios are reported) and nothing
+ * is overwritten (only empty fields are filled).
  */
 
 import { readFile } from 'node:fs/promises';
@@ -55,12 +39,7 @@ async function stashSideScenes(config) {
   return data.findScenes.scenes || [];
 }
 
-/*
- * Name -> id for everyone and everything Stash already knows.
- *
- * Read whole rather than queried per film: fifty-one films with six cast each
- * is three hundred lookups, and the entire performer list is one request.
- */
+/* Name -> id for all performers and studios, in one request each. */
 async function directories(config) {
   const data = await gql(
     config,
@@ -71,12 +50,8 @@ async function directories(config) {
   );
 
   /*
-   * The two are not spelled the same: a performer has `alias_list` and a studio
-   * has `aliases`, and both are lists rather than the comma-separated string an
-   * older schema used. Guessing that wrong is a 422 with no field name in it,
-   * so they are read as the schema actually declares them.
-   *
-   * A real name always wins over someone else's alias — hence the has() guard.
+   * Performers have `alias_list`, studios `aliases`, both lists. A real name
+   * beats someone else's alias.
    */
   const index = (records, aliasKey) => {
     const map = new Map();
@@ -104,11 +79,7 @@ function folderOf(scene) {
   return path.slice(at + MOVIE_ROOT.length).split('/')[0] || null;
 }
 
-/*
- * Emby writes <premiered> as a full date and <year> as a bare one. Stash takes
- * either — checked against a real write — so a year is offered rather than
- * thrown away, and rather than having two thirds of it invented.
- */
+/* <premiered> is a full date, <year> a bare year; Stash accepts both. */
 function dateFrom(movie) {
   const premiered = String(movie.premiered || '').slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(premiered)) return premiered;
@@ -211,20 +182,12 @@ export async function apply(config, { only = null } = {}) {
   return { attempted: wanted.length, updated: done.length, done, failed };
 }
 
-/* ------------------------------------------------------------- the posters
+/*
+ * ------------------------------------------------------------- the posters
  *
- * Emby's poster.jpg, pushed into Stash as the scene cover.
- *
- * Unlike everything above, this **overwrites**. Stash generates a screenshot
- * cover for every scene it scans, so there is no empty field to fill politely
- * into — the whole point is to replace that screenshot with the artwork sitting
- * beside the film. There is no per-scene undo either; getting the screenshots
- * back means running Stash's own cover-generation task again.
- *
- * Worth knowing before you look at the result: a poster is portrait, roughly
- * 2:3, and Stash draws scene covers in 16:9. The artwork will letterbox or
- * crop. Every folder here also has a landscape fanart.jpg, which is what
- * `which` switches to if the portrait version looks wrong in place.
+ * Emby's poster.jpg as the Stash scene cover. This overwrites (Stash always
+ * has a generated cover); undo by regenerating covers in Stash. Posters are
+ * portrait and will crop in 16:9; `which` switches to fanart.jpg.
  */
 
 const IMAGE_TYPE = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };

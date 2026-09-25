@@ -1,33 +1,16 @@
 import { spawn } from 'node:child_process';
 
 /*
- * IAFD, for the facts Stash does not carry.
+ * IAFD, for facts Stash doesn't carry (birthplace, weight, career end).
  *
- * Stash fills a performer in from whichever stash-box identified them, and
- * that record is thin in a consistent way: it knows a hair colour and a
- * measurement, and it does not know where somebody was born, what they weigh,
- * or the year they stopped working. IAFD knows all three, and Stash already
- * holds the link — the performer's `urls` carry an iafd.com address whenever
- * one was scraped, so nothing here has to search for a person or guess which
- * of two people with one name it found.
- *
- * One page, fetched, read, and never crawled. This follows no links: the only
- * address it will fetch is one that came off the performer's own record, and
- * the same-host check below is what makes that true rather than intended.
- *
- * Nothing here writes to Stash. What comes back is shown beside what Stash
- * has, marked as somebody else's fact.
+ * Only fetches the iafd.com URL already on the performer's Stash record,
+ * never follows links. Nothing here writes to Stash.
  */
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 
-/*
- * A person's height does not change, so this is cached for a week and a cold
- * portal is the only thing that ever pays for the fetch. The cap is a bound on
- * a long-running process rather than a policy — a library with four thousand
- * performers should not hold four thousand pages of HTML-derived facts.
- */
+/* Cached a week. The cap bounds memory. */
 const TTL = 7 * 24 * 60 * 60 * 1000;
 const MAX_CACHED = 500;
 const cache = new Map(); // url -> { at, record }
@@ -35,11 +18,10 @@ const cache = new Map(); // url -> { at, record }
 export const iafdUrlOf = (urls = []) =>
   urls.find((u) => /^https?:\/\/(www\.)?iafd\.com\//i.test(u)) || null;
 
-/* ------------------------------------------------------------------ reading
+/*
+ * ------------------------------------------------------------------ reading
  *
- * IAFD writes its biography as a run of label/value pairs, and the value is a
- * <p> for most of them and a <div> for the aliases. Both, or the AKA list is
- * the one thing this misses.
+ * Label/value pairs; values are <p>, or <div> for aliases.
  */
 
 const strip = (html) =>
@@ -65,11 +47,7 @@ function pairs(html) {
   return found;
 }
 
-/*
- * IAFD says "No known aliases", "None", and a bare dash for the same thing,
- * which is that it does not know. A page that printed "Piercings: None" as a
- * fact would be adding a row to say nothing.
- */
+/* IAFD's ways of saying "unknown". */
 const EMPTY = /^(no known aliases|none|unknown|n\/a|-+|no data)$/i;
 const real = (value) => (value && !EMPTY.test(value) ? value : null);
 
@@ -85,12 +63,7 @@ function isoDate(value) {
   return `${m[3]}-${String(month + 1).padStart(2, '0')}-${m[2].padStart(2, '0')}`;
 }
 
-/*
- * Both are written imperial first with the metric in brackets — "5 feet, 3
- * inches (160 cm)" — so the number in the brackets is the one Stash's units
- * want. Literal patterns rather than one built from the unit, because the
- * backslashes in a constructed one are a bug waiting for a quiet afternoon.
- */
+/* Metric is in the brackets. Literal patterns, not built ones. */
 const CENTIMETRES = /\((\d+(?:\.\d+)?)\s*cm\)/i;
 const KILOGRAMS = /\((\d+(?:\.\d+)?)\s*kg\)/i;
 
@@ -133,21 +106,14 @@ export function parse(html, url) {
   };
 }
 
-/* ------------------------------------------------------------------ fetching
+/*
+ * ------------------------------------------------------------------ fetching
  *
- * A failure here is not an error the page should show. The vitals it has come
- * from Stash and are already on screen; this either adds to them or it does
- * not, and "IAFD was slow" is not something to interrupt somebody with.
+ * Failures are silent: Stash's facts are already on screen.
  */
 /*
- * IAFD is behind Cloudflare, and it does not challenge consistently: the same
- * request three times running gets turned away twice and answered once. So
- * this asks up to three times with a pause between, and gives up quietly.
- *
- * Nothing is being got around here — a challenge is taken as "no answer", the
- * interstitial is never solved, and one page a week per performer is not a
- * rate anything needs protecting from. It is a retry because the failure is
- * intermittent, which is the only reason to retry anything.
+ * Cloudflare challenges intermittently, so up to three tries. A challenge is
+ * treated as no answer, never solved.
  */
 const ATTEMPTS = 3;
 const PAUSE = 4000;
@@ -160,10 +126,7 @@ const LANGUAGE = 'en-US,en;q=0.9';
 
 async function viaFetch(url) {
   const res = await fetch(url, {
-    /*
-     * Accept-Language is not decoration: a request without one is turned away
-     * more often than not, whatever the user agent says.
-     */
+    /* Requests without Accept-Language are usually turned away. */
     headers: {
       'User-Agent': UA,
       Accept: ACCEPT,
@@ -181,24 +144,9 @@ async function viaFetch(url) {
 }
 
 /*
- * The same page, fetched by wget instead — and this is the one that works here.
- *
- * Cloudflare does not only look at the address a request came from. Measured on
- * 2026-09-04, from inside this container and within the same minute: Node's own
- * fetch got **403 and a challenge page**, and `wget` against the identical URL,
- * with the identical headers, got **200**. Same machine, same IP, same second.
- * What differs is the shape of the TLS and HTTP handshake, and undici's is on
- * somebody's list.
- *
- * That is worth knowing beyond this file: the performer vitals this module has
- * always fetched were failing the same way and reporting it as "IAFD had
- * nothing", which is what a challenge looks like when it is treated as a miss.
- *
- * Nothing is being got around. The challenge is still never solved, no cookie
- * is harvested and no interstitial is answered — this asks the same question
- * with a different, entirely ordinary client, and takes no for an answer when
- * no is what comes back. Spawned rather than added as a dependency because this
- * app has none and markerclips.mjs already reaches for a binary the same way.
+ * The same request via wget. Cloudflare rejects Node's fetch (by its TLS
+ * handshake) while wget from the same machine gets through. Nothing is
+ * bypassed: no challenge solved, no cookie taken.
  */
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -229,15 +177,7 @@ function viaWget(url) {
   });
 }
 
-/*
- * Which of the two this machine can use, worked out once by trying.
- *
- * Neither is hard-coded: an installation where fetch is fine should not shell
- * out on every page, and one where it is challenged should not spend three
- * attempts a page discovering that forever. So the first page that succeeds
- * settles it, and a first page that fails both ways settles nothing — it may
- * simply be a page IAFD does not have.
- */
+/* Which transport works, settled by the first success. */
 let transport = null;
 
 async function fetchOnce(url) {
@@ -267,33 +207,18 @@ export async function lookup(url) {
   const html = await fetchWithRetries(url);
   const record = html ? parse(html, url) : null;
 
-  /*
-   * A miss is cached too, but only for an hour: the page is probably there and
-   * this run was unlucky, so a week would turn one bad afternoon into a
-   * performer who permanently has no vitals.
-   */
+  /* Misses are cached for an hour only. */
   if (cache.size >= MAX_CACHED) cache.clear();
   cache.set(url, { at: record ? Date.now() : Date.now() - TTL + 60 * 60 * 1000, record });
   return record;
 }
 
-/* ----------------------------------------------------------------- filling
+/*
+ * ----------------------------------------------------------------- filling
  *
- * What of an IAFD record Stash does not already have.
- *
- * Gaps only. Stash is the library of record and this never argues with it: a
- * field it has an answer for is left exactly as it is, however sure IAFD
- * sounds. So there is no dialog to tick through and nothing to undo — the
- * worst this can do is put a fact where there was previously nothing.
- *
- * `career_end` counts as a gap and `career_length` does not. Stash parses its
- * own "2018 -" into a start with no end, so the end year is a hole in the
- * record rather than a second opinion about it, and filling it leaves the
- * sentence Stash wrote alone.
- *
- * The last four have no Stash field at all. They go into custom_fields, which
- * is merged rather than replaced, so this cannot tread on custom fields put
- * there by anything else.
+ * What IAFD has that Stash doesn't. Gaps only; never overwrites.
+ * `career_end` counts as a gap. The last four fields go into
+ * custom_fields, which is merged.
  */
 
 const blank = (value) =>
@@ -314,23 +239,14 @@ const FIELDS = [
   ['alias_list', 'Also known as', (i) => (i.aka.length ? i.aka : null), (v) => v.join(', ')],
 ];
 
-/*
- * Nationality is not here on purpose. Stash's country is a two-letter code and
- * IAFD's is a word, so the two would sit in different places saying the same
- * thing — and the page keeps one rule: everything marked as IAFD's is
- * something the button will write, and nothing else is marked at all.
- */
+/* No nationality: Stash's country is a code, IAFD's a word. */
 const CUSTOM = [
   ['Birthplace', (i) => i.birthplace],
   ['Star sign', (i) => i.astrology],
   ['Shoe size', (i) => i.shoeSize],
 ];
 
-/*
- * `stash` is the performer as Stash returns it — snake_case, and including
- * custom_fields, because a custom field that is already set is as much of an
- * answer as a column that is.
- */
+/* `stash` is the performer as Stash returns it, custom_fields included. */
 export function proposal(stash, record) {
   if (!record) return { fields: {}, custom: {}, rows: [] };
 
@@ -358,38 +274,17 @@ export function proposal(stash, record) {
   return { fields, custom, rows };
 }
 
-/* ----------------------------------------------------- titles and scenes
+/*
+ * ----------------------------------------------------- titles and scenes
  *
- * The other half of IAFD, and the reason the Group Builder exists.
- *
- * A DVD's page carries a **Scene Breakdowns** table — one row per scene, with
- * the performers in it. That is the only freely readable statement anywhere of
- * *what a film is made of*. AdultEmpire and data18 both say it better and
- * neither can be read: AdultEmpire redirects every page to /AgeConfirmation
- * and disallows every search path in robots.txt, and data18 answers a plain
- * fetch with a 403. IAFD asks for neither a consent it was not given nor a
- * challenge to be solved, and its robots.txt allows this outright.
- *
- * **What the table does not say is the point.** It lists people, not titles —
- * "Scene 2: Alexis Tae, Molly Little, Seth Gamble" and nothing else. So a scene
- * matched through here is matched on its cast, which is a guess, and every
- * proposal built on one says so. The exact tier is ThePornDB's own scene list;
- * this is what answers when TPDB has none, which for this library is most of
- * the time.
+ * A DVD page's Scene Breakdowns table: one row per scene, performers only.
+ * Used by the Group Builder when TPDB has no scene list. Cast matches are guesses.
  */
 
 const HOST = 'https://www.iafd.com';
 const SEARCH = HOST + '/results.asp?searchtype=comprehensive&searchstring=';
 
-/*
- * IAFD's own crawl budget. There is no Crawl-delay in its robots.txt, so this
- * is a manners figure rather than a required one — a scan of one studio is
- * three hundred titles, and three hundred requests as fast as they will go is
- * not a thing to do to somebody else's server for a shelf of DVD covers.
- *
- * One at a time, deliberately. A delay means nothing if four workers each wait
- * it separately — the same note groupurl.mjs carries about its thirty seconds.
- */
+/* 1.2s between requests, one at a time. A courtesy; robots.txt sets none. */
 export const CRAWL_DELAY = 1200;
 
 let nextAllowed = 0;
@@ -400,21 +295,10 @@ async function polite() {
   nextAllowed = Date.now() + CRAWL_DELAY;
 }
 
-/*
- * The retry loop lookup() has always used, lifted out so the title side gets
- * the same treatment. Cloudflare turns this site away intermittently rather
- * than consistently, and a challenge is taken as "no answer" — never solved.
- */
+/* The retry loop, shared with the title side. */
 async function fetchWithRetries(url) {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-    /*
-     * Inside the loop, not outside it. A challenged page is fetched three times
-     * and a delay that only covered the first one would let a bad afternoon hit
-     * this site three times in eight seconds — which is the opposite of what
-     * the delay is for. Every request through this module waits its turn,
-     * including the once-a-week performer lookups, because a rule that has to
-     * be remembered at each call site is a rule that will be forgotten at one.
-     */
+    /* Wait before every attempt, not just the first. */
     await polite();
 
     try {
@@ -432,25 +316,11 @@ const sameHost = (url) => /^https?:\/\/(www\.)?iafd\.com\//i.test(url || '');
 
 /*
  * Titles matching a name. -> [{id, url, title, year, distributor, aka}]
- *
- * Never believed on its own. "Under the Bed" returns seventeen films and three
- * of them are somebody else's; picking one is the caller's job, done against a
- * year and a studio it already knows. This only reads the table.
+ * The caller picks.
  */
 const ROW = /<tr[^>]*>\s*<td>\s*<a href="([^"]*title\.rme\/id=([0-9a-f-]{36}))"[^>]*>([\s\S]*?)<\/a>\s*<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>/gi;
 
-/*
- * The hash has to go, and it is not cosmetic.
- *
- * Measured on 2026-09-04: "Barely Legal #153" returns **nothing** from this
- * search, and "Barely Legal 153" returns exactly one right answer. Same for
- * #135 and #130. IAFD's search will not take the marker, so every numbered
- * release — which is most of what a group builder is looking for — was coming
- * back as "IAFD has never heard of this film".
- *
- * Volume and number words go the same way, for the same reason and because the
- * catalogue is inconsistent about printing them at all.
- */
+/* Strip "#" and volume words: IAFD's search finds "Barely Legal 153" but not "#153". */
 const searchable = (title) =>
   String(title || '')
     .replace(/(?:#|\bvol(?:ume)?\.?|\bno\.?)\s*(\d+)/gi, ' $1')
@@ -479,13 +349,9 @@ export async function searchTitles(title) {
 }
 
 /*
- * A film's scene breakdown, and the facts beside it worth checking the match
- * against. -> {url, title, studio, distributor, releaseDate, compilation,
- * webscene, scenes: [{index, performers}]} or null.
- *
- * A page with no breakdown table comes back with an empty `scenes`, not null:
- * "IAFD has this film and does not know what is in it" is a different answer
- * from "IAFD does not have it", and the caller reports them differently.
+ * A film's scene breakdown. -> {url, title, studio, distributor,
+ * releaseDate, compilation, webscene, scenes: [{index, performers}]} or null.
+ * No breakdown table gives empty `scenes`, not null.
  */
 const SCENE_ROW = /<tr[^>]*>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/gi;
 

@@ -1,17 +1,6 @@
 /*
- * TMDB — the second source for films.
- *
- * ThePornDB knows the adult catalogue; it does not reliably know a 1976 feature
- * that happens to be X-rated, or a parody catalogued as a normal film. TMDB
- * does, and the .nfo files Emby already wrote to this share carry
- * <uniqueid type="tmdb">, so the library is half-indexed against it already.
- *
- * IMDB has no free API of its own, so an IMDB id is used the way everyone uses
- * it: handed to TMDB's /find to resolve into a TMDB record.
- *
- * Needs a key of its own — unlike the TPDB token, there is nothing on this
- * machine to borrow one from. Both key formats TMDB issues are accepted: the v4
- * read token goes in a header, the older v3 key in the query string.
+ * TMDB, the second source for films (mainstream-catalogued ones). IMDB ids
+ * are resolved through TMDB's /find. Needs its own key.
  */
 
 const API = 'https://api.themoviedb.org/3';
@@ -21,11 +10,7 @@ export class TmdbError extends Error {}
 
 export const configured = (config) => Boolean(config.tmdbApiKey);
 
-/*
- * v4 read tokens are JWTs and go in the Authorization header; v3 keys are 32
- * hex characters and go in the query string. Guessing wrong gives a 401 that
- * says nothing useful, so it is decided on the shape of the key.
- */
+/* v4 tokens (JWTs) go in the header, v3 keys (32 hex) in the query. */
 function request(config, path, params = {}) {
   const key = String(config.tmdbApiKey || '');
   const isJwt = key.startsWith('eyJ');
@@ -61,10 +46,7 @@ export async function check(config) {
 
 const image = (path, size) => (path ? `${IMAGES}/${size}${path}` : null);
 
-/*
- * Shaped to match tpdb.toMovie() so the gap-filler can rank and render both
- * kinds side by side without caring which came from where.
- */
+/* Same shape as tpdb.toMovie(). */
 function toMovie(raw) {
   return {
     source: 'tmdb',
@@ -84,10 +66,7 @@ function toMovie(raw) {
   };
 }
 
-/*
- * include_adult matters here more than anywhere: without it TMDB hides most of
- * what this library is, and the search comes back empty for films it holds.
- */
+/* include_adult, or TMDB hides most of this library. */
 export async function searchMovies(config, query, { year = null, limit = 10 } = {}) {
   if (!query || !query.trim()) return [];
 
@@ -109,11 +88,7 @@ export async function findByImdb(config, imdbId) {
   return (data.movie_results || []).map(toMovie);
 }
 
-/*
- * The full record, with the cast and crew the .nfo wants. Genres arrive as
- * objects and directors are buried in the crew, so both are flattened here
- * rather than in the writer.
- */
+/* Full record with cast and crew. Genres and directors flattened here. */
 export async function getMovie(config, id) {
   const raw = await get(config, `/movie/${encodeURIComponent(id)}`, { append_to_response: 'credits' });
   if (!raw || !raw.id) return null;

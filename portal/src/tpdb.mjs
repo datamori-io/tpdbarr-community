@@ -1,17 +1,7 @@
 /*
- * ThePornDB's own API — the only source of scene artwork.
- *
- * The free Whisparr metadata mirror carries no per-scene images (verified: the
- * /site and /scene endpoints both return Images: null), so posters, stills and
- * fingerprints have to come from TPDB directly, which needs a token.
- *
- * The token is borrowed from Stash, which already stores one for TPDB's
- * stash-box. Nothing to paste, and it never leaves this machine except back to
- * TPDB itself.
- *
- * Fetching is slow — 100 scenes per page, several seconds each — so a whole
- * site is pulled once in the background and cached. Callers get whatever has
- * arrived so far and ask again.
+ * ThePornDB's own API, for artwork and fingerprints (the Whisparr mirror
+ * has no scene images). The token is borrowed from Stash. A site is pulled
+ * once in the background and cached; callers get what has arrived so far.
  */
 
 import { tpdbToken, fingerprintIndex, matchByFingerprints } from './stash.mjs';
@@ -38,13 +28,7 @@ async function token(config) {
         return null;
       })
       .then((value) => {
-        /*
-         * Only a token worth having is remembered. Caching the failure instead
-         * meant that one slow moment from Stash — a restart, a busy scan — took
-         * ThePornDB out until this process was restarted, long after Stash was
-         * fine again. Forgetting a null costs one extra request; keeping one
-         * costs the whole feature.
-         */
+        /* Don't cache a null: a slow Stash would disable TPDB until restart. */
         if (!value) tokenPromise = null;
         return value;
       });
@@ -58,15 +42,14 @@ export async function available(config) {
 }
 
 /*
- * Scenes and movies are shaped differently on TPDB, and it matters for layout:
+ * TPDB image shapes:
  *
  *   scene  background.large  1500x1085   landscape
  *   scene  image             16:9        the studio's own still
  *   scene  poster            800x1200    a portrait crop TPDB generates
  *   movie  every field       ~0.71:1     a normal movie poster
  *
- * So `image` is the one to show for a scene, and `poster` for a movie. Both are
- * carried so either can be rendered without another round trip.
+ * Show `image` for a scene, `poster` for a movie. Both are carried.
  */
 function mapScene(raw) {
   const hashes = (raw.hashes || []).filter((h) => h.hash);
@@ -101,12 +84,11 @@ async function fetchPage(auth, siteId, page) {
   return res.json();
 }
 
-/* ------------------------------------------------------------- discovery
+/*
+ * ------------------------------------------------------------- discovery
  *
- * TPDB's global feed is overwhelmingly clip-site content — 82 of the newest 100
- * scenes came from ManyVids alone — and those performers are rarely linked to a
- * parent record, so their gender is unknown. Both facts drive the filtering
- * below.
+ * TPDB's global feed is mostly clip sites, whose performers rarely have a
+ * gender, hence the filtering below.
  */
 
 const CLIP_NETWORKS =
@@ -118,11 +100,7 @@ export function isClipSite(scene) {
 
   if (CLIP_NETWORKS.test(network) || CLIP_NETWORKS.test(site)) return true;
 
-  /*
-   * Per-performer storefronts are named "Network: Someone" — "ManyVids: Latika
-   * Jha", "HobbyPorn: Miniblondie", "I Want Clips: Vixenmegan123". One rule
-   * catches the whole shape, including networks not on the list above.
-   */
+  /* Per-performer storefronts are named "Network: Someone". */
   return /^[^:]{2,30}:\s+\S/.test(site);
 }
 
@@ -156,19 +134,8 @@ const WANTED_SHAPES = new Set(['straight', 'lesbian', 'solo']);
 export const isWantedShape = (scene) => WANTED_SHAPES.has(shapeOf(scene));
 
 /*
- * Rate limiting, and why it is a gate rather than a retry.
- *
- * ThePornDB answers 429 when it has had enough, and it has had enough sooner
- * than anything here assumed: a Group Builder pass asking about 552 films
- * through a pool of six collected **313 of them** in one run, each one a film
- * silently dropped from the scan. A per-call retry would not have helped much —
- * six workers each discovering the limit separately just means six more
- * requests into a server already saying stop.
- *
- * So the cooldown is shared. The first 429 sets a time nobody may fetch before,
- * and every worker waits on it, so the whole app backs off together and comes
- * back once. `Retry-After` is obeyed when the server sends one, because a
- * number it chose is better than a number this file guessed.
+ * Rate limiting. The first 429 sets a shared cooldown every worker waits on,
+ * so the app backs off together. `Retry-After` is obeyed when sent.
  */
 const RETRY_AFTER = 5000;
 const MAX_COOLDOWN = 60000;
@@ -200,14 +167,7 @@ async function get(auth, path) {
     const back = Math.min(told > 0 ? told : RETRY_AFTER * attempt, MAX_COOLDOWN);
     const until = Date.now() + back;
 
-    /*
-     * Said out loud, once per cooldown rather than once per waiting worker.
-     *
-     * A gate that backs off silently is a gate that looks like a hang: the
-     * first version of this handled 429s perfectly and the only symptom left
-     * was a progress counter that stopped moving for minutes with nothing in
-     * the log to explain it.
-     */
+    /* Log once per cooldown, so a pause doesn't look like a hang. */
     if (until > cooldownUntil) {
       console.warn(`[tpdbarr] TPDB asked for a pause — backing off ${Math.round(back / 1000)}s`);
       cooldownUntil = until;
@@ -227,10 +187,7 @@ export function toCard(raw) {
     siteName: raw.site?.name || '',
     network: raw.site?.network?.name || '',
     shape: shapeOf(raw),
-    /*
-     * The parent is the canonical performer; the bare id is a site-specific
-     * alias record, and TPDB's performer endpoints are keyed on the parent.
-     */
+    /* Use the parent performer id; TPDB's performer endpoints are keyed on it. */
     performers: (raw.performers || []).map((p) => ({ name: p.name, uuid: p.parent?.id || p.id || null })),
     url: raw.slug ? `https://theporndb.net/scenes/${raw.slug}` : null,
     image: art.image,
@@ -275,10 +232,10 @@ export async function recentForPerformer(config, performerUuid, { limit = 8 } = 
   return (payload.data || []).filter(isWantedShape).map(toCard);
 }
 
-/* ------------------------------------------------------- one of a thing
+/*
+ * ------------------------------------------------------- one of a thing
  *
- * The detail pages. Both need a TPDB token, which is borrowed from Stash — so
- * both say so plainly rather than rendering an empty page.
+ * Detail pages. Both need a TPDB token and say so plainly if missing.
  */
 
 export class NoTokenError extends Error {}
@@ -340,11 +297,7 @@ export async function getPerformer(config, uuid) {
   };
 }
 
-/*
- * Everything a performer is in, newest first. Deliberately unfiltered — the
- * shape filter exists to clean up a discovery feed, and you are on this page
- * because you asked for this person specifically.
- */
+/* Everything a performer is in, newest first. Unfiltered. */
 export async function performerScenes(config, uuid, { pages = 3, limit = 60 } = {}) {
   const auth = await requireToken(config);
   const out = [];
@@ -361,17 +314,11 @@ export async function performerScenes(config, uuid, { pages = 3, limit = 60 } = 
   return out;
 }
 
-/* ------------------------------------------------------- images, in full
+/*
+ * ------------------------------------------------------- images, in full
  *
- * Everything TPDB carries, for building a gallery rather than drawing a card.
- * mapScene() picks the one image a card should show; these two hand back all
- * of them, biggest and most original first.
- *
- * Order matters, because the first few are the ones worth keeping. A scene's
- * `image` is the studio's own still and `background.full` is the uncropped
- * original; the `poster` fields are crops TPDB generates from that background,
- * upscaled and stamped with the site's logo — real images, but the same
- * picture again with a watermark on it. So they go last and say what they are.
+ * Every image TPDB has, for building a gallery, best first. The `poster`
+ * fields are watermarked crops of the background, so they go last.
  */
 
 const seen = () => {
@@ -428,17 +375,11 @@ export async function performerImages(config, uuid) {
   return { title: data.name || '', date: '', site: '', performers: [data.name].filter(Boolean), images: out };
 }
 
-/* --------------------------------------------------------------- movies
+/*
+ * --------------------------------------------------------------- movies
  *
- * A TPDB movie is a bundle of scenes with a poster on the front — a DVD, or a
- * studio's feature release. Whisparr v2 is scene-shaped and cannot add one, so
- * a movie here is a way *into* its scenes rather than a thing you buy: the
- * grid says whether you already hold it, and the movie page adds the scenes
- * you are missing one at a time.
- *
- * The shape filter is deliberately not applied. It exists to make a feed of
- * two thousand clips readable; a feature release has a large unlinked cast and
- * would fail it almost every time.
+ * A TPDB movie is a bundle of scenes. Whisparr v2 can't add one, so the
+ * movie page adds its scenes. The shape filter is not applied.
  */
 
 export function toMovie(raw) {
@@ -451,10 +392,8 @@ export function toMovie(raw) {
     siteName: raw.site?.name || '',
     network: raw.site?.network?.name || '',
     /*
-     * A movie's only portrait art is the studio's own box art, in `image`.
-     * `poster` and `posters` both hand back the landscape background again —
-     * checked, byte-for-byte the same URLs — so a release with no box art gets
-     * that landscape cropped into the poster frame instead.
+     * A movie's portrait art is `image` (box art). `poster`/`posters` return the
+     * landscape background again.
      */
     poster: raw.image || null,
     background: raw.background?.large || raw.background?.full || raw.poster || null,
@@ -463,11 +402,8 @@ export function toMovie(raw) {
     url: raw.slug ? `https://theporndb.net/movies/${raw.slug}` : null,
     sceneCount: Array.isArray(raw.scenes) ? raw.scenes.length : null,
     /*
-     * The list endpoint sends these too, and that is worth more than it looks:
-     * a caller that can judge a release from the roster row does not have to
-     * fetch three thousand movie records to find the forty worth reading. Only
-     * `scenes` needs the detail call. An array when TPDB has no links for a
-     * record, an object when it does, so it is normalised here.
+     * Links come on the list too, saving detail calls. Array when empty, object
+     * otherwise; normalised here.
      */
     links: raw.links && !Array.isArray(raw.links) ? raw.links : {},
     sku: raw.sku || null,
@@ -493,11 +429,7 @@ export async function recentMovies(config, { pages = 4, limit = 48 } = {}) {
   return out;
 }
 
-/*
- * Movies by name. Used by the gap-filler, where the only thing known about a
- * film is the folder it sits in — so the query is a title someone typed years
- * ago and the answer needs looking at before it is believed.
- */
+/* Movies by name, for the gap-filler. Results need checking. */
 export async function searchMovies(config, query, { limit = 8 } = {}) {
   const auth = await requireToken(config);
   if (!query || !query.trim()) return [];
@@ -506,18 +438,7 @@ export async function searchMovies(config, query, { limit = 8 } = {}) {
   return (payload.data || []).map(toMovie);
 }
 
-/*
- * The movie catalogue, searched and read deep enough to be sorted.
- *
- * searchMovies above answers a different question — the gap-filler wants the
- * best few matches for a folder name and stops there. This one is for browsing:
- * ordering six hundred results by studio only means anything if all six hundred
- * were read, so it pages until it has them or hits the cap, and says which
- * happened rather than quietly sorting a slice.
- *
- * "adam and eve" returns 566 across six pages; "adam & eve" returns 2413 across
- * twenty-five, which is why there is a cap at all.
- */
+/* Search the movie catalogue deep enough to sort, up to a cap, and report which. */
 export async function searchMovieCatalogue(config, query, { cap = 600 } = {}) {
   const auth = await requireToken(config);
   const term = String(query || '').trim();
@@ -538,25 +459,11 @@ export async function searchMovieCatalogue(config, query, { cap = 600 } = {}) {
 }
 
 /*
- * Every movie a site has put out, rather than the newest slice of everything.
+ * Every movie a site has released, for the Group Builder. `site_id` comes
+ * from a scene's `site.id`. `since` stops paging once the newest-first feed
+ * passes it (one page of slack).
  *
- * The movie feed above is a river and the search is a name; neither can answer
- * "what has this studio released", which is the only question the Group Builder
- * asks. `site_id` is the same id a scene carries in `site.id`, so a studio in
- * Stash gets one only by way of a scene it holds — there is no name lookup for
- * a site, and guessing one from a title would put another studio's back
- * catalogue on the shelf.
- *
- * `since` is the reason this is usable at all. New Sensations has 3,629 movies
- * and the feed comes back newest first, so a caller that only cares about films
- * old enough to contain the scenes it holds can stop paging instead of reading
- * thirty-seven pages at eight seconds each. Paging stops on the first page
- * where nothing is newer than the bound — one page of slack, because a feed
- * ordered by release date still has the odd record out of sequence.
- *
- * -> {movies, total, capped, read}. Pure Taboo alone is 291 and New Sensations
- * is ten times that, which is why the cap exists and why the caller is told
- * both what it bit and how much of the catalogue was actually read.
+ * -> {movies, total, capped, read}
  */
 // Three, for the reason the rate-limit gate above exists: six was enough to be
 // told no three hundred times in one pass.
@@ -577,18 +484,7 @@ export async function moviesForSite(config, siteId, { cap = 2000, since = null, 
   let read = (first.data || []).length;
   onPage?.(1, lastPage);
 
-  /*
-   * Six pages at a time, and the reason is measured rather than assumed: a
-   * single page takes ThePornDB about eight seconds whatever is on it, so New
-   * Sensations' thirty-seven pages is five minutes read one after another and
-   * under a minute read six at a time. The site's own scene reader upstairs
-   * uses the same width.
-   *
-   * Batched rather than fully parallel so `since` still stops the read. The
-   * feed is newest first, so once a whole batch is older than the bound there
-   * is nothing behind it worth having — and a batch is small enough that
-   * overshooting costs one round rather than the rest of the catalogue.
-   */
+  /* Six pages at a time (each takes ~8s). Batched so `since` can still stop the read. */
   for (let next = 2; next <= lastPage && out.length < cap;) {
     const batch = [];
     for (let n = next; n < next + PAGES_AT_A_TIME && n <= lastPage; n++) batch.push(n);
@@ -623,14 +519,8 @@ export async function getMovie(config, guid) {
     tags: (data.tags || []).map((t) => t.name).filter(Boolean).slice(0, 12),
     scenes: (data.scenes || []).map(toCard),
     /*
-     * Where else this release is written down: AdultEmpire, IAFD, AFDB,
-     * Excalibur — whichever TPDB happens to hold. Two things want it. The
-     * AdultEmpire address is what a built group carries so Stash's own scraper
-     * can fill it in later, and the IAFD one saves a title search that would
-     * otherwise be a guess between seventeen films with the same name.
-     *
-     * An array on a record TPDB has no links for, an object when it does, so
-     * it is normalised here rather than at every reader.
+     * Other listings of the release (AdultEmpire, IAFD, …). The AdultEmpire URL
+     * goes on built groups; the IAFD one saves a title search. Normalised here.
      */
     links: data.links && !Array.isArray(data.links) ? data.links : {},
     sku: data.sku || null,
@@ -638,18 +528,8 @@ export async function getMovie(config, guid) {
 }
 
 /*
- * A performer's whole catalogue, not just the front of it.
- *
- * performerScenes() above deliberately reads a page or two, because the pages
- * that use it want "what have they been in lately". Asking "what am I missing
- * of theirs" is a different question and the newest slice cannot answer it: a
- * library built out of a studio's back catalogue overlaps the newest sixty
- * scenes almost nowhere, so a gap counted against that window comes back as
- * "all of them" every time.
- *
- * -> {scenes, total, complete}. `complete` is false when TPDB has more pages
- * than the budget allowed, so the caller can say so rather than implying it
- * counted everything.
+ * A performer's whole catalogue, for counting gaps.
+ * -> {scenes, total, complete}; `complete` is false if pages ran out.
  */
 export async function performerCatalogue(config, uuid, { maxPages = 8 } = {}) {
   const auth = await requireToken(config);
@@ -754,11 +634,8 @@ async function matchAgainstStash(config, job) {
 }
 
 /*
- * One file in Stash can only be one scene. TPDB sometimes carries the same
- * fingerprint against two scenes — a mis-submitted hash — which would otherwise
- * report both as held. Keep whichever scene the file actually looks like and
- * drop the rest, because wrongly saying "you already have this" means quietly
- * never fetching it.
+ * A file can only be one scene. When TPDB has one fingerprint on two scenes,
+ * keep the one whose title matches the file.
  */
 function dropCollisions(job) {
   const claimants = new Map(); // stash scene id -> [tpdb scene ids]
@@ -824,16 +701,10 @@ export function artSnapshot(siteId) {
   };
 }
 
-/* ------------------------------------------------------------- the wildcard
+/*
+ * ------------------------------------------------------------- the wildcard
  *
- * StashDB is the catalogue the search is built on, because its ids survive the
- * whole trip into Stash. ThePornDB is the other question: is this thing on the
- * internet at all.
- *
- * So this is not a second set of results to merge — it is what you reach for
- * when the first search came back empty. Same standard of data, different
- * coverage, and a different route out (v2 rather than v3), which is why it is
- * kept visibly separate rather than blended in.
+ * TPDB search, shown separately from StashDB results: different route (v2).
  */
 export async function searchScenes(config, term, { limit = 24 } = {}) {
   const auth = await token(config);

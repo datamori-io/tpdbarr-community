@@ -1,9 +1,8 @@
-/* ==========================================================================
-   The library — rails, tiles, the player.
-
-   The acquisition side is a list you read. This side is artwork you scan, so
-   it wants the width; the rest of the app keeps its narrower column.
-   ========================================================================== */
+/*
+ * ==========================================================================
+ * The library: rails, tiles, the player. Wider column than the rest of the app.
+ * ==========================================================================
+ */
 
 main:has(.rail), main:has(.tiles), main:has(.stage) { max-width: 1560px; }
 
@@ -108,14 +107,8 @@ a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px)
 .tilepreview.on { opacity: 1; }
 
 /*
- * The frame under the cursor, and the timeline you pick it with — see
- * hoverPreview() in library/core.js.
- *
- * The frame covers the whole tile rather than the top 85%: the strip lies over
- * the bottom of the picture instead of taking a slice out of it, so a 16:9
- * frame in a 16:9 tile is not squashed to fit the remainder. It sits above the
- * preview video so that pointing at the strip answers with the frame rather
- * than with whatever the loop happens to be showing.
+ * The hovered frame (see hoverPreview() in library/core.js). Covers the
+ * whole tile, above the preview video.
  */
 .tileframe {
   position: absolute;
@@ -128,11 +121,7 @@ a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px)
 }
 .tileframe.on { opacity: 1; }
 
-/*
- * 15% of the tile, and the same number is SCRUB_BAND in core.js. Only visible
- * while the tile is hovered — an always-on bar across six hundred tiles is a
- * pattern, not a control.
- */
+/* 15% of the tile (SCRUB_BAND in core.js). Visible on hover only. */
 .tilescrub {
   position: absolute;
   left: 0;
@@ -222,9 +211,7 @@ a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px)
 }
 .tilebody .tilefolder b { color: var(--text-2); font-weight: 600; }
 
-/* Where there is a description, the title holds two lines whether it needs
-   them or not, so a row of tiles starts its blurb on the same line. Scoped to
-   tiles that have one: the rails that do not keep the height they had. */
+/* With a description, titles hold two lines so blurbs line up. */
 .tilebody:has(.tiledesc) .title { min-height: 2.6em; }
 
 /* What it is about. Two lines like the title, so a row of tiles keeps its
@@ -258,28 +245,19 @@ a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px)
   aspect-ratio: 2 / 3;
 }
 
-/* ------------------------------------------------- the performer's vitals
+/*
+ * ------------------------------------------------- the performer's vitals
  *
- * The column beside the photograph. The grid fills across before it fills
- * down, so a performer Stash knows four things about gets one tidy row rather
- * than a four-deep column with white space beside it; `auto-fit` on a min
- * width then collapses to one column on a phone without a second breakpoint.
+ * Fills across before down; `auto-fit` collapses to one column on a phone.
  */
 
-/* Bigger than the 132px the poster pages use. A performer page is a portrait
-   with a record beside it, and at thumbnail size the face was lost to the
-   grid of facts next to it. */
+/* Portrait at 208px. */
 .listhead.person .portrait { width: 208px; }
 
 .listhead .who { min-width: 0; flex: 1; }
 .listhead .who .fave { color: var(--accent-hi); font-size: 18px; margin-left: 8px; vertical-align: 2px; }
 
-/*
- * Three columns at most. The grid fills across before it fills down, so on a
- * wide screen `auto-fit` alone gives five and the order stops reading as an
- * order — height next to shoe size next to country. Capped, it stays a list
- * somebody wrote down, and it still collapses to one on a phone.
- */
+/* At most three columns. */
 .vitals {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -307,11 +285,7 @@ a.railtitle:hover .chevron { color: var(--accent-hi); transform: translateX(3px)
   vertical-align: 1px;
 }
 
-/*
- * Keeping what IAFD lent you. Quiet by design — it is an offer, not the thing
- * you came to the page to do, and it only appears when there is something to
- * add. Sized off the grid above it rather than the page's primary button.
- */
+/* The IAFD save button, quiet, only when there's something to add. */
 .listhead .keep {
   margin: 12px 0 0;
   padding: 5px 11px;

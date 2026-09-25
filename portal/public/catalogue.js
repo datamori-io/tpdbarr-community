@@ -1,28 +1,12 @@
-/*
- * The StashDB half of a scene, drawn the same way wherever it appears.
- *
- * The acquisition side draws it in its results; the library's studio page draws
- * it for the scenes that studio put out and you do not have. Both are asking
- * the same two questions — do I already have this, and is anything already
- * trying to get it — so both ask them with the same badges and the same button.
- * Two copies would be two answers waiting to disagree.
- */
+/* A StashDB scene's badges and buttons, shared by the search and studio pages. */
 
 import { api, el, minutes } from './util.js';
 
-/*
- * The badges and the button. A scene you own still gets the button — wanting a
- * second, better file for something already on the shelf is exactly what the v3
- * side is for.
- */
+/* Badges and button. Owned scenes keep the button (for a better copy). */
 export function stashdbState(scene, className, { onTrackChange = null, onDispose = null } = {}) {
   const badges = el('div', { className });
 
-  /*
-   * An ignored scene is a decision already made, so it says so and offers only
-   * the way back. Showing it the same three buttons as everything else is how a
-   * decision stops meaning anything.
-   */
+  /* Ignored: say so and offer the way back. */
   if (scene.disposition === 'ignored') {
     badges.append(el('span', { className: 'badge ignored' }, 'Skipped'));
     badges.append(undoIgnore(scene, onTrackChange));
@@ -53,12 +37,7 @@ export function stashdbState(scene, className, { onTrackChange = null, onDispose
       state3 === 'downloaded' ? 'In v3' : state3 === 'monitored' ? 'Monitored' : 'Known to v3'));
   }
 
-  /*
-   * The three answers a scene in a tracked catalogue can be given: Skip, Want
-   * and Add — not for me, I want it, get it now. They sit together because
-   * they are one decision, and a scene you already hold is not asked: owning
-   * it was the answer.
-   */
+  /* Skip, Want, Add. Not shown for scenes you hold. */
   if (!scene.stash) badges.append(ignoreButton(scene, onDispose));
   badges.append(trackToggle(scene, onTrackChange));
 
@@ -76,11 +55,7 @@ export function stashdbState(scene, className, { onTrackChange = null, onDispose
         const result = await api(`/api/whisparr3/scenes/${scene.id}`, { method: 'POST' });
         button.textContent = result.searched ? 'Searching' : 'Monitored';
 
-        /*
-         * Adding is wanting, said louder. Leaving it off the want list would
-         * mean a scene you fetched on purpose still counted as undecided
-         * against the studio it came from.
-         */
+        /* Adding also marks it wanted. */
         if (!scene.tracked) {
           await api('/api/acquire/tracked/scenes', { method: 'POST', body: JSON.stringify(wanted(scene)) });
           scene.tracked = true;
@@ -99,14 +74,7 @@ export function stashdbState(scene, className, { onTrackChange = null, onDispose
   return badges;
 }
 
-/*
- * Skip — "not for me."
- *
- * The row leaves the page on the way out, because the whole point of saying it
- * is that you do not want to be asked again — a decision that leaves the thing
- * sitting there is a decision that has to be made twice. It leaves the
- * percentage too: a skipped scene is in neither half of the fraction.
- */
+/* Skip: the row leaves, and the scene leaves the percentage. */
 function ignoreButton(scene, onDispose) {
   const button = el('button', { className: 'chip quiet ignore', type: 'button' }, 'Skip');
   button.title = 'Not for me. Drops out of the results and out of the percentage.';
@@ -153,13 +121,8 @@ function undoIgnore(scene, onTrackChange) {
 }
 
 /*
- * Want.
- *
- * Kept by the portal against the StashDB id, not by Whisparr — Whisparr fetches
- * files and is emptied as they import, so it cannot be the record of what you
- * meant to get. Marking downloads nothing: Add is still the sentence that says
- * fetch it. Unmarking does reach the downloader, because a scene nobody wants
- * should not still be being looked for.
+ * Want: kept by the portal against the StashDB id. Doesn't download.
+ * Unwanting unmonitors in Whisparr.
  */
 function trackToggle(scene, onTrackChange) {
   const button = el('button', { className: 'chip quiet track', type: 'button' });
@@ -212,13 +175,7 @@ const wanted = (scene) => ({
   details: scene.details || '',
 });
 
-/*
- * The blurb, cut to a length whatever is drawing it can carry — a card takes
- * the default, a list row is wider and asks for more. StashDB's details run
- * from one line to several paragraphs, and anything that grows with the longest
- * one in the grid ruins the row it is in, so it is cut at a word boundary and
- * the whole of it stays on the hover title.
- */
+/* The blurb, cut at a word to the caller's length; the whole of it on hover. */
 // Forty-odd scenes on StashDB have the title again as their description. Drawn
 // as written that is the same line twice on one card, so it is dropped.
 const bare = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -232,15 +189,7 @@ export function blurb(details, title, limit = 160) {
   return (space > limit / 2 ? cut.slice(0, space) : cut).trimEnd() + '…';
 }
 
-/*
- * The scene as a card.
- *
- * A row is for reading — cast, studio, date, all legible at once. A grid is for
- * looking, so the card leads with the still and keeps only what you can take in
- * without reading: the title, the date, who is in it, the first line of what it
- * is about, the state and the button. Both the cast and the blurb are cut to
- * one or two lines and carry the whole of themselves on the hover title.
- */
+/* The scene as a card: still, title, date, cast, blurb, state, button. */
 export function stashdbCard(scene, options) {
   const cast = (scene.performers || []).map((p) => p.name).join(', ');
   const about = blurb(scene.details, scene.title);
@@ -264,19 +213,13 @@ export function stashdbCard(scene, options) {
     )
   );
 
-  // The card opens the scene on StashDB — the same place the row's title goes.
-  // Adding stays on the button, because a whole-card click that quietly starts
-  // a download is a click nobody meant to make.
+  // The card opens StashDB; adding stays on the button.
   card.onclick = () => window.open(scene.url, '_blank', 'noreferrer');
   card.title = cast;
   return card;
 }
 
-/*
- * How much of a tracked catalogue you hold. The row comes from the coverage
- * measurement in discover.mjs and is drawn identically on the Acquire page and
- * on a studio's own page.
- */
+/* Tracked coverage bar (see discover.mjs). */
 export function coverageBar(row) {
   if (row.pending) return el('div', { className: 'muted small' }, 'Measuring against StashDB…');
 

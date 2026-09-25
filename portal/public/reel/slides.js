@@ -13,8 +13,8 @@ function slideFor(item) {
   const { src, then, instead, poster, start, end } = mediaFor(item);
 
   /*
-   * What to try after this one fails, in order: ours, then Stash's, then the
-   * scene itself — only the last of which is a window into a longer file.
+   * Fallback order: our clip, Stash's, then the scene file (the only one
+   * that's a window into a longer file).
    */
   const chain = [then, instead].filter(Boolean);
   const scene = item.scene;
@@ -23,27 +23,17 @@ function slideFor(item) {
   const video = el('video', {
     className: 'reelvid',
     poster,
-    /*
-     * A clip is the whole of what it plays and loops itself. A scene preview
-     * does too. Only a seek into the full file needs windowed() to loop it,
-     * and a marker does not know which of those it is until it has tried.
-     */
+    /* Clips and previews loop themselves; only a seek into the full file needs windowed(). */
     loop: true,
     muted: true,
     playsInline: true,
     preload: 'none',
   });
 
+  /* A slide already on the file windows now; one trying a clip only if that fails. */
   /*
-   * A slide that is already on the file — a scene, or a marker on a reel that
-   * has given up on clips — windows now. One that is trying a clip windows
-   * only if that fails, below.
-   */
-  /*
-   * Playing the file rather than a rendered clip: seek to the moment and loop
-   * the window by hand. Noted here and recorded on the slide once it exists —
-   * `slide` is declared further down, and touching it from up here is a
-   * temporal-dead-zone error that takes the whole page out.
+   * Noted here, set on the slide later: `slide` is declared below, and
+   * touching it here is a temporal-dead-zone error.
    */
   const windowing = Boolean(end && !chain.length);
 
@@ -56,11 +46,7 @@ function slideFor(item) {
     let step = 0;
 
     video.addEventListener('error', () => {
-      /*
-       * Emptying a src to give a buffer back raises this too, and that is not
-       * a failure — it is unload() doing its job. Only a slide whose current
-       * source is the one we last asked for has actually failed to play it.
-       */
+      /* Emptying src fires an error too; only a failure of the current source counts. */
       const now = video.getAttribute('src');
       const asked = step === 0 ? src : chain[step - 1];
       if (!now || now !== asked || step >= chain.length) return;
@@ -69,12 +55,7 @@ function slideFor(item) {
       step += 1;
       if (live) live.clipless = (live.clipless || 0) + 1;
 
-      /*
-       * Only the last link is the scene itself, and only that one is a window
-       * into something longer. The seek and the hand-rolled loop go on then,
-       * not before — a self-contained clip loops itself and would be stopped
-       * dead by a window twenty minutes wide.
-       */
+      /* The seek and manual loop start only on the scene-file fallback. */
       if (next === instead) {
         video.loop = false;
         windowed(video, start, end);
@@ -133,11 +114,7 @@ function slideFor(item) {
         el('div', { className: 'reelsub' }, sub.join(' · ')),
         cast.length ? el('div', { className: 'reelcast' }, cast) : null
       ),
-      /*
-       * The marker's tag sits in the middle of the button row, in the gap the
-       * two clusters leave — it is a label for the clip rather than another
-       * line of the caption, and down here it stops pushing the title around.
-       */
+      /* The tag sits in the gap in the button row. */
       item.tag ? el('div', { className: 'reeltagline' }, el('span', { className: 'reeltag' }, item.tag)) : null,
       o,
       el('a', { className: 'reelcorner slot3 right', href, title: 'Open the scene' },
@@ -148,12 +125,8 @@ function slideFor(item) {
 
   slide.dataset.src = src;
   /*
-   * Marked only once this slide has actually fallen back to the scene file.
-   *
-   * It is what tells armRoll() the clip is a window into something longer and
-   * must not use the element's own loop. Set up front it was wrong for every
-   * marker that had a rendered clip: a twenty-second clip that loops itself
-   * got its loop turned off and stopped dead at the end.
+   * Set only once the slide has fallen back to the scene file; armRoll()
+   * reads it. Set earlier, it turned off looping on real clips.
    */
 
   // What armRoll() reads to know this is a window into something longer.
@@ -161,10 +134,7 @@ function slideFor(item) {
 
   slide.append(scrubbable(slide, video, start, end));
 
-  /*
-   * One time round, when rolling. A windowed marker never fires `ended` — it
-   * is looped by hand — so its end is watched for instead.
-   */
+  /* Advance after one play when rolling. Windowed markers never fire `ended`. */
   video.addEventListener('ended', () => { if (slide.dataset.roll) advance(live); });
 
   if (end) {
@@ -173,10 +143,7 @@ function slideFor(item) {
     });
   }
 
-  /*
-   * Clicking the picture pauses, the way it does everywhere else. The overlay
-   * takes its own clicks, so this never fires from a link or the O button.
-   */
+  /* Clicking the picture pauses. */
   video.onclick = () => {
     if (video.paused) {
       if (live) live.paused = false;
@@ -191,15 +158,8 @@ function slideFor(item) {
 }
 
 /*
- * A slide from off the library — RedGIFs, or Reddit.
- *
- * Same shape as a library slide so the reel does not stutter between them: the
- * creator or handle sits where a marker's tag does, the title where the
- * scene's does, and the performer — when it came from one in the library
- * rather than something followed by hand — is a chip like the cast.
- *
- * The difference is that a Reddit post might be a picture, and a picture does
- * not play. RedGIFs is always video.
+ * A RedGIFs or Reddit slide, in the library slide's shape. A Reddit post
+ * may be a picture.
  */
 function socialSlide(item) {
   const { src, poster } = mediaFor(item);
@@ -212,10 +172,7 @@ function socialSlide(item) {
 
   const site = item.kind === 'redgifs' ? 'RedGIFs' : 'Reddit';
 
-  /*
-   * Phone-cropped, because both of these are usually shot for a phone — except
-   * a RedGIFs clip that says it is landscape, which gets the band a scene gets.
-   */
+  /* Phone-shaped, unless a RedGIFs clip says it's landscape. */
   const shape = item.kind === 'redgifs' && item.tall === false ? 'wide' : 'tall';
 
   const slide = el('article', { className: 'reelslide feed ' + shape },
@@ -297,12 +254,7 @@ export async function loadPage(session) {
     session.page = data.page;
     session.count = data.count;
 
-    /*
-     * How far through the library we are, counted on library items alone. The
-     * count Stash gives is of markers or scenes, and the page is longer than
-     * that once Reddit is mixed in — comparing the two would call the reel
-     * finished several pages early.
-     */
+    /* Progress counted on library items only. */
     session.pulled += data.items.filter((item) => item.kind === 'marker' || item.kind === 'scene').length;
     if (!data.items.length || session.pulled >= data.count) session.done = true;
 
@@ -311,13 +263,7 @@ export async function loadPage(session) {
       const slide = slideFor(item);
       session.slides.push(slide);
       session.track.append(slide);
-      /*
-       * Not before the reel is on the page. A slide is the full height of a
-       * track that has no height yet, which makes it zero-high and sitting
-       * exactly where every other one is — so the observer reports all twelve
-       * as fully visible at once. show() observes the first batch itself, once
-       * there is a layout to measure against.
-       */
+      /* Observe only once mounted: before layout every slide looks fully visible. */
       if (session.mounted) session.observer.observe(slide);
     }
 
@@ -327,11 +273,7 @@ export async function loadPage(session) {
   }
 }
 
-/*
- * Which slide owns the screen. Only one plays; its neighbours are loaded but
- * paused so that scrolling either way starts instantly, and everything further
- * out gives its buffer back.
- */
+/* One slide plays; neighbours are loaded and paused; the rest release their buffers. */
 export function activate(session, index) {
   if (index === session.current) return;
   session.current = index;

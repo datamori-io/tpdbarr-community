@@ -5,22 +5,15 @@ import { manage } from '../markermanage.js';
 import { el } from '../util.js';
 import { SECTION_OF, paint, painterFor, show, state } from '../import/core.js';
 
-/* -------------------------------------------------- the marker builder
+/*
+ * -------------------------------------------------- the marker builder
  *
- * Markers were the one thing in the library nothing here made.
+ * Three states on one address: no `scene` is the queue, a `scene` is the
+ * bench (markerbuilder.js), `manage` is the list of cut markers
+ * (markermanage.js).
  *
- * They arrive from two Stash plugins run by hand — timestampTrade first,
- * TPDBMarkers second and only into scenes that have none — and that order is
- * load-bearing, because both import within fifteen seconds of an existing
- * marker and rewrite it in place rather than skipping it. This page does not
- * change that rule; it just means a moment nobody else knows about can be cut
- * by hand instead of waiting for a scraper to have heard of the scene.
- *
- * The page is three states behind one address. No `scene` and it is a queue —
- * which scenes have nothing marked. With one it is the bench, and the bench is
- * the whole point: see markerbuilder.js. `manage` is the list of what has
- * already been cut, which is the question you ask afterwards rather than the
- * one you ask before: see markermanage.js.
+ * The timestampTrade and TPDBMarkers plugins rewrite markers within 15
+ * seconds; run them after marking, or not at all.
  */
 
 export async function showMarkerBuilder(qs) {

@@ -1,20 +1,10 @@
 /*
- * Monitored — what either Whisparr is still looking for, to search by hand.
- *
- * The third tab of Import › Video. v3 is the StashDB scenes, v2 the ThePornDB
- * ones a movie sent. Each row opens the Indexers band underneath it with a
- * query already written — studio squashed the way release names spell it, and
- * the lead performer — which is the shape that actually finds things; a date
- * query finds nothing on these indexers. The box stays editable, because the
- * point of searching by hand is that a person can see what the parser missed.
- *
- * A grab goes to NZBGet's Manual category and on to the Import Folder, not to
- * Whisparr — so the scene stays monitored there until Stash has it and the
- * usual tidy-up removes it.
- *
- * Which is why the list is not Whisparr's word alone: the server takes out
- * anything Stash already holds (shown folded at the foot, so it can be checked)
- * and marks what Whisparr is downloading and what was grabbed here before.
+ * Monitored: what either Whisparr still wants, to search by hand. Each row
+ * opens the Indexers band with a query ready (squashed studio + lead
+ * performer; date queries find nothing). Grabs go to NZBGet's Manual
+ * category and the Import Folder, not Whisparr. The server drops scenes
+ * Stash already holds (listed at the foot) and marks downloading and
+ * already-grabbed ones.
  */
 
 import { api, el } from '../util.js';
@@ -74,10 +64,7 @@ function fromSwitch(params, from) {
     refresh);
 }
 
-/*
- * The filter is typed, not paged: 700 rows of text are nothing to a browser,
- * and narrowing by studio or performer as you type is the whole use of it.
- */
+/* Filtered as you type, not paged. */
 function listOf(rows, from, initial) {
   if (!rows.length) {
     return el('div', { className: 'empty' }, `Nothing Whisparr ${from} is looking for is missing from Stash.`);
@@ -161,10 +148,8 @@ function row(r, from) {
 }
 
 /*
- * What Whisparr is still monitoring but Stash already has — kept out of the
- * list above and shown here so a wrong match can be seen. Exact is the StashDB
- * id; probable is title + date. These want unmonitoring, not searching: the
- * tidy-up on Stats does that.
+ * Monitored but already in Stash, for checking. Exact = StashDB id,
+ * probable = title + date. These want unmonitoring (Stats), not searching.
  */
 function heldList(held) {
   if (!held.length) return null;

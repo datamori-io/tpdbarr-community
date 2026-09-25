@@ -1,17 +1,10 @@
-/*
- * The still half of the library: galleries, the pictures in them, and the
- * builder that makes one from a scrape or an upload.
- */
+/* Galleries, their pictures, and the builder. */
 
 import { api, el } from '../util.js';
 import { chips, claim, failed, failedIn, filedAndStars, head, heading, holds, loading, loadingIn, plural, preview, shell } from './core.js';
 import { entityTile, grid, missingRail, shelfPage, tile } from './tiles.js';
 
-/*
- * `onChanged` is what turns the card into an editable one: pages that can
- * redraw themselves pass it and get the pencil, the rails that borrow this
- * tile elsewhere do not.
- */
+/* With `onChanged` the card gets the edit pencil. */
 function galleryTile(gallery, onChanged) {
   const node = entityTile({
     name: gallery.title,
@@ -50,18 +43,8 @@ function galleryTile(gallery, onChanged) {
   return node;
 }
 
-/*
- * The row that appears on a scene, a performer or a movie. Asked for after the
- * page has drawn and rendered only if there is something in it, so a library
- * with no galleries at all — which is every library until the day it isn't —
- * looks exactly as it did before.
- */
-/*
- * The same galleries, in the rail instead of in a row of their own. A scene
- * has a handful rather than a wall, so one to a view with a pair of arrows is
- * the whole shelf — and it keeps the column under the player for the things
- * you do rather than the things you have.
- */
+/* Galleries on a scene, performer or movie, drawn only if there are any. */
+/* The same galleries in the side rail, one at a time with arrows. */
 export async function sideGalleries(query) {
   const data = await api('/api/library/galleries?' + query).catch(() => null);
   if (!data?.galleries?.length) return null;
@@ -110,25 +93,15 @@ export async function attachedGalleries(query, note) {
   });
 }
 
-/* ------------------------------------------------------------- the pencil
+/*
+ * ------------------------------------------------------------- the pencil
  *
- * The small things you decide about a gallery while looking at the wall of
- * them: what it is called, which picture fronts it, how that picture is
- * cropped into the square, and getting rid of it.
- *
- * The crop is a focal point stored on the gallery, not a cropped copy of the
- * file — the pictures are the thing you kept, and an editor that quietly
- * rewrites one is not what "change the thumbnail" should mean. Everything
- * else here is Stash's own: the cover is its cover, the delete is its delete.
+ * Rename, cover, crop and delete. The crop is a focal point on the gallery,
+ * not a cropped copy.
  */
 /*
- * One row of "what is this tied to": the chips you have, and a box that asks
- * Stash for the rest.
- *
- * Stash does the matching rather than the browser, because the alternative is
- * reading 1264 performers into a page to filter three of them. `chosen` is the
- * live array the dialog reads back on save — the picker mutates it in place
- * rather than reporting changes upward, which keeps this to one argument.
+ * One tie row: chips, plus a box Stash answers. `chosen` is mutated in
+ * place and read back on save.
  */
 function tiePicker(spec) {
   const chips = el('div', { className: 'tiechips' });
@@ -224,12 +197,7 @@ async function editGallery(gallery, onChanged) {
     save.click();
   };
 
-  /*
-   * The crop, shown the size the card shows it. Clicking says "keep this
-   * part": the point you click is the point held in the middle of the square,
-   * which is what object-position means and the only crop control a square
-   * needs.
-   */
+  /* The crop at card size; click to choose the centre. */
   const preview = el('div', { className: 'cropbox' });
   const shot = el('img', { alt: '' });
   preview.append(shot);
@@ -281,11 +249,7 @@ async function editGallery(gallery, onChanged) {
     })
     .catch((err) => { strip.replaceChildren(el('span', { className: 'muted small' }, err.message)); });
 
-  /*
-   * What it belongs to. The build fills these in when you start from a scene
-   * or a performer page; everything else arrives tied to nothing, and this is
-   * where that gets fixed.
-   */
+  /* Ties: scenes, performers, studio. */
   const scenes = gallery.scenes.map((s) => ({ id: s.id, name: s.title }));
   const performers = gallery.performers.map((p) => ({ id: p.id, name: p.name }));
   const studio = gallery.studio ? [{ id: gallery.studio.id, name: gallery.studio.name }] : [];
@@ -417,12 +381,7 @@ async function editGallery(gallery, onChanged) {
   name.focus();
 }
 
-/*
- * Galleries take the same bar, narrowed by the three things a picture set
- * actually has on it. There are no tags on a gallery and no runtime, so there
- * is no kind and no longest — what there is instead is how many pictures are
- * in it.
- */
+/* Gallery facets: filed, studio, performer, year. */
 const GALLERY_FACETS = [
   { key: 'filed', any: 'Filed or not', of: (g) => [g.organized ? 'Filed' : 'Not filed'] },
   { key: 'studio', any: 'Any studio', of: (g) => (g.studio ? [g.studio.name] : []) },
@@ -455,10 +414,7 @@ export async function showGalleries(query = '') {
     ]);
     if (!holds(mine)) return;
 
-    // Editing anything redraws the wall, which is cheap and means the card
-    // always shows what Stash now holds rather than what it held a moment ago.
-    // The address is read back rather than closed over, so a rename lands on
-    // the shelf you had filtered rather than on all of them.
+    // Redraw after an edit, re-reading the address for the current filters.
     const again = () => showGalleries(location.hash.split('?')[1] || '');
 
     const galleries = data.galleries.map((gallery) => ({
@@ -489,17 +445,9 @@ export async function showGalleries(query = '') {
             ' — from a web page, or from the art ThePornDB already holds for a scene or a performer.'),
         ];
 
-    /*
-     * No builder here any more. Making a gallery from nothing is a setup
-     * question and lives in Settings › Galleries; the builders that stay are
-     * the tied ones, on the scene or the performer they are for.
-     */
+    /* The builder lives in Settings › Galleries and on scene/performer pages. */
     shell('#/library/galleries', heading, rest,
-      /*
-       * The same thin row of what you do not have that every other page in
-       * this half ends with. Their own page carries the button that builds it,
-       * so the tile goes there rather than trying to start a build from here.
-       */
+      /* People with no gallery; the tile goes to their page. */
       bare?.performers?.length
         ? missingRail({
             title: 'No pictures yet',
@@ -544,11 +492,7 @@ export async function showGallery(id) {
             [plural(count, 'image'), gallery.date, gallery.photographer && `by ${gallery.photographer}`,
               gallery.studio?.name].filter(Boolean).join(' · ')),
           gallery.details ? el('p', {}, gallery.details) : null,
-          /*
-           * The same pair the scene page carries, and for the same reason:
-           * Stash keeps filed and a rating for a gallery too, and until now
-           * nothing in this portal ever set either.
-           */
+          /* Filed and rating, as on scenes. */
           el('div', { className: 'sceneactions' },
             filedAndStars(gallery, `/api/library/galleries/${gallery.id}`, () => showGallery(id))),
           chips('castrow', gallery.performers, (p) => `#/library/performer/${p.id}`),
@@ -558,10 +502,7 @@ export async function showGallery(id) {
       shotTools(gallery, shots, () => showGallery(id)),
       shots.node,
       count > images.length ? moreButton(gallery, shots, count) : null,
-      /*
-       * The ties, under the pictures rather than over them: you opened a
-       * gallery to look at it, and what it belongs to is the second question.
-       */
+      /* Ties under the pictures. */
       scenes.length
         ? [head('In these scenes', plural(scenes.length, 'scene')), grid(scenes)]
         : null,
@@ -584,20 +525,11 @@ export async function showGallery(id) {
   }
 }
 
-/*
- * The pictures. A grid of thumbnails that opens a viewer, and the viewer works
- * off this same list — so paging in more pictures lengthens what you can arrow
- * through without rebuilding anything.
- */
+/* Thumbnail grid and viewer, sharing one list. */
 function shotGrid(gallery, images) {
   const node = el('div', { className: 'shots' });
 
-  /*
-   * The same grid does both jobs. Ordinarily a click opens the viewer; in
-   * select mode it ticks the picture instead, because the two things you want
-   * to do to a picture you are looking at — front the gallery with it, get rid
-   * of it — are both about picking pictures rather than viewing them.
-   */
+  /* Select mode: a click ticks instead of opening the viewer. */
   const state = { images: [], nodes: [], node, selecting: false, selected: new Set(), onPick: null };
 
   state.add = (more) => {
@@ -647,11 +579,8 @@ export function shot(state, index, img) {
 }
 
 /*
- * What you can do to the pictures: add more, or pick some and act on them.
- *
- * Delete says what it will take and takes the files with it — a picture left
- * in the folder is one the next scan puts straight back, so a record-only
- * delete would quietly undo itself.
+ * Add pictures, or select some to set the cover or delete (files too,
+ * or the next scan brings them back).
  */
 function shotTools(gallery, shots, reload) {
   const status = el('span', { className: 'muted small' });
@@ -789,11 +718,7 @@ function moreButton(gallery, shots, count) {
   return el('div', { className: 'sceneactions' }, button);
 }
 
-/*
- * The viewer. Full-size, arrow keys, click the backdrop to leave — and it
- * takes itself down on a hash change, because it lives on <body> rather than
- * inside the view and would otherwise outlast the page that opened it.
- */
+/* Full-size viewer on <body>; removes itself on a hash change. */
 function openViewer(state, start) {
   let at = start;
 
@@ -845,13 +770,7 @@ function openViewer(state, start) {
   document.body.append(viewer);
 }
 
-/*
- * Sending files up, one request each.
- *
- * One at a time on purpose: a failed picture is then a failed picture rather
- * than a failed set, the progress line means something, and the server needs
- * no multipart parser — the body is the file and the name is in the query.
- */
+/* One request per file: per-file failures, real progress, no multipart parser. */
 async function uploadFiles(files, params, onProgress) {
   const query = new URLSearchParams(params);
   const done = [];
@@ -878,16 +797,11 @@ async function uploadFiles(files, params, onProgress) {
   return { written, skipped, failed };
 }
 
-/* ------------------------------------------------------------ building one
+/*
+ * ------------------------------------------------------------ building one
  *
- * Find, choose, write. Three steps and they stay three: the find says nothing
- * about what will be kept, and nothing is downloaded until someone has looked
- * at the pictures and cut the list down. Same argument as the movie
- * gap-filler — this is the only other thing in the portal that writes files.
- *
- * `spec.tie` is what the page already knows: the scene page ties to its own
- * scene, cast and studio, the performer page to that performer. Nothing here
- * matches or guesses.
+ * Find, choose, write; nothing downloads until you've chosen. `spec.tie`
+ * is what the page already knows.
  */
 export function buildPanel(spec) {
   const panel = el('div', { className: 'gappanel gallerybuild' });
@@ -955,14 +869,7 @@ export function buildPanel(spec) {
     sources.append(button);
   }
 
-  /*
-   * The third source: pictures you already have. A zip is unpacked on the way
-   * in, since that is how a photo set usually arrives; anything else is taken
-   * one file at a time.
-   *
-   * Its own name box rather than the picker's, because nothing was found here
-   * to take a title from.
-   */
+  /* Your own pictures or a zip; its own name box. */
   const chooser = el('input', {
     type: 'file',
     multiple: true,
@@ -1033,11 +940,8 @@ export function buildPanel(spec) {
 }
 
 /*
- * Where the gallery is going to land, and whether it can. Checked when the
- * panel opens rather than when Build is pressed, because the answer is usually
- * "Stash is not scanning that folder yet" and that is worth knowing before
- * choosing forty pictures. Settings › Galleries shows the same node beside the
- * two folder boxes, where it is the answer to "did I type those right".
+ * Where the gallery will land and whether Stash will import it, checked
+ * when the panel opens. Also shown in Settings › Galleries.
  */
 export function setupCheck() {
   const note = el('p', { className: 'note' }, 'Checking where a gallery would go…');
@@ -1054,9 +958,7 @@ export function setupCheck() {
         ? `Stash scans ${setup.stashPath} but excludes images from it, so a gallery would never appear.`
         : `Stash is not scanning ${setup.stashPath}, so the pictures would sit there unimported.`);
 
-    // Only offered when the folder is the only thing missing — a settings
-    // write on somebody else's application belongs behind a button that says
-    // what it will do.
+    // Offer the one-button fix only when the folder is all that's missing.
     if (setup.writable && (!setup.covered || setup.excludesImages)) {
       const fix = el('button', { className: 'act primary', type: 'button' },
         `Add ${setup.stashPath} to Stash, images included`);
@@ -1083,12 +985,7 @@ export function setupCheck() {
   return wrap;
 }
 
-/*
- * The pictures found, to be cut down. What arrives ticked is the finder's
- * call — the pictures a page linked at full size, or everything on a page that
- * linked none, or nothing at all on ThePornDB, where the list is a handful of
- * versions of one picture.
- */
+/* Found pictures to cut down; what starts ticked is the finder's call. */
 function picker(result, spec, status) {
   const chosen = new Set();
   const wrap = el('div', { className: 'picker' });
@@ -1164,12 +1061,7 @@ function picker(result, spec, status) {
   return wrap;
 }
 
-/*
- * Four steps, and the one it is on. Polled rather than streamed, and the loop
- * stops on its own when the node leaves the page — which is what happens when
- * you navigate away, and is simpler than teaching the view's teardown about a
- * panel that may not exist.
- */
+/* The build's four steps, polled; stops when the node leaves the page. */
 const STAGE = {
   writing: 'Downloading',
   scanning: 'Waiting for Stash to finish scanning the folder',

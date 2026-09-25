@@ -1,11 +1,9 @@
-/* ==========================================================================
-   The library sections — overview, scenes, movies, performers, studios.
-
-   Each page is the same shape: a grid of what you hold, then a thin rail of
-   what you do not. The rail is quieter than the grid on purpose — it is the
-   smaller half of the question, and six hundred people you own nothing of
-   would otherwise bury the two hundred you do.
-   ========================================================================== */
+/*
+ * ==========================================================================
+ * The library sections: a grid of what you hold, then a quieter rail of
+ * what you don't.
+ * ==========================================================================
+ */
 
 /* Faces and covers want the width the rails already take. */
 main:has(.facets), main:has(.tallies) { max-width: 1560px; }
@@ -42,11 +40,10 @@ main:has(.facets), main:has(.tallies) { max-width: 1560px; }
 .tallyrest { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
 
 
-/* --------------------------------------------------------------- the facets
+/*
+ * --------------------------------------------------------------- the facets
  *
- * One tile for a person, a studio and a movie. They differ only in the shape
- * of the artwork and where a click goes; three slightly different cards on
- * three sibling pages would read worse than one.
+ * One tile for a person, a studio and a movie.
  */
 
 .facets {
@@ -56,10 +53,7 @@ main:has(.facets), main:has(.tallies) { max-width: 1560px; }
   align-items: start;
 }
 
-/* A category leads with a 16:9 frame — the same picture the Scenes shelf puts
-   on a tile — so it takes the same width the Scenes shelf gives one. --tile-sm
-   is sized for a face or a poster, and a wide still at that width came out so
-   small that XL on the Categories page was narrower than M on Scenes. */
+/* Categories lead with 16:9 frames, so they take the Scenes tile width. */
 .facets:has(.facetart.wide) {
   grid-template-columns: repeat(auto-fill, minmax(var(--tile-lg), 1fr));
 }
@@ -89,10 +83,7 @@ main:has(.facets), main:has(.tallies) { max-width: 1560px; }
   background: var(--panel-2);
   transition: opacity 0.15s ease;
 }
-/*
- * A studio is a logo, not a portrait. Landscape and contained rather than
- * cropped — a logo cropped to a poster loses the half with the name on it.
- */
+/* Logos: landscape and contained. */
 .facetart.logo { aspect-ratio: 16 / 9; background: var(--panel-2); }
 .facetart.logo img { object-fit: contain; padding: 12px; }
 .facetart.wide { aspect-ratio: 16 / 9; }

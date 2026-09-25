@@ -32,11 +32,7 @@ export async function showHome() {
   }
 }
 
-/*
- * Bands in the order the questions actually get asked: what is new to me, what
- * is stuck, what am I nearly done with, who have I been following, what else is
- * out there.
- */
+/* Bands: new, stuck, nearly done, your performers, everything else. */
 function renderHome(paint, home, building, queue) {
   const refresh = el('button', { className: 'chip', type: 'button' }, building ? 'refreshing…' : 'Refresh');
   refresh.disabled = building;
@@ -74,13 +70,10 @@ function band(title, note, scenes, empty) {
   );
 }
 
-/* ------------------------------------------------------------- needs you
+/*
+ * ------------------------------------------------------------- needs you
  *
- * The "is anything stuck?" answer, which nothing else in the app gives —
- * Whisparr will search for a scene forever without ever mentioning it.
- *
- * Deliberately a summary and not a workbench: retrying, unmonitoring and
- * deleting belong in Whisparr, where the undo lives.
+ * What's stuck in Whisparr. A summary only; fix it in Whisparr.
  */
 
 const ATTENTION_LABEL = { busy: 'Queue', failed: 'Stuck', upcoming: 'Upcoming' };
@@ -139,11 +132,10 @@ function attentionRow(kind, title, detail, href) {
   return row;
 }
 
-/* ------------------------------------------------------------ site coverage
+/*
+ * ------------------------------------------------------------ site coverage
  *
- * How much of each catalogue you already hold, counted in Stash rather than in
- * Whisparr — Whisparr is a downloader here, and a scene only sits in it for the
- * hours between grabbing and importing.
+ * How much of each site you hold, counted in Stash.
  */
 
 function coverageBand(coverage) {
@@ -191,11 +183,7 @@ function coverageRow(row, basis) {
   return node;
 }
 
-/*
- * One click only closes a small gap. Hundreds of scenes behind a single button
- * is not a shortcut — that row opens the site instead, where the "Do not have"
- * filter does the same job deliberately.
- */
+/* One click only for small gaps; bigger ones open the site. */
 function gapAction(row) {
   if (!row.missing) return el('span', { className: 'gapnote' }, 'complete');
   if (!row.missingIds.length) return el('span', { className: 'gapnote' }, 'open to pick');
@@ -221,11 +209,10 @@ async function fillGap(row, trigger) {
   }
 }
 
-/* ---------------------------------------------------------- your performers
+/*
+ * ---------------------------------------------------------- your performers
  *
- * Performer-first. Everywhere else in this hobby the performer is the entity
- * you navigate by, and a name above a row explains why these scenes are here
- * far better than a footnote under each card.
+ * Grouped under each performer.
  */
 
 function performerBand(groups) {

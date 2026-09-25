@@ -1,15 +1,7 @@
 /*
- * Per-page thumbnail size.
- *
- * The stylesheet keeps one scale (--tile-sm/md/lg) that every artwork grid and
- * rail draws from, built from a base size times --tile-mult. So a size control
- * only has to move that one multiplier and the whole page follows — grids,
- * rails and posters together, which is the point: the complaint this answers
- * was thumbnails that did not agree with each other.
- *
- * The choice is per page because the pages are not asking the same question. A
- * wall of 654 performers wants to be small enough to scan; the scene you are
- * about to watch wants to be big enough to recognise.
+ * Per-page thumbnail size. Every grid and rail sizes off --tile-sm/md/lg,
+ * which are base sizes times --tile-mult, so this moves one multiplier.
+ * Per page, since pages want different sizes.
  */
 
 import { api, el } from './util.js';
@@ -24,13 +16,8 @@ export const STEPS = [
 const DEFAULT_STEP = 'm';
 
 /*
- * Anything that sizes itself off the scale. If a page has none of these, it has
- * no thumbnails and gets no control.
- *
- * `.scenes` is a list of rows rather than a grid, and it belongs here for the
- * same reason the grids do: its stills are drawn off the same scale, so the
- * control moves them and a list without one was the only place in the app
- * where the size on screen was not yours to set.
+ * Containers that size off the scale. A page with none gets no control.
+ * `.scenes` (list rows) included.
  */
 const GRIDS = '.tiles, .cards, .facets, .creators, .shots, .candidates, .railtrack, .scenes';
 
@@ -41,10 +28,7 @@ export function loadTileScale(config) {
   stored = { ...(config?.tileScale || {}) };
 }
 
-/*
- * The route hash is the key, minus its query string: two different filters of
- * the same page are still the same page to look at.
- */
+/* The route hash without its query is the key. */
 export function pageKey(hash) {
   const clean = String(hash || '').replace(/^#\/?/, '').split('?')[0];
   return clean.replace(/\/+$/, '') || 'home';
@@ -63,10 +47,7 @@ export function applyStep(step) {
   document.documentElement.style.setProperty('--tile-mult', String(multFor(step)));
 }
 
-/*
- * Called after a route has rendered. Applies the page's stored size, and drops
- * the control into the page's toolbar when there is something to resize.
- */
+/* After a route renders: apply the stored size and mount the control. */
 export function mountTileSize(view, hash) {
   const key = pageKey(hash);
   let current = stepFor(key);
@@ -77,14 +58,8 @@ export function mountTileSize(view, hash) {
   if (view.querySelector('.sizepick')) return;
 
   /*
-   * Where the control goes, in order of preference: a toolbar the page already
-   * has, then its heading row, and failing both a row of its own above the
-   * grid. Pages here are built three different ways and none of them was
-   * written with this control in mind.
-   *
-   * `.edhead` is the Overview's section rule. It is asked for last of the
-   * three because it is the only one that already has something on its right —
-   * the MORE — and the two sit together there rather than competing for it.
+   * Where the control goes: the page's toolbar, its heading row, the
+   * Overview's `.edhead` (beside MORE), or a row of its own.
    */
   let host = view.querySelector('.toolbar')
     || view.querySelector('.feedhead')

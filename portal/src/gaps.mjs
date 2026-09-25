@@ -1,16 +1,7 @@
 /*
- * "What am I missing of the people I already collect?"
- *
- * Bounded on purpose. Answering it properly for all 693 performers you hold
- * files of would be 693 walks of ThePornDB; this asks only about the ones you
- * have most of, where a gap is actually worth knowing about, and caches the
- * answer for half an hour. It is built in the background like the home page,
- * for the same reason — it is dozens of paged requests.
- *
- * Studios are deliberately absent here. The home page already computes exactly
- * this for sites, counted in Stash, and caches it; the studios page reads that
- * rather than asking the same question a second way and getting a second
- * answer.
+ * What you're missing of the performers you have most of. Bounded, built in
+ * the background, cached half an hour. Studios come from the home page's
+ * coverage table instead.
  */
 
 import * as tpdb from './tpdb.mjs';
@@ -52,21 +43,12 @@ const byDate = (a, b) => String(b.date).localeCompare(String(a.date));
 async function performerGaps(config) {
   if (!stashConfigured(config)) return [];
 
-  /*
-   * TPDB's performer catalogue is keyed on its own uuid, so the ones Stash only
-   * ever identified against StashDB cannot be asked about here — they are on
-   * the Performers page and in the acquisition search, which run on the other
-   * catalogue.
-   */
+  /* TPDB is keyed on its own uuid, so StashDB-only performers can't be asked here. */
   const { performers } = await stash.libraryPerformers(config, { limit: PERFORMERS });
   const owned = performers.filter((p) => p.uuid);
   if (!owned.length) return [];
 
-  /*
-   * Matched on fingerprints rather than on Whisparr state, for the reason the
-   * whole app is built around: Whisparr holds a scene for the hours it is in
-   * flight, so it cannot answer "do I have this". Stash can.
-   */
+  /* Matched on fingerprints in Stash, not Whisparr state. */
   const index = await stash.fingerprintIndex(config).catch(() => null);
   const out = [];
 
@@ -84,12 +66,7 @@ async function performerGaps(config) {
       !found.has(scene.id) && !(index && stash.matchByFingerprints(index, scene)));
     missing.sort(byDate);
 
-    /*
-     * Sanity check on the arithmetic. If the whole catalogue came back and not
-     * one of it matched a performer you demonstrably hold files of, the match
-     * failed rather than the gap being total — say nothing instead of saying
-     * something false.
-     */
+    /* Nothing matched at all means the match failed; say nothing. */
     const held = scenes.length - missing.length;
     if (complete && person.count > 0 && held === 0) continue;
 

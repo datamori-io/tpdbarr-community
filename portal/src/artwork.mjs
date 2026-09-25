@@ -1,33 +1,15 @@
 /*
- * Pictures somebody uploaded, and what this app will accept as one.
- *
- * Three places take artwork now — a category's cover, a performer's photograph
- * and a studio's logo — and they disagree about where it ends up. A category's
- * is the portal's own file in config/covers/; the other two are written into
- * Stash, because a performer's picture is Stash's record and not this app's
- * opinion of it.
- *
- * What they cannot be allowed to disagree about is what counts as a picture.
- * Two copies of a magic-byte table are two copies that drift, and the one that
- * drifts is the one that lets something through.
- *
- * **Sniffed, not trusted.** The format is read out of the file's own header
- * rather than from the name the browser sent. That name is the one part of an
- * upload entirely under the client's control, and here it would decide both
- * the filename written to disk and the content type served back out.
+ * Uploaded artwork: category covers (config/covers/), performer photos and
+ * studio logos (into Stash). One check for all three. The format is read
+ * from the file's header, never the uploaded name.
  */
 
-// 8MB. Artwork is displayed a few hundred pixels wide and this is already
-// generous; the cap is there because none of the places this lands is a media
-// folder. A performer's photograph goes into the Stash database itself.
+// 8MB cap: base64 makes it an 11MB Stash mutation.
 export const MAX_ART = 8 * 1024 * 1024;
 
 const starts = (buffer, bytes, at = 0) => bytes.every((byte, i) => buffer[at + i] === byte);
 
-/*
- * What this actually is, or null. Only the formats a browser will draw, and
- * each read from its own header rather than from a list of extensions.
- */
+/* The image type from its header, or null. Browser-drawable formats only. */
 export function kindOf(buffer) {
   if (!buffer || buffer.length < 16) return null;
 
@@ -58,10 +40,7 @@ export const ART_TYPES = {
   '.avif': 'image/avif',
 };
 
-/*
- * The one check, made the same way everywhere, so the three callers cannot
- * develop three opinions about an 8MB WebP. Throws what the route should send.
- */
+/* The one check. Throws what the route should send. */
 export function checked(buffer) {
   if (!buffer?.length) throw Object.assign(new Error('The upload was empty.'), { status: 400 });
 
@@ -80,12 +59,5 @@ export function checked(buffer) {
   return kind;
 }
 
-/*
- * How Stash takes an image: a data URI on the update mutation, which it
- * decodes and stores itself. There is no upload endpoint to post bytes at.
- *
- * Base64 is a third bigger than the bytes it carries, so an 8MB picture is an
- * 11MB mutation body. That is the real reason for the cap above rather than
- * anything about how big a photograph ought to be.
- */
+/* Stash takes images as a data URI on the update mutation. */
 export const dataUrl = (buffer, kind) => `data:${kind.type};base64,${buffer.toString('base64')}`;

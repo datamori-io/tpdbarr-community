@@ -1,14 +1,7 @@
 /*
- * Categories — the index, one category's page, and the editor behind both.
- *
- * A category is portal-owned (see src/categories.mjs): a name, a blurb, a
- * cover, the scenes you put in by hand and a rule that keeps finding more. So
- * everything on these two pages is a write to the portal's own store and
- * nothing here touches Stash.
- *
- * The editor lives on the category's own page rather than in a modal. Editing
- * a grouping is looking at it and changing your mind about it, and a dialog
- * over the top of the wall hides the very thing you are deciding about.
+ * Categories: the index, one category's page, and its editor. Portal-owned
+ * (see src/categories.mjs); nothing here touches Stash. The editor sits on
+ * the category's page, not in a modal.
  */
 
 import { api, el } from '../util.js';
@@ -20,24 +13,13 @@ const SECTION = '#/library/categories';
 
 const href = (slug) => `#/library/category/${slug}`;
 
-// A category's picture is one of its own scenes, through the portal's
-// thumbnail like every other tile — so the setting that fills a missing cover
-// reaches a category whose lead scene has none.
+// A scene's picture through the portal's thumbnail route.
 const art = (id) => (id ? `/media/scene/${id}/thumb` : null);
 
 /*
- * Which picture a category actually shows, asked in one place so the tile, the
- * banner and the picker can never disagree about it.
- *
- * Artwork you uploaded wins. It is the only one of the three that somebody
- * chose on purpose and could not be reconstructed — a scene cover is a frame
- * of something still in the library, and the stand-in is whatever sorted
- * first. Nothing falls back to nothing: a category with neither has no picture
- * and says so by not drawing one.
- *
- * A filmography category's `cover` is not a Stash scene id — it may be a
- * StashDB picture you hold nothing of yet — so the server already hands back a
- * usable address in `coverImage` rather than something this needs to resolve.
+ * The picture a category shows, in one place. Uploaded art wins, then the
+ * chosen scene, then the first. Filmography categories get `coverImage`
+ * from the server.
  */
 const coverOf = (cat) => cat.art || (cat.kind === 'filmography' ? cat.coverImage : art(cat.cover));
 
@@ -49,10 +31,7 @@ function categoryTile(cat) {
     image: coverOf(cat),
     shape: 'wide',
     href: href(cat.slug),
-    // Two facts, and the second one only when it is true: a category that
-    // fills itself behaves differently from one you keep by hand, and that is
-    // worth knowing before you open it. A filmography category answers the
-    // same question with how much of it you actually hold.
+    // Whether it fills itself; for filmography, how much you hold.
     meta: cat.kind === 'filmography'
       ? `${cat.held} of ${plural(cat.count, 'scene')} · directed by ${cat.director}`
       : [plural(cat.count, 'scene'), cat.ruled ? 'self-filling' : null].filter(Boolean).join(' · '),
@@ -91,11 +70,7 @@ export async function showCategories() {
 
 /* ============================================================ one category */
 
-/*
- * The head of a category's page: its cover as a band, its name, what is in it
- * and why. The blurb is shown as written — it is a sentence you typed about
- * your own shelf, not scraped copy, so there is nothing to cut or clean up.
- */
+/* The category's banner: cover, name, count and blurb as written. */
 function banner(cat, edit) {
   const cover = coverOf(cat);
 
@@ -133,16 +108,8 @@ export async function showCategory(slug, query = '') {
 const filtersNow = () => location.hash.split('?')[1] || '';
 
 /*
- * The same bar the Scenes shelf wears, asked of one category. A category is a
- * shelf — often a few hundred scenes — and the questions you ask of it are the
- * shelf's questions: whose is it, who is in it, what is it about, when, and
- * what order. So it is the same piece of furniture rather than a second one
- * that drifts, and its state lives in the address like the shelf's does.
- *
- * The category's own order leads the sort list, because that is what the page
- * is *for*: what you put there by hand first, in the order you put it, then
- * what the rule found. It has to be a sort of its own or opening the page
- * would quietly reorder it.
+ * The Scenes shelf's filter bar over one category, state in the address.
+ * The category's own order leads the sort list.
  */
 function categoryShelf(cat, scenes, query) {
   const arranged = new Map(scenes.map((scene, i) => [scene, i]));
@@ -177,11 +144,7 @@ function draw(data, query = '') {
     ? categoryShelf(cat, scenes, query)
     : [];
 
-  /*
-   * The bar brings its own heading, and the banner above it is already the
-   * category's name in letters three times the size. What is worth keeping is
-   * the count beside it, which is the one thing that changes as you filter.
-   */
+  /* Drop the bar's heading (the banner has the name); keep the count. */
   if (feedhead) feedhead.querySelector('h2')?.remove();
 
   const panel = el('div', { className: 'catedit', hidden: true });
@@ -210,13 +173,11 @@ function draw(data, query = '') {
   );
 }
 
-/* ==================================================== one filmography
+/*
+ * ==================================================== one filmography
  *
- * The other kind of category: a director's scenes, whether or not you hold
- * them. Not a scene, so not `tile()` — an entry here has no resolution, no
- * play state, sometimes no Stash id at all — but the same "picture with a
- * name under it" shape the studios and performers shelves already draw. See
- * categories.mjs's `kind: 'filmography'` for where the list comes from.
+ * A director's scenes, owned or not, drawn as picture-and-name tiles.
+ * See categories.mjs `kind: 'filmography'`.
  */
 
 const shapeFilm = (entry) => ({
@@ -225,11 +186,8 @@ const shapeFilm = (entry) => ({
     .filter(Boolean).join(' ').toLowerCase(),
 });
 
-// Three states, not two: owned, seen and skipped on purpose (config.tracked's
-// ignore list, the same "Skip" every decide queue writes to — see
-// categories.mjs's decorateFilm), and never looked at. The middle one is not
-// "missing" the way the third is; it is a decision you already made.
-// "On its way" leads "Skipped": sending one to v3 is the later decision.
+// Owned, skipped (the decide queue's ignore list), or never looked at.
+// "On its way" beats "Skipped".
 const onItsWay = (e) => e.v3 === 'monitored' || e.v3 === 'downloaded';
 const heldState = (e) => (e.owned ? (e.probable ? 'In your library (title + date)' : 'In your library')
   : onItsWay(e) ? 'On its way (v3)'
@@ -258,10 +216,7 @@ function orderFilms(items, sort) {
   return by.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 }
 
-// Full colour for what is on the shelf, translucent for what is not — the
-// same `faded` the missing rows of performers and studios already wear. An
-// owned entry opens its scene page; an unowned one has none to open, so it
-// goes to StashDB instead.
+// Owned in full colour and opens the scene; missing is faded and opens StashDB.
 function filmTile(entry, v3on) {
   const node = entityTile({
     name: entry.title,
@@ -279,12 +234,7 @@ function filmTile(entry, v3on) {
   return node;
 }
 
-/*
- * Send a missing one to Whisparr v3 — the same route as the Add button on
- * StashDB cards, keyed on the StashDB id every entry here already carries.
- * Like that button, sending also puts it on the want list: a scene fetched on
- * purpose should not still count as undecided under its studio.
- */
+/* Send to Whisparr v3, like StashDB cards' Add; also adds it to the want list. */
 function sendButton(entry) {
   const sent = onItsWay(entry);
   const button = el('button', {
@@ -338,9 +288,7 @@ function filmographyShelf(cat, entries, query, v3on) {
     sorts: FILM_SORTS,
     order: orderFilms,
     card: (entry) => filmTile(entry, v3on),
-    // entityTile draws a `.facet`, the same wide picture-with-a-name-under-it
-    // the category index and the studio/performer shelves use — not `.tile`,
-    // which is shaped around a scene's own duration and progress bar.
+    // entityTile draws a `.facet`, not a scene `.tile`.
     wall: 'facets',
     query,
   });
@@ -394,23 +342,14 @@ function drawFilmography(data, query = '') {
   );
 }
 
-/* ------------------------------------------------------- filmography editor
+/*
+ * ------------------------------------------------------- filmography editor
  *
- * Two boxes rather than the rule-based editor's four: there is no rule to
- * write and no hand order to keep, because a filmography sorts itself by
- * date. What is left is where the list comes from, and patching the two ways
- * an automated search gets it wrong — misses something, or finds the wrong
- * thing entirely.
+ * Where the list comes from, plus hand fixes for what the search missed or
+ * got wrong.
  */
 
-/*
- * The one banner picture, uploaded rather than chosen from a strip — the
- * rule-based cover box offers a strip of the category's own scenes because
- * those are yours to pick from; a filmography's entries are mostly not, so
- * there is nothing of its own worth offering and this is upload-or-nothing.
- * The route underneath (setArt/clearArt) is the same one the rule-based
- * cover uses, kind-agnostic on the server.
- */
+/* Upload-only banner picture, using the same setArt/clearArt route. */
 function filmArt(cat) {
   const note = el('span', { className: 'muted' });
   const upload = el('input', {
@@ -575,9 +514,7 @@ function filmPatch(cat, entries) {
     entries.length ? list : el('p', { className: 'note' }, 'Nothing in this filmography yet.'));
 }
 
-// Redrawing after a write. The server hands back the whole category, so there
-// is nothing to reconcile in the browser — the page is rebuilt from the answer
-// and the editor reopens where it was.
+// Rebuild from the server's answer after a write; reopen the editor.
 async function refresh(slug) {
   const mine = claim();
   try {
@@ -658,31 +595,12 @@ function details(cat) {
     name, blurb, el('div', { className: 'toolbar' }, save, note));
 }
 
-/* ----------------------------------------------------------------- cover
+/*
+ * ----------------------------------------------------------------- cover
  *
- * What a category leads with.
- *
- * The field has been in the store since the beginning and the server has
- * always accepted it; nothing ever wrote it. So every category showed the
- * frame of whichever scene happened to sort first, which on a self-filling one
- * changes the day a new scene lands — the picture at the top of the page moved
- * on its own and there was no way to hold it still.
- *
- * Either your own picture or one of its scenes, and yours wins where there is
- * one. A category is an argument about a set of scenes and usually the picture
- * that makes the argument is one of them — but not always, and the ones where
- * it is not are exactly the ones worth hanging something of your own on.
- *
- * Clearing is safe either way. Remove the artwork and the chosen scene comes
- * back; unchoose the scene and the first member stands in. A category always
- * shows something, so nothing here can leave it blank.
- *
- * **Only what is on this page.** The category page is paged at sixty and the
- * editor is handed that page, not the whole membership. Reading the rest to
- * offer them as covers would be a second pass over the shelf for a picture,
- * and page one is picks first then newest — which is where the cover you want
- * almost always is. It says how many it is showing rather than pretending the
- * grid is everything.
+ * Your own picture, or one of the category's scenes; yours wins. Clearing
+ * either falls back, never to blank. Only scenes on this page (the first
+ * sixty) are offered.
  */
 function coverBox(cat, data) {
   const scenes = data.scenes || [];
@@ -718,11 +636,7 @@ function coverBox(cat, data) {
     }
   };
 
-  /*
-   * The upload, which is the one request on this page that is not JSON: the
-   * body is the picture. Not api() for that reason — that stamps a JSON
-   * content type on anything with a body. Same shape as the gallery uploader.
-   */
+  /* The upload sends the picture as the body, so not api() (which sets a JSON type). */
   send.onclick = async () => {
     const file = upload.files[0];
     if (!file) { note.textContent = 'Choose a picture first.'; return; }
@@ -753,13 +667,8 @@ function coverBox(cat, data) {
   };
 
   /*
-   * The scenes, as a strip. Disabled while there is artwork rather than hidden:
-   * a control that vanishes teaches you nothing about why, and the sentence
-   * under the box says what to press to get them back.
-   *
-   * `cat.cover` is what the server resolved rather than what is stored — a
-   * cover naming a scene that has since left the category comes back as the
-   * stand-in — so the tick is always on a picture you can see.
+   * Scene strip, disabled while there's artwork. `cat.cover` is the
+   * server-resolved cover.
    */
   const chosen = String(cat.cover || '');
 
@@ -810,30 +719,12 @@ function coverBox(cat, data) {
   );
 }
 
-/* ------------------------------------------------------------------- rule
+/*
+ * ------------------------------------------------------------------- rule
  *
- * A rule is a stack of lines, and each line is one condition.
- *
- * It used to be three comma-separated boxes and a word — tags, studios,
- * performers, all OR-ed, with an "any / all" that quietly applied to the tags
- * only. Everything it could express, it expressed in one shape, and the one
- * joining word on screen did not join the things either side of it. So you
- * could not say "these tags but not that studio", and you could not tell what
- * the word you could see was doing.
- *
- * Now: add a line, choose what it looks at, choose how, type the words. Every
- * line after the first carries the word that joins it to everything above it,
- * and any line can be thrown away without touching the rest.
- *
- * **Read top to bottom, with no precedence.** Each line joins to the result of
- * the lines above it rather than to the one directly above, which is what the
- * stack of rows looks like and is said on the page in as many words. See
- * categories.mjs for why.
- *
- * Comma-separated values rather than a tag-picker widget because you already
- * know what you mean and typing it is faster than hunting a dropdown of four
- * hundred — the datalist on each field offers the ones you actually hold, with
- * counts, for when you do not.
+ * A stack of lines, one condition each; lines after the first say how they
+ * join. Read top to bottom, no precedence (see categories.mjs). Values are
+ * comma-separated; datalists offer what you hold.
  */
 
 const split = (value) => value.split(',').map((v) => v.trim()).filter(Boolean);
@@ -851,10 +742,7 @@ const FIELDS = [
   ['title', 'Title'],
 ];
 
-// Three fields have a list of what you actually hold to offer. Title does not
-// — there is no shortlist of titles worth putting in a dropdown, and the whole
-// point of searching one is that you are typing a word rather than picking a
-// name.
+// Suggestions for tags, studios and performers; none for title.
 const SUGGESTED = new Set(['tags', 'studios', 'performers']);
 
 // "none of" is the reason a second line is worth having: the commonest thing
@@ -884,11 +772,7 @@ function ruleBox(cat, terms) {
 
   const current = () => ({ clauses: [...rows.children].map((row) => row.read()) });
 
-  /*
-   * What the rule would catch, shown as you type. A rule you cannot see the
-   * result of is a rule you will get wrong — and it costs nothing, because the
-   * server answers it off the same cached shelf read the page came from.
-   */
+  /* Live preview of what the rule catches, off the cached shelf. */
   let typing = null;
   const look = async () => {
     const rule = current();
@@ -914,13 +798,7 @@ function ruleBox(cat, terms) {
   };
   onTeardown(() => clearTimeout(typing));
 
-  /*
-   * The first line has nothing to join to, so it says "Where" instead of
-   * offering a word that would do nothing. Which line is first can change
-   * under you — delete the top one and the second becomes it — so the whole
-   * stack is re-labelled after every add and every removal rather than each
-   * row deciding once at birth.
-   */
+  /* The first line says "Where". Relabelled after every add or removal. */
   const relabel = () => {
     for (const [i, row] of [...rows.children].entries()) row.lead(i === 0);
   };
@@ -954,9 +832,7 @@ function ruleBox(cat, terms) {
     const lead = el('div', { className: 'catjoin' }, join, first);
     const row = el('div', { className: 'catruleline' }, lead, field, op, values, drop);
 
-    // The suggestions follow the field, so switching a line from tags to
-    // performers offers performers rather than the tags you were halfway
-    // through typing.
+    // Suggestions follow the field.
     field.onchange = () => { suggest(values, field.value); look(); };
     op.onchange = look;
     join.onchange = look;
@@ -1036,11 +912,10 @@ function ruleBox(cat, terms) {
 }
 
 
-/* ----------------------------------------------------------------- picker
+/*
+ * ----------------------------------------------------------------- picker
  *
- * Adding scenes by hand. Searches the same one read of the shelf the Scenes
- * page filters, so it offers the whole library and not a page of it, and shows
- * ten at a time — this is "find the one I mean", not a second shelf.
+ * Add scenes by hand, searching the whole shelf, ten at a time.
  */
 
 function picker(cat, shelf) {
@@ -1104,25 +979,15 @@ function picker(cat, shelf) {
     search, results, note);
 }
 
-/* ------------------------------------------------------------ hand order
+/*
+ * ------------------------------------------------------------ hand order
  *
- * The scenes you chose, in the order they lead the page — and the cover. Only
- * these are movable: the rule's haul is ordered by when it arrived, and a
- * manual position for a scene that may stop matching tomorrow has nowhere to
- * live.
- *
- * Up and down rather than dragging. The same list is used on the iPad, where a
- * drag inside a scrolling page is a fight.
+ * Reorder picks with up/down (drag is awkward on the iPad). Rule matches
+ * keep arrival order.
  */
 
 function order(cat, data) {
-  /*
-   * Only what is on the first page can be listed, because that is where the
-   * titles and the stills came from. Picks lead the page, so this is all of
-   * them right up to sixty — and past that the back of the list is not
-   * reachable here. Saving a short list is still safe: the server keeps
-   * anything it was not told about at the back, which is where it already was.
-   */
+  /* Only first-page picks can be listed. The server keeps unlisted ones at the back. */
   const byId = new Map(data.scenes.map((s) => [String(s.id), s]));
   const picked = data.picked.filter((id) => byId.has(id));
 
@@ -1203,11 +1068,10 @@ function order(cat, data) {
     list, el('div', { className: 'toolbar' }, save, note));
 }
 
-/* ---------------------------------------------------------------- deleting
+/*
+ * ---------------------------------------------------------------- deleting
  *
- * Two presses, because there is nothing to undo it with: the store is the only
- * record a category ever had. The scenes themselves are untouched — a category
- * is a list, and deleting the list is not deleting anything in it.
+ * Two presses: there's no undo. The scenes are untouched.
  */
 
 function danger(cat) {
@@ -1244,11 +1108,10 @@ function danger(cat) {
     el('div', { className: 'toolbar' }, button, note));
 }
 
-/* ============================================= the picker on a scene page
+/*
+ * ============================================= the picker on a scene page
  *
- * The other half of assigning. The moment you are most likely to notice a
- * scene belongs somewhere is while you are watching it, and walking back to
- * the category to add it by name is how that thought gets lost.
+ * Add the scene you're watching to a category.
  */
 
 export function scenePicker(sceneId) {

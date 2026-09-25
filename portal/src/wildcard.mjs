@@ -1,38 +1,11 @@
 /*
- * Wild Card — building one scene's record out of several sources at once.
+ * Wild Card: build one scene's record from several sources at once.
  *
- * The match page answers one question: *which scene is this*, and it answers
- * it by asking sources that can recognise a scene from a fingerprint. When
- * that works it is the best thing in the portal. When it does not — and on
- * pc-import it very often does not, because the file is a DVD rip nobody has
- * ever fingerprinted — the honest answer is that no single source knows what
- * this is, and the page has nothing left to offer.
- *
- * What actually happens then is that you go and look. You find the film on
- * AdultEmpire, the scene list on HotMovies, the credits on AdultFilmIndex, and
- * you copy a field from each into Stash by hand. Three pages, one record, and
- * none of them complete on their own.
- *
- * **So this page does that, and keeps the copying.** You hand it URLs and you
- * hand it keyword sources; every answer arrives as a *contribution* rather
- * than as a candidate, and the record is assembled field by field with you
- * saying which contribution wins each one. Nothing is merged automatically and
- * nothing is ranked: two sources disagreeing about a date is exactly the thing
- * you are here to adjudicate, and a page that quietly picked one would be
- * hiding the only interesting part.
- *
- * **Both halves of it are Stash's own scrapers**, which is the point. Stash
- * has 724 scene scrapers installed here. 705 of them can take a URL and read
- * the page behind it; 193 can take a keyword and search the site themselves.
- * The match page uses neither — it filters to the 186 that answer a FRAGMENT
- * scrape, because that is the shape a fingerprint question takes. Everything
- * this page does was already installed and simply never asked.
- *
- * Nothing here writes until `apply`, and `apply` writes only the fields handed
- * to it. There is no "first non-empty wins" in this module: that rule belongs
- * to the match page, where the picks are whole records from boxes that agree
- * about what a scene is. Here they do not agree, which is why you are reading
- * them side by side.
+ * For scenes no fingerprint knows (often DVD rips). You give it URLs and
+ * keywords; each answer is a *contribution*, and you choose which one wins
+ * each field. Nothing is merged or ranked. Everything goes through Stash's
+ * own installed scrapers. Nothing is written until `apply`, and only the
+ * fields handed to it.
  */
 
 import { gql } from './stash.mjs';
@@ -60,12 +33,7 @@ const SCENE = `
   stash_ids { endpoint stash_id }
 `;
 
-/*
- * What a scraper hands back. The same list the match page asks for, plus the
- * two fields it has no use for and this one does: a scraper that knows a
- * film's director or its catalogue code often knows little else worth having,
- * and those two are exactly what you would otherwise be copying by hand.
- */
+/* Match's fields plus director and code. */
 const SCRAPED = `
   title code details director urls date image remote_site_id
   studio { stored_id name remote_site_id }
@@ -73,34 +41,17 @@ const SCRAPED = `
   performers { stored_id name gender remote_site_id }
 `;
 
-/*
- * What a *group* scraper hands back, which is a different shape and a
- * different thing.
- *
- * A group is a film. Its record has the studio, the date, the director, the
- * synopsis and the box art on it — everything the film-level pages carry — and
- * no cast and no scene title, because a film does not have one scene. That is
- * exactly the gap the DVD rips in pc-import leave, so it is worth having, and
- * it is worth being labelled as the film rather than the scene.
- */
+/* What a group (film) scraper returns: film-level fields, no cast or scene title. */
 const SCRAPED_GROUP = `
   name date director synopsis urls front_image
   studio { stored_id name }
   tags { stored_id name }
 `;
 
-/* ------------------------------------------------------------ the sources
+/*
+ * ------------------------------------------------------------ the sources
  *
- * Which scrapers can be asked a keyword.
- *
- * NAME, not FRAGMENT. A FRAGMENT scrape is "here is a scene I hold, tell me
- * about it" and needs the scene to exist on both sides; a NAME scrape is
- * "here is a phrase, search your own site" — which is the thing you were doing
- * in a browser tab. The DVD sites are all in this list and in none of the
- * others: AdultFilmIndex, AdultEmpire, AdultDvdMarketPlace, HotMovies,
- * TheClassicPorn.
- *
- * Measured 2026-09-12 on this Stash: 724 scene scrapers, 193 of them NAME.
+ * Scrapers that can search by NAME (the DVD sites among them).
  */
 export async function sources(config) {
   const data = await gql(
@@ -115,35 +66,19 @@ export async function sources(config) {
 
   return {
     films,
-    /*
-     * Sorted by name because this is a list you read rather than a list you
-     * rank — there is no sensible "best" scraper for a phrase nobody has typed
-     * yet, and 193 of them in arbitrary order is a wall.
-     */
+    /* Sorted by name. */
     ask: all
       .filter((s) => can(s, 'NAME'))
       .map((s) => ({ key: s.id, label: s.name || s.id }))
       .sort((a, b) => a.label.localeCompare(b.label)),
-    /*
-     * Not a list to choose from: Stash picks the scraper off the URL's host
-     * itself. The count is here only so the page can say how many hosts it is
-     * able to read, which is the answer to "will it know this site".
-     */
+    /* Just a count: Stash picks the URL scraper by host. */
     urls: all.filter((s) => can(s, 'URL')).length,
   };
 }
 
 /*
- * How many sites can be read as a *film*.
- *
- * Asked separately because Stash keeps a scraper's abilities per type, and a
- * scraper can be a group scraper and not a scene one — AdultFilmIndex is
- * exactly that as of 2026-09-12, which is why it vanished from the list above
- * without anybody touching it.
- *
- * **None of them search by name.** All 118 are URL-only, so there is no group
- * half of the keyword panel and there is not going to be one; the film sites
- * are reached by pasting a film page, and that is the whole of it.
+ * How many sites can be read as a film. Abilities are per type, so a group
+ * scraper may not be a scene one. None search by name; all are URL-only.
  */
 async function groupCount(config) {
   const data = await gql(
@@ -155,11 +90,10 @@ async function groupCount(config) {
     .filter((s) => (s.group?.supported_scrapes || []).includes('URL')).length;
 }
 
-/* -------------------------------------------------------------- the scene
+/*
+ * -------------------------------------------------------------- the scene
  *
- * The record being built up, and its current values as the baseline. Every
- * contribution is read against these: a field Stash already has is a field you
- * are choosing whether to overrule, not a blank you are filling.
+ * The record being built. Current values are the baseline.
  */
 
 const briefScene = (raw) => ({
@@ -177,12 +111,7 @@ const briefScene = (raw) => ({
   path: raw.files?.[0]?.path || null,
   image: raw.paths?.screenshot || null,
   stashIds: raw.stash_ids || [],
-  /*
-   * The filename read down to its title, from the same parser the match page
-   * uses. It is what the keyword box starts with, and on the scenes that end
-   * up here it is the only description that exists — these are the files with
-   * no title, which is most of why they are here.
-   */
+  /* The filename's title, via match's parser. The keyword box starts with it. */
   term: raw.title || readName(raw.files?.[0]?.path).title,
 });
 
@@ -192,13 +121,7 @@ export async function scene(config, id) {
   return { scene: briefScene(data.findScene) };
 }
 
-/*
- * Finding the scene to work on.
- *
- * Stash's own `q` reads the path as well as the title, which is the whole
- * reason it is used rather than a title filter: the scenes that need this page
- * are the scenes with no title, and that is most of why they need it.
- */
+/* Find the scene to work on. Stash's `q` also searches the path. */
 export async function find(config, term, { limit = 20 } = {}) {
   const q = String(term || '').trim();
   if (!q) return { scenes: [] };
@@ -216,15 +139,10 @@ export async function find(config, term, { limit = 20 } = {}) {
   return { scenes: (data.findScenes?.scenes || []).map(briefScene) };
 }
 
-/* ------------------------------------------------------- the contributions
+/*
+ * ------------------------------------------------------- the contributions
  *
- * Whatever a source said, in one shape.
- *
- * `ok` and `note` are as much a part of the answer as the fields are. A
- * scraper that is broken today is a normal Tuesday, and a page that silently
- * dropped it would have you wondering why AdultEmpire "had nothing" when what
- * actually happened was a 403. Every source reports, the failures included,
- * and they stay on screen saying so.
+ * One shape for every source. Failures report with `ok` and `note` and stay on screen.
  */
 const shape = (raw, from, label, { url = '' } = {}) => ({
   from,
@@ -249,15 +167,7 @@ const shape = (raw, from, label, { url = '' } = {}) => ({
   },
 });
 
-/*
- * A film, in the same shape a scene answer arrives in.
- *
- * `kind` is the one addition, and the page needs it: a group answer's title is
- * the *film's* name, and taking it as the scene title would give you four
- * scenes all called "Oil Overload #15". Everything else on it — the studio,
- * the date, the director, the box art — is the answer you came for, because a
- * film page is where those actually live.
- */
+/* A film answer. `kind` stops its title being taken as the scene title. */
 const shapeGroup = (raw, label, url) => ({
   from: 'url',
   kind: 'group',
@@ -290,17 +200,8 @@ const hostOf = (value) => urlOf(value)?.host || String(value).slice(0, 60);
 const protocolOf = (value) => urlOf(value)?.protocol || '';
 
 /*
- * A page you found yourself.
- *
- * This is the half that replaces the copying. Stash picks the scraper off the
- * URL's host, so there is nothing to choose here and nothing to configure —
- * paste the address of the page you are already looking at and the fields come
- * back off it, cover included.
- *
- * **Only addresses you typed.** Nothing on this page follows a link it found
- * inside somebody else's answer, which is the same rule the picture scraper
- * has always kept: a scraped page is data, and data does not get to decide
- * what gets fetched next.
+ * Read URLs you pasted. Stash picks the scraper by host. Only URLs you
+ * typed; links found in answers are never followed.
  */
 const MOST_URLS = 12;
 
@@ -311,22 +212,14 @@ export async function fromUrls(config, urls = []) {
 
   if (!list.length) return { contributions: [] };
 
-  /*
-   * In parallel, unlike the match page's Search All. That one is a hundred and
-   * forty calls at one endpoint and gets you rate-limited for the afternoon;
-   * this is a handful of addresses you typed, at a handful of different hosts.
-   */
+  /* In parallel: a few URLs at different hosts. */
   const contributions = await Promise.all(list.map(async (url) => {
     const host = hostOf(url);
     if (!/^https?:$/.test(protocolOf(url))) return nothing('url', host, 'Not an http address.', { url });
 
     /*
-     * The scene attempt swallows its own failure rather than throwing, because
-     * a site that cannot be read as a scene must still get its chance to be
-     * read as a film — and "cannot" arrives both ways. AdultFilmIndex answers
-     * a scene scrape with `runtime error: index out of range`, not an empty
-     * result, and letting that throw skipped the group scraper that would have
-     * answered it perfectly well.
+     * Swallow a scene-scrape failure so the group scraper still gets its turn
+     * (AdultFilmIndex errors on a scene scrape instead of returning empty).
      */
     try {
       const data = await gql(
@@ -337,15 +230,7 @@ export async function fromUrls(config, urls = []) {
 
       if (data?.scrapeSceneURL) return shape(data.scrapeSceneURL, 'url', host, { url });
 
-      /*
-       * Nothing read it as a scene, so try reading it as a film.
-       *
-       * This is most of what gets pasted here. An AdultEmpire or
-       * AdultFilmIndex address is a *film* page, and 118 scrapers can read one
-       * — including several that cannot read a scene at all. Asked second
-       * rather than first because a scene answer is the more specific one and
-       * wins where both exist.
-       */
+      /* Not a scene, so try it as a film. Scene answers win where both exist. */
       const film = await gql(
         config,
         `query($u: String!) { scrapeGroupURL(url: $u) { ${SCRAPED_GROUP} } }`,
@@ -364,13 +249,8 @@ export async function fromUrls(config, urls = []) {
 }
 
 /*
- * A phrase, asked of sites that can search themselves.
- *
- * One source can answer with several scenes — HotMovies returns every scene in
- * a film, which is exactly what you want when the filename is "Oil Overload 15
- * Scene 3" — so a source becomes several contributions rather than one, capped
- * per source and each labelled with which answer it was. Reading eight
- * near-identical rows is the job; reading eighty is not.
+ * Keyword search of sites that can search themselves. One source may return
+ * several scenes, capped per source.
  */
 const PER_SOURCE = 5;
 const MOST_SOURCES = 8;
@@ -389,11 +269,7 @@ export async function ask(config, query, keys = []) {
 
   const answers = await Promise.all(wanted.map(async (key) => {
     const label = known.get(key);
-    /*
-     * A key that is not in the list is a key that cannot do a NAME scrape.
-     * Asking anyway is a GraphQL error rather than an empty answer, and an
-     * error here would take the other seven sources down with it.
-     */
+    /* Not in the list means no NAME scrape; asking anyway is a GraphQL error. */
     if (!label) return [nothing('ask', key, 'That scraper cannot search by name.')];
 
     try {
@@ -419,21 +295,12 @@ export async function ask(config, query, keys = []) {
   return { term, contributions: answers.flat() };
 }
 
-/* ------------------------------------------------------------- the writing
+/*
+ * ------------------------------------------------------------- the writing
  *
- * What you assembled, onto the scene.
- *
- * Unlike the match page there is no field precedence here and no overwrite
- * flag: every value in `values` was chosen by a person looking at the
- * alternatives, so an occupied field being replaced is the intent rather than
- * an accident. A field absent from `values` is not touched at all, which is
- * how "keep what Stash has" is spelled.
- *
- * Performers, studios and tags are attached **only when Stash already has one
- * of that name**, the same rule the match page keeps and for the same reason:
- * creating them means inventing records off the back of a guess, and a wrong
- * guess then has a page of its own. What could not be attached is reported
- * rather than silently dropped.
+ * Every value in `values` was chosen by a person, so it overwrites. Fields
+ * not in `values` are left alone. Performers, studios and tags attach only
+ * if Stash has them; the rest are reported.
  */
 const NAMED = {
   performer: `query($n: String!) {
@@ -453,24 +320,10 @@ async function idFor(config, kind, name) {
   return list[0]?.id || null;
 }
 
-/* ------------------------------------------------------- what Stash already has
+/*
+ * ------------------------------------------------------- what Stash already has
  *
- * The names you can pick from, for the fields where a name is only worth
- * choosing if Stash has one.
- *
- * The page has always refused to invent a performer, a studio or a tag — a
- * scraped name Stash does not hold is reported and dropped, because creating
- * records off the back of a guess gives the guess a page of its own. The
- * consequence was that a field nobody scraped was a field you could not fill,
- * even when you knew the answer and Stash was holding it.
- *
- * So this is the other half of that rule rather than an exception to it: you
- * may add anything **Stash already has**, chosen from Stash's own list. Nothing
- * new is created here either.
- *
- * Ordered by how many scenes carry it, because on a library this size the one
- * you mean is nearly always one you already use a lot, and an alphabetical list
- * of nine hundred tags buries it.
+ * Names you can pick from Stash's own lists, most used first. Nothing is created.
  */
 const ROSTER = {
   performer: [`query($f: PerformerFilterType) {
@@ -512,26 +365,11 @@ export async function names(config, kind, term = '') {
   };
 }
 
-/* ------------------------------------------------------- making a new one
+/*
+ * ------------------------------------------------------- making a new one
  *
- * The one thing the roster could not do.
- *
- * "Pick from what Stash has" is the right rule for a *scraped* name: a source
- * spelling a performer three ways is a guess, and three records is what
- * believing all three guesses looks like. But a name **you** typed into the
- * blank box is not a guess and never was — you are looking at the file, you
- * know whose scene it is, and Stash not holding them yet is the ordinary case
- * for a studio nobody has imported before rather than evidence you are wrong.
- *
- * So the blank box stays blank until you ask: nothing is created by typing,
- * and nothing is created by the write. Creating is its own press, on its own
- * button, after the box has told you Stash has nothing by that name.
- *
- * Tags too. They were held back at first on the grounds that a tag you cannot
- * find is usually one that exists under another spelling — which is true, and
- * is also exactly what the box in front of you is for: it has just searched the
- * roster as you typed and come back with nothing. Having looked, you are in a
- * better position to say it is new than this rule was.
+ * Create a performer, studio or tag you typed, on its own button, once the
+ * box has shown Stash has none by that name. Never on the write.
  */
 const MAKE = {
   performer: [`mutation($n: String!) { performerCreate(input: {name: $n}) { id name } }`, 'performerCreate'],
@@ -559,30 +397,12 @@ export async function create(config, kind, name) {
   return { kind, id: row.id, name: row.name, made: true };
 }
 
-/* ------------------------------------------------------------ your own cover
+/*
+ * ------------------------------------------------------------ your own cover
  *
- * A picture off your machine, or off an address you pasted.
- *
- * The row already offers Stash's cover, every scraper's, and any frame this
- * portal has cut out of the file. What it could not offer was the one you
- * have: the DVD sleeve you scanned, or the still on a page whose scraper this
- * library does not have. That was the last field on the page you could see the
- * answer to and not fill.
- *
- * **Held rather than written.** Nothing here touches the scene. An upload is
- * kept in memory under an address of its own, the row draws it like any other
- * option, and it only reaches Stash if you pick it and press Write — the same
- * path a scraper's cover takes. Close the tab and it was never anything.
- *
- * In memory because that is what it is: a choice you are in the middle of
- * making. A folder would need a sweeper, and the failure of a sweeper is a
- * disk full of covers nobody chose. Twelve at a time and an hour each, which
- * is longer than anyone spends on one scene.
- *
- * A pasted address is fetched here rather than handed to Stash as a link, for
- * two reasons worth the round trip: the page can then actually show you what
- * you pasted (hotlink protection refuses the browser and not us), and what
- * Stash gets is bytes this app has already checked are a picture.
+ * A picture uploaded or fetched from a pasted URL. Held in memory (twelve,
+ * an hour each) and only reaches Stash if chosen on Write. Fetched here so
+ * the page can show it past hotlink protection, and checked to be a picture.
  */
 const ART_KEEP = 60 * 60 * 1000;
 const ART_MOST = 12;
@@ -616,13 +436,7 @@ export function heldArt(id) {
   return held;
 }
 
-/*
- * The same hold, filled from an address instead of a file chooser.
- *
- * http and https only, and the answer has to be a picture by its own header —
- * `artwork.checked` reads the magic bytes, so a page that returns HTML with an
- * image content type is refused here rather than stored as a broken cover.
- */
+/* Fetch into the same hold. http(s) only; magic bytes must say picture. */
 export async function fetchArt(address) {
   let url;
   try { url = new URL(String(address).trim()); } catch { url = null; }
@@ -642,23 +456,12 @@ export async function fetchArt(address) {
 }
 
 /*
- * A cover Stash can actually fetch.
- *
- * Everything a scraper offers is an address on somebody's CDN and Stash goes
- * and gets it. A frame cut by this portal is not — its address is
- * `/media/scene/6867/frame/25`, which is relative to the browser that drew the
- * page. Stash is a different container on a different address and would fetch
- * nothing, and the failure would be silent: the write succeeds and the scene
- * has no cover.
- *
- * So a frame is read off disk here and handed over as bytes. Everything else
- * is passed through as the address it is.
+ * Our frame URLs are relative to the browser, so Stash can't fetch them.
+ * Read off disk and sent as bytes. Other URLs pass through.
  */
 const FRAME = /^\/media\/scene\/(\d+)\/frame\/(\d+)(?:\?|$)/;
 
-// The other address of ours: a picture you uploaded or pasted, held in memory
-// above. Same problem as a frame and the same answer — Stash cannot fetch it,
-// so it goes over as bytes.
+// Held uploads: same problem, same answer.
 const HELD = /^\/api\/import\/wildcard\/art\/([a-z0-9]+)(?:\?|$)/;
 
 async function coverFrom(value) {
@@ -691,11 +494,7 @@ export async function apply(config, sceneId, values = {}, opts = {}) {
   for (const key of TEXT_FIELDS) {
     const value = values[key];
     if (typeof value !== 'string' || !value.trim()) continue;
-    /*
-     * The last gate before Stash. The contributions were normalised on arrival,
-     * but this is the value the browser handed back and a date Stash cannot
-     * read fails the whole write — the cast, the cover and the ids with it.
-     */
+    /* A bad date fails the whole Stash write, so check it again here. */
     if (key === 'date') {
       const when = asDate(value);
       if (!when) { skipped.push(`date “${value.trim()}” is not a date Stash can read`); continue; }
@@ -721,12 +520,7 @@ export async function apply(config, sceneId, values = {}, opts = {}) {
     else skipped.push(`studio “${name}” is not in Stash`);
   }
 
-  /*
-   * The lists replace rather than add to what is already there. On this page a
-   * cast is something you assembled by ticking sources against each other, and
-   * quietly unioning it with whatever the scene already had would hand you a
-   * cast you never chose and cannot see the shape of.
-   */
+  /* Lists replace what's there: you assembled the cast deliberately. */
   for (const [key, kind, field] of [
     ['performers', 'performer', 'performer_ids'],
     ['tags', 'tag', 'tag_ids'],
@@ -745,11 +539,7 @@ export async function apply(config, sceneId, values = {}, opts = {}) {
     if (ids.length) { input[field] = [...new Set(ids)]; wrote.push(key); }
   }
 
-  /*
-   * The links are added to rather than replaced, which is the opposite of the
-   * cast and worth the inconsistency: a URL is a fact about where this scene
-   * can be found, and a second address does not make the first one untrue.
-   */
+  /* URLs are added to, not replaced. */
   if (Array.isArray(values.urls) && values.urls.length) {
     const now = new Set(current.findScene.urls || []);
     for (const u of values.urls) if (String(u || '').trim()) now.add(String(u).trim());
@@ -767,16 +557,7 @@ export async function apply(config, sceneId, values = {}, opts = {}) {
     { input }
   );
 
-  /*
-   * The rename runs after the write and never before it.
-   *
-   * renamer.mjs re-plans from Stash rather than being handed a name, so by
-   * the time it looks the scene is already carrying the title and studio and
-   * date that were just chosen — the file gets named after the record, which
-   * is the only order in which that sentence is true. It is also why a refused
-   * rename is reported rather than thrown: the write happened, and losing it
-   * behind an error about a filename would be the worst of both.
-   */
+  /* Rename after the write; renamer re-plans from Stash. A refusal is reported, not thrown. */
   let renamed = null;
   if (opts.rename) {
     renamed = await renamer.rename(config, sceneId)

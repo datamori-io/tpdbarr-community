@@ -1,21 +1,7 @@
 /*
- * The Import overview.
- *
- * The first page of the import side, and it answers two questions rather than
- * one: what am I already collecting, and what is worth a look that I am not.
- *
- * The first half is the tracked catalogues, summed — how many decisions are
- * outstanding across all of them, how much of what you said you want you
- * actually have. That summary is the reason this page exists: the Tracked page
- * lists seven rows, and seven rows do not tell you whether you are behind.
- *
- * The second half is suggestions, and every one of them comes from something
- * you have already said. Favourites are marked on StashDB itself, so this page reads them rather than inventing a
- * taste model. Trending is the one row that is not about you, and it is last
- * for that reason.
- *
- * Slow enough to be built in the background and served from cache, like the
- * console. Nothing here changes minute to minute.
+ * The Import overview: the tracked catalogues summed, and suggestions
+ * from your StashDB favourites (studios and performers), then trending.
+ * Suggestions are built in the background and cached.
  */
 
 import * as stashdb from './stashdb.mjs';
@@ -30,15 +16,7 @@ let building = null;
 
 export const forgetOverview = () => { cache = null; };
 
-/*
- * The summary is recomputed every time and only the suggestions are cached.
- *
- * They cost wildly different things: the summary is a sum over a snapshot
- * already in memory, the suggestions are three StashDB reads and an ownership
- * pass. Caching them together meant that a restart — which empties the coverage
- * cache — froze a page of zeros in place for half an hour, because the summary
- * was built from measurements that had not happened yet.
- */
+/* Only suggestions are cached; the summary is recomputed from memory each time. */
 export function overviewSnapshot(config) {
   const { rows } = discover.coverageSnapshot(config);
 
@@ -69,11 +47,10 @@ export async function ensureOverview(config, { force = false } = {}) {
   return overviewSnapshot(config);
 }
 
-/* ------------------------------------------------------------ the summary
+/*
+ * ------------------------------------------------------------ the summary
  *
- * The tracked rows added up. `decisions` is the headline: it is the only number
- * here that is a job rather than a fact, and a growing one means the catalogues
- * have moved on without you.
+ * The tracked rows added up. `decisions` is the headline.
  */
 function summarise(rows) {
   const measured = rows.filter((r) => !r.pending);
@@ -108,12 +85,7 @@ const row = async (config, input, label, why) => {
   const { scenes } = await stashdb.queryScenes(config, stashdb.sceneQuery({ ...input, perPage: ROW * 2 }));
   const annotated = await discover.annotate(config, scenes);
 
-  /*
-   * A suggestion you already own is not a suggestion, and one you have already
-   * said no to is worse than that. Both come out here rather than being drawn
-   * greyed — this row is short, and every slot spent on a decision you already
-   * made is one not spent on a scene you have not seen.
-   */
+  /* Drop suggestions you own or skipped. */
   return {
     label,
     why,
@@ -131,12 +103,7 @@ async function buildSuggestions(config) {
     return null;
   };
 
-  /*
-   * Studios and performers separately rather than one favourites feed. They are
-   * different questions — "my studios have released something" is a shelf you
-   * are filling, "my performers have" is a person you follow — and StashDB's
-   * FavoriteFilter can tell them apart, so there is no reason to blur them.
-   */
+  /* Studios and performers as separate rows. */
   const suggestions = await Promise.all([
     row(config, { favorites: 'STUDIO', sort: 'DATE' }, 'New from your studios',
       'the newest from the 107 studios you have favourited on StashDB').catch(report('studios')),

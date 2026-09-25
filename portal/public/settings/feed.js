@@ -1,11 +1,6 @@
 /*
- * Feed — what the reel opens as.
- *
- * These are defaults rather than commands: the reel writes the same store every
- * time you touch a control in it, and an address that names a setting still
- * beats both. They are read and written through the reel's own route rather
- * than /api/config — that one drops every cache on its way past, which is right
- * for a changed Stash URL and absurd for a mix slider.
+ * Feed defaults. The reel saves as you use it; the address still wins.
+ * Uses the reel's route, not /api/config (which drops every cache).
  */
 
 import { api, el } from '../util.js';
@@ -104,11 +99,7 @@ function row(name, hint, control, out, href) {
   );
 }
 
-/*
- * The clip renderer, which is the one thing here that is a job rather than a
- * setting. It runs itself on the hour; this is somewhere to see how far it has
- * got and to say "not in an hour, now".
- */
+/* The clip renderer: runs hourly; this shows progress and can run it now. */
 function clipRow(clips) {
   if (!clips) return el('div', { className: 'paramrow' },
     el('div', { className: 'paramname' }, 'Marker clips', el('span', { className: 'muted' }, 'unavailable')),

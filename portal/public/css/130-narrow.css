@@ -1,13 +1,8 @@
 /* ------------------------------------------------- the top bar, narrow */
 
 /*
- * The site header on a phone.
- *
- * Three things compete for one row — the brand, the search, and the nav —
- * and at 375px the nav was pushed off the right-hand edge entirely.
- * So below 760px the search drops to its own line and the nav scrolls
- * sideways rather than being cut off, and below 520px the brand keeps only
- * its mark.
+ * The header on a phone: below 760px the search gets its own line and the
+ * nav scrolls sideways; below 520px the brand keeps only its mark.
  */
 @media (max-width: 760px) {
   .topbar {
@@ -66,27 +61,13 @@
 }
 
 /*
- * Two rows, not three.
+ * Below 620px the brand goes, leaving nav and search in two rows.
  *
- * The wordmark is 132px of fixed-size sprite — .brandmark is a window with
- * overflow hidden and the image is positioned inside it — so it will not
- * shrink, and with it in place the nav could not fit beside it. The header
- * came out brand / nav / search stacked, tall enough on a 375px screen that
- * the brand scrolled off the top and you got a header with no name on it.
- *
- * Below 620 the brand goes instead. It is a link home, and the nav has one of
- * those anyway; what you actually need at this width is the destinations
- * and somewhere to type.
- *
- * Do not try to scale the image to fix this: the negative top and left in
- * .brandmark img are cropping a wordmark out of a larger picture, and any
- * max-width on it slices a letter off.
+ * Don't scale the image instead: .brandmark img's negative offsets crop
+ * the wordmark, and any max-width slices a letter off.
  */
 @media (max-width: 620px) {
-  /*
-   * The wordmark goes, the Feed stays. It is no longer in the nav to fall
-   * back on, and it is a destination rather than decoration.
-   */
+  /* The Feed stays. */
   .brand { display: none; }
 }
 

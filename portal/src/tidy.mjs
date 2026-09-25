@@ -1,44 +1,15 @@
 /*
- * Tidying Whisparr up behind the pipeline.
+ * Tidying Whisparr behind the pipeline.
  *
- * Whisparr is a downloader, not a library — see the stage note in stashlib.mjs.
- * A scene is grabbed, encoded, moved and imported into Stash, and from that
- * moment Whisparr holding it monitored is pure residue: it will never be
- * searched for again, but it still sits in the list, still counts against every
- * "wanted" number, and still has a file on the disk it grabbed to.
+ * Once Stash has filed a scene, Whisparr monitoring it is leftover. Two
+ * buttons, never automatic:
  *
- * Measured 2026-09-01, which is why this exists: v3 held 539 movies and **all
- * 539 were monitored**, 236 of them with a file. Nothing had ever been
- * unmonitored. v2 was near-clean by comparison — 117 monitored out of 31,974
- * episodes.
+ *   1. Unmonitor what Stash has filed. Reversible.
+ *   2. Remove what's been unmonitored for 15 days. Only if Stash has a copy.
  *
- * Two steps, both a button, neither automatic:
- *
- *   1. **Unmonitor** what Stash has filed. Reversible, so it needs no ceremony.
- *   2. **Remove** what has been unmonitored for 15 days. Destructive, so it
- *      waits, and it only ever touches something Stash is holding a copy of.
- *
- * The gap between them is the point. Unmonitoring is a claim that the file
- * landed; the fortnight is the time for that claim to be wrong out loud — a bad
- * encode, a re-scan, a file moved back — before the original is dropped.
- *
- * **The two instances are not in the same state, and it is a settings
- * difference, not a bug.** Read off their own media-management config:
- *
- *   v3  autoUnmonitorPreviouslyDownloadedMovies   = true
- *   v2  autoUnmonitorPreviouslyDownloadedEpisodes = false
- *
- * So when FileFlows moves a file out from under v3, v3 notices the file has
- * gone and unmonitors the movie on its own — watched happening here on
- * 2026-09-01, movie 340: grabbed 13:16, imported 19:01, unmonitored by v3, and
- * the survey found it that way with no write from this portal. v2 never does
- * this. Which splits the work cleanly: step 1 is mostly for v2 and for the ones
- * v3 misses, and step 2 is the whole of the value on v3, because nothing in
- * either app ever removes anything.
- *
- * It is also why the watermark below times from **first sight** rather than
- * from our own write. Most of what ages here will have been unmonitored by
- * Whisparr, not by us.
+ * v3 has autoUnmonitorPreviouslyDownloadedMovies on and unmonitors on its
+ * own when FileFlows moves a file; v2's equivalent is off. So step 1 is
+ * mostly for v2, and step 2 is the value on v3.
  */
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
@@ -56,16 +27,12 @@ export const HOLD_DAYS = 15;
 
 const DAY = 24 * 60 * 60 * 1000;
 
-/* ------------------------------------------------------------ the watermark
+/*
+ * ------------------------------------------------------------ the watermark
  *
- * Neither Whisparr records *when* something was unmonitored — there is no such
- * field on a movie or an episode — so the fortnight has to be timed here.
- *
- * The clock starts on **first sight**, not on our own write: every survey
- * stamps any monitored=false movie it has not seen before. That way something
- * unmonitored by hand in Whisparr's own UI still ages, and a lost file only
- * ever makes the wait longer, never shorter. Erring long is the right direction
- * for the one operation here that deletes.
+ * Whisparr doesn't record when something was unmonitored, so the 15 days
+ * are timed here, from when a survey first sees it unmonitored. A lost file
+ * only makes the wait longer.
  */
 
 let cache = null;   // { "v3:123": "2026-09-01T10:00:00.000Z" }
@@ -108,16 +75,10 @@ async function save() {
   }
 }
 
-/* ------------------------------------------------------------- what is filed
+/*
+ * ------------------------------------------------------------- what is filed
  *
- * Only /organized_scenes counts as landed. That is the end of the pipeline and
- * the thing that was asked for: "once it is registered in the organized folder". A
- * scene still in /pc-import or /Import Folder is yours — the whole app counts
- * it now — but it has not finished moving, and unmonitoring on the strength of
- * a file that is still being encoded is how you lose the only copy.
- *
- * /movies is left out on purpose: those 52 features came in through Emby, not
- * through Whisparr, so there is nothing there to tidy.
+ * Only /organized_scenes counts as landed. /movies came through Emby, not Whisparr.
  */
 
 const FILED = { path: { value: '/organized_scenes/', modifier: 'INCLUDES' } };
@@ -130,19 +91,9 @@ let filedCache = null;
 export const forgetFiled = () => { filedCache = null; };
 
 /*
- * Filed scenes, indexed the two ways Whisparr can be joined to them.
- *
- * v3 indexes on the StashDB scene UUID and so does Stash, so that join is
- * exact — 884 of 984 filed scenes carry one. The other hundred were identified
- * against TPDB's stash-box instead and have no StashDB id at all, so they fall
- * through to title + date, the same fallback the coverage percentage uses.
- *
- * **v2 has no exact join at all.** Its `episode.tvdbId` is TPDB's *numeric*
- * scene id (11315917) while Stash stores TPDB's *UUID*
- * (c4783ab5-95be-4b86-9c5e-76e282ad67af), and those are different keys for the
- * same scene with nothing in either system to translate between them. So the
- * v2 side is title + date only — which is one more reason v2 never gets past
- * unmonitoring here.
+ * Filed scenes, indexed for joining to Whisparr. v3 joins exactly on the
+ * StashDB UUID; the rest fall back to title + date. v2 has no exact join:
+ * its tvdbId is TPDB's numeric id, Stash stores TPDB's UUID.
  */
 async function filedIndex(config, { force = false } = {}) {
   if (!force && filedCache && Date.now() - filedCache.at < INDEX_TTL) return filedCache.index;
@@ -193,26 +144,13 @@ function filedAs(index, { stashId, title, date }) {
 
 const isoDate = (value) => (value ? String(value).slice(0, 10) : null);
 
-/*
- * What there is to tidy. Reads only.
- *
- * Both Whisparrs are optional: one that is not configured or not answering
- * leaves its half empty and says why, rather than failing the page. They are
- * independent instances and one being down is no reason to hide the other's
- * work.
- */
+/* What there is to tidy. Reads only. Each Whisparr is optional. */
 let surveying = null;
 
 export async function survey(config, { force = false } = {}) {
   /*
-   * One pass at a time. A survey reads the whole filed shelf out of Stash and
-   * every monitored episode out of v2 — fifteen requests on their own — and the
-   * Overview can easily ask for it two or three times over while a render
-   * settles. Running those concurrently is the same answer computed three times
-   * and, measured here, enough load to make one of them come back empty.
-   *
-   * A forced pass is the two write paths making sure of their ground, so it
-   * never shares and never becomes the promise anyone else waits on.
+   * One survey at a time; concurrent ones overloaded and came back empty.
+   * A forced pass (from the writes) never shares.
    */
   if (!force) {
     if (surveying) return surveying;
@@ -265,11 +203,7 @@ async function runSurvey(config, { force = false } = {}) {
 
       const days = Math.floor((now - Date.parse(book[key])) / DAY);
 
-      /*
-       * Removal is gated on Stash holding it, not on the clock alone. An
-       * unmonitored movie Stash has no record of is one that was cancelled or
-       * given up on, and deleting its file would throw away the only copy.
-       */
+      /* Removal needs Stash to hold it: otherwise the file may be the only copy. */
       if (!hit) continue;
 
       const row = {
@@ -282,12 +216,7 @@ async function runSurvey(config, { force = false } = {}) {
       (days >= HOLD_DAYS ? v3.due : v3.waiting).push(row);
     }
 
-    /*
-     * The stage Stash cannot see: grabbed, on the disk, and no Stash record of
-     * any kind. Nothing to tidy — it is the *front* of the pipeline — but it is
-     * the one stage the Overview could not otherwise show, since every other
-     * one is a Stash path.
-     */
+    /* Grabbed but not in Stash yet: the front of the pipeline, for the Overview. */
     v3.unseen = v3.movies.filter(
       (m) => m.hasFile && !filedAs(index, { stashId: m.stashId, title: m.title, date: isoDate(m.releaseDate) })
     ).length;
@@ -327,12 +256,7 @@ async function surveyV3(config) {
   };
 }
 
-/*
- * v2's catalogue is enormous and almost entirely irrelevant: 31,974 episodes
- * across 15 sites, of which 117 are monitored. Only the monitored ones can ever
- * be candidates, so only those are carried out of here — the rest is megabytes
- * of nothing.
- */
+/* Only v2's monitored episodes are carried. */
 async function surveyV2(config) {
   const series = await whisparr.listSeries(config);
   const wanted = [];
@@ -354,15 +278,7 @@ async function surveyV2(config) {
 
 /* --------------------------------------------------------------- the writes */
 
-/*
- * Unmonitor everything the survey found filed. Reversible on both sides: v3
- * takes one bulk edit, v2 one bulk monitor call, and either can be flipped back
- * in Whisparr's own UI.
- *
- * The survey is re-run here rather than trusting ids posted from the browser. A
- * page left open for an hour would otherwise act on whatever those ids happen
- * to mean now.
- */
+/* Unmonitor everything filed. Re-surveys rather than trusting posted ids. */
 export async function unmonitor(config) {
   const found = await survey(config, { force: true });
   const result = { v3: { count: 0 }, v2: { count: 0 } };
@@ -392,16 +308,8 @@ export async function unmonitor(config) {
 }
 
 /*
- * Remove what has been unmonitored for the full fortnight.
- *
- * **v3 only, and that is a constraint rather than a choice.** v2 is a Sonarr
- * fork: an episode cannot be deleted, only a whole series or an episode's file.
- * Deleting the series would take its entire catalogue with it — 15,836 episodes
- * for Playboy Plus alone — and mean re-pulling all of it to add one scene from
- * that site again. So the v2 half stops at unmonitored and stays there.
- *
- * Files go with it, and so does an import exclusion: a scene that has been
- * encoded and filed does not want fetching a second time.
+ * Remove what's been unmonitored 15 days. v3 only: v2 can't delete one
+ * episode, only a whole series. Deletes files and adds an import exclusion.
  */
 export async function remove(config) {
   const found = await survey(config, { force: true });

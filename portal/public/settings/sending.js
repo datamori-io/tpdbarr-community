@@ -1,16 +1,6 @@
 /*
- * Sending — the nightly trickle out of the want list.
- *
- * This lived on the Tracked page, beside the list it drains, on the argument
- * that a switch nobody can see beside the thing it acts on is a switch nobody
- * remembers is on. That was right when the page was one column; it stopped
- * being right when the page grew a second layer of tabs and the bar ended up
- * halfway down one of them. A schedule is set about twice a year, and a
- * control you touch twice a year is a setting.
- *
- * What did not come with it is "Send N now". That one is not a schedule, it is
- * a thing you do to the list while looking at it, so it stays on the list. See
- * release.mjs for why it is a trickle and why the ten are random.
+ * Sending: the nightly release schedule (see release.mjs). "Send N now"
+ * stays on the want list.
  */
 
 import { api, el } from '../util.js';
@@ -45,10 +35,7 @@ function scheduleBox() {
     });
     at.onchange = () => save({ hour: Number(at.value) });
 
-    /*
-     * How long the list will take at this rate. The number people actually want
-     * from a trickle is not "ten a night", it is "so when is it done".
-     */
+    /* How many days the list will take at this rate. */
     const days = state.waiting && state.perDay ? Math.ceil(state.waiting / state.perDay) : 0;
 
     const note = el('span', { className: 'muted small' },

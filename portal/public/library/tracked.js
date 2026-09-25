@@ -1,7 +1,6 @@
 /*
- * How much of a catalogue you hold, wherever that gets asked — the badge on a
- * shelf tile, the bar on a studio or performer, and the three views of one
- * shelf that a tracked subject gets. See discover.mjs for the measurement.
+ * Catalogue coverage in the library: tile badges, the bar on studio and
+ * performer pages, and their three views. See discover.mjs.
  */
 
 import { api, el } from '../util.js';
@@ -9,25 +8,12 @@ import { stashdbCard } from '../catalogue.js';
 import { head, showMore, view } from './core.js';
 import { entityTile, grid, tile, trackedRail } from './tiles.js';
 
-/* --------------------------------------------------- studio and performer
+/*
+ * --------------------------------------------------- studio and performer
  *
- * The two library pages with a catalogue on them.
- *
- * Every other page here answers "what do I have". A studio and a performer are
- * where the other half is worth asking on the same screen — what did they put
- * out, and what of it is missing — so both carry three views of one shelf:
- * what you hold, counted in Stash; what you do not, from StashDB; and both
- * together. On a studio the cast rail filters all three, because "what did she
- * film for them" is the same question asked of each; a performer has no such
- * rail, because there the cast is the subject.
- *
- * The percentage needs tracking turned on. It is the same measurement the
- * Acquire page shows and it costs a catalogue read, which is not something to
- * do on every page load — so the button is the switch. See discover.mjs.
- *
- * Nothing here is in the address. The view and the cast filter are how you are
- * reading this page rather than which page it is, and re-reading the studio
- * every time you change your mind would cost a pass over its whole shelf.
+ * Three views of one shelf: what you hold (Stash), what you're missing
+ * (StashDB), and both. On a studio the cast rail filters all three.
+ * The percentage needs tracking on. View and filter aren't in the address.
  */
 
 const CATALOGUE_VIEWS = [
@@ -37,14 +23,8 @@ const CATALOGUE_VIEWS = [
 ];
 
 /*
- * The two things in this library that have a catalogue behind them.
- *
- * A studio and a performer are the same page asked about a different subject:
- * what do I hold, what did I say I wanted and have not got, what is there at
- * all. Everything the three views do differently for the two is in here rather
- * than in them — which shelf to page, which StashDB filter, and the word for
- * "of this one" in an empty state. Two copies of those views would be two
- * answers waiting to disagree, the same reason the scene card is shared.
+ * Studio and performer differ only in what's here: which shelf, which
+ * StashDB filter, the empty-state word.
  */
 export const SUBJECTS = {
   studio: {
@@ -91,13 +71,7 @@ export function trackButton({ stashdbId, tracked, noun }, track) {
   return button;
 }
 
-/*
- * The three views, with the numbers on them.
- *
- * What you hold is always countable. What is missing is not, until the studio
- * is tracked and measured — so those two carry a number once there is one, and
- * none rather than a wrong one until then.
- */
+/* The view switch with counts. Missing has no number until measured. */
 export function viewBar({ subject, data, view, performer }, pick, filterBy) {
   const subjectData = subject.of(data);
   const catalogue = Boolean(subjectData.stashdbId && data.stashdb?.available);
@@ -167,16 +141,8 @@ export async function heldView(id, state) {
 }
 
 /*
- * What you are missing: the scenes you marked from this subject that are not on
- * the shelf yet.
- *
- * This is your list, not StashDB's arithmetic. A catalogue gap is a fact about
- * StashDB — six hundred scenes you never asked for — and it is on the header as
- * a percentage, which is where a fact like that belongs. This view answers the
- * other question: of the ones I said I wanted, what has not arrived.
- *
- * Nothing is fetched to draw it. The marks carry enough of each scene to redraw
- * the card, and whether it has arrived was asked once when the page loaded.
+ * Missing: scenes you marked from this subject that haven't arrived. Drawn
+ * from the marks; no fetch.
  */
 export function wantedView(state, onChange, redraw) {
   const list = (state.data.wanted?.scenes || []).filter((s) => !s.stash);
@@ -219,13 +185,7 @@ export function wantedView(state, onChange, redraw) {
   ];
 }
 
-/*
- * Everything StashDB has for this subject, with what you hold marked on it and
- * a Track button on every card.
- *
- * Not the union of the two catalogues: a scene you own that StashDB has never
- * listed is on the shelf in the first view and cannot be on this one.
- */
+/* Everything StashDB has for the subject, with what you hold marked. */
 export async function catalogueView(state, onChange) {
   const { subject } = state;
 
@@ -263,12 +223,11 @@ export async function catalogueView(state, onChange) {
   ];
 }
 
-/* ------------------------------------------------------------ what you track
+/*
+ * ------------------------------------------------------------ what you track
  *
- * A shelf of 1300 people cannot ask about each one: the coverage rows are read
- * once and looked up by StashDB id, which is the only id the two halves share.
- * Not being able to read them at all — no stash-box, StashDB down — leaves
- * every tile untracked, which is the honest answer rather than an error.
+ * Coverage rows read once, looked up by StashDB id. Unreadable leaves
+ * every tile untracked.
  */
 const TRACKED = 'Tracked';
 const UNTRACKED = 'Not tracked';
@@ -287,15 +246,7 @@ export const trackedOn = (rows, kind, stashdbId) => {
   return { coverage: row, trackedAs: row ? TRACKED : UNTRACKED };
 };
 
-/*
- * How much of what you decided you want is on the shelf, as a badge.
- *
- * Only on the ones you track, because the number does not exist for anything
- * else — a badge on every tile is a badge on none of them. A tracked thing
- * with nothing decided yet says so rather than saying 0%, for the same reason
- * the bar does: nought per cent reads as "you have none of this" when you may
- * have all of it.
- */
+/* A coverage badge, only on tracked things. Nothing decided shows "—", not 0%. */
 export function coverageBadge(row) {
   if (!row) return null;
   if (row.pending) return { text: '…', match: 'probable', title: 'Tracked. Measuring against StashDB…' };
@@ -319,17 +270,8 @@ export function coverageBadge(row) {
 }
 
 /*
- * What you monitor, at the top of the shelf it is about.
- *
- * The grid below already badges a tracked tile, but a tracked thing is a
- * handful among several hundred, and finding one by scrolling is not finding
- * it. So the same tiles lead the page as a row of their own, in the order the
- * snapshot already puts them in — least complete first, because what the number
- * is for is what is missing.
- *
- * Something you track and hold nothing of still belongs here, and it is the one
- * tile that cannot go to a library page: there is no page for a performer with
- * no files. It goes to the Registry instead, which is where the catalogue is.
+ * Tracked things as a rail at the top, least complete first. One with no
+ * files links to the Registry.
  */
 export function trackedEntityRail(rows, kind, held) {
   const mine = rows.filter((row) => row.kind === kind);

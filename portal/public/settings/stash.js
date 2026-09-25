@@ -1,11 +1,4 @@
-/*
- * Stash — the things you ask Stash to go and do.
- *
- * These were a row of cards on the Catalogue landing page, above the piles
- * they act on. They are presses rather than counts, and a landing page that
- * says which tool to open is a different page from one that starts jobs, so
- * they live under Manage now and the Catalogue page keeps its numbers.
- */
+/* Manage › Stash: jobs you ask Stash (or the portal) to run. */
 
 import { api, el } from '../util.js';
 import { state } from '../import/core.js';
@@ -45,17 +38,8 @@ export async function showStash(paint) {
 }
 
 /*
- * The things you ask Stash to go and do, which are the same shape.
- *
- * Both are fire-and-report: Stash hands back a job id and the browser must not
- * hold a request open across work measured in minutes or hours. Both have to
- * cope with the job already running when the page opens, because the job
- * outlives the page by design and Stash will happily queue a second one behind
- * the first and do everything twice.
- *
- * Drawn immediately and asked about afterwards. Whether something is already
- * running is one more round trip, the counts below are useful without it, and
- * a landing page that waits on a footnote is a landing page that feels broken.
+ * A Stash job card. Returns a job id and polls; copes with a job already
+ * running (Stash would queue a duplicate). Drawn first, status asked after.
  */
 function jobCard({ title, hint, label, idle, endpoint, doing, done }) {
   const said = el('span', { className: 'muted small' }, 'Checking with Stash…');
@@ -96,9 +80,7 @@ function jobCard({ title, hint, label, idle, endpoint, doing, done }) {
   const follow = (id) => {
     if (!id) return;
     watch(id);
-    // Slow on purpose: these run for minutes at least and the answer only
-    // changes on that scale. A tighter poll is a hundred requests saying the
-    // same thing.
+    // Poll every four seconds.
     timer = setInterval(() => watch(id), 4000);
   };
 
@@ -137,24 +119,8 @@ function jobCard({ title, hint, label, idle, endpoint, doing, done }) {
 }
 
 /*
- * Telling Stash to go and look at the disk.
- *
- * Every count on this page is a count of what Stash knows about, and Stash
- * only knows about a file it has scanned. A folder the downloader filled an
- * hour ago is not a small pile here — it is no pile at all, and the page reads
- * as finished at exactly the moment it is furthest from it. So the control
- * that makes the numbers true sits above them rather than in Stash's settings
- * two clicks away.
- *
- * **The three arrival folders, not the library.** A scene only ever enters
- * through /pc-import, /Import Folder or /movies; the rest of what Stash is
- * configured with is either already counted or on its way out. Walking all of
- * it to find this morning's grab was minutes spent where the answer could not
- * be. See SCAN_PATHS in catalogue.mjs.
- *
- * Covers and phashes are asked for on the way in, which is why this is not
- * quite the same press as Stash's own Scan button: the two piles below that a
- * scan can avoid creating, it avoids creating.
+ * Scan the three arrival folders (see SCAN_PATHS in catalogue.mjs),
+ * generating covers and phashes on the way in.
  */
 const scan = () => jobCard({
   title: 'The library on disk',
@@ -168,18 +134,7 @@ const scan = () => jobCard({
     + 'minutes rather than the whole library. Covers and phashes are made for anything it finds.',
 });
 
-/*
- * The heavy half of what Stash can make.
- *
- * Previews, sprites, image previews and clip previews — ffmpeg over whole
- * files, which is what makes a scene hover on a shelf and scrub on its page.
- * Hours rather than minutes, and nothing else in the portal needs it to have
- * happened, which is why it is a press and not something that runs on its own.
- *
- * Only /organized_scenes. The other folders are a scene passing through, and a
- * preview built over a file that FileFlows is about to re-encode and move is
- * thrown away with it.
- */
+/* Previews, sprites, image and clip previews, for /organized_scenes only. Hours. */
 const media = () => jobCard({
   title: 'Previews and sprites',
   hint: 'the heavy ones — hovering on a shelf, scrubbing on a page',
@@ -191,15 +146,7 @@ const media = () => jobCard({
     + 'Only /organized_scenes, nothing already made is touched, and it is hours rather than minutes.',
 });
 
-/*
- * Fingerprints, which are not a pile — they are the reason the piles are hard.
- *
- * A stash-box asked about a scene matches on fingerprints and nothing else. An
- * oshash only matches somebody holding the byte-identical file; a phash is the
- * frames and survives a re-encode. Without one a scene has a single brittle
- * chance at a certainty and then falls to a keyword guess, which is what makes
- * Match feel like it does not work.
- */
+/* Fingerprints: without a phash, a scene only matches a byte-identical file. */
 function fingerprints(totals, prints) {
   const said = el('span', { className: 'muted small' }, '');
   const go = el('button', { className: 'add', type: 'button', hidden: true }, 'Generate the missing ones');
@@ -215,12 +162,7 @@ function fingerprints(totals, prints) {
     go.hidden = false;
   }
 
-  /*
-   * The button here does the whole library, which is the difference between it
-   * and the one on the Match page — that one is scoped to the pile in front of
-   * you, and the gap deliberately is not. Counted on 2026-09-12: the three
-   * piles overlap and none of them covers it.
-   */
+  /* The whole library, unlike Match's button, which is scoped to the pile. */
   go.onclick = async () => {
     go.disabled = true;
     go.textContent = 'Asking Stash…';
@@ -247,11 +189,7 @@ function fingerprints(totals, prints) {
   );
 }
 
-/*
- * The organized folder on its own. The arrival scan above leaves it alone on
- * purpose; this is for after a re-shelve, or after something on the Mac was
- * moved by hand and Stash is holding paths that are not there any more.
- */
+/* Scan /organized_scenes alone, after a re-shelve or a manual move. */
 const organizedScan = () => jobCard({
   title: 'Organized folder',
   hint: 'the filed library, walked on its own',
@@ -263,11 +201,11 @@ const organizedScan = () => jobCard({
     + 'so nothing is imported twice. Longer than the arrival scan — it is the whole library.',
 });
 
-/* ------------------------------------------------------------ the chores
+/*
+ * ------------------------------------------------------------ the chores
  *
- * Rename, nfo and thumbnails are the portal's own loops, not Stash jobs, and
- * only one runs at a time. Every chore card watches the same run and says what
- * it is doing — its own progress, or which other chore has the floor.
+ * Rename, nfo and thumbnails: the portal's own loops, one at a time. Every
+ * chore card shows the shared run.
  */
 const choreCards = new Set();
 let choreTimer = null;
@@ -298,10 +236,7 @@ function failures(run) {
       el('li', {}, el('a', { href: `#/library/scene/${f.id}` }, f.title || `scene ${f.id}`), ` — ${f.why}`))));
 }
 
-/*
- * One chore card: a title, some buttons, and a line under them that the
- * shared poll keeps true.
- */
+/* One chore card, kept current by the shared poll. */
 function choreCard({ title, hint, idle, kinds, changedWord, buttons }) {
   const said = el('span', { className: 'muted small' }, idle);
   const extra = el('div', {});
@@ -361,12 +296,9 @@ async function startChore(card, endpoint) {
 }
 
 /*
- * Press twice for anything that deletes or overwrites.
- *
- * Not window.confirm: the app's own browser pane never shows the dialog and
- * answers it "no" on your behalf, so the button looked dead. The first press
- * arms the button and says what the second will do; it disarms itself after
- * a few seconds if the second never comes.
+ * Press twice for anything that deletes or overwrites. Not window.confirm:
+ * the app's browser pane answers it "no" without showing it. Disarms after
+ * a few seconds.
  */
 function armed(button, warning, action) {
   let timer = null;
@@ -390,11 +322,7 @@ function armed(button, warning, action) {
   };
 }
 
-/*
- * Rename all in organized. Two presses on purpose: the first only asks what
- * would move, and the page says so — how many, and a sample of each — before
- * the second moves anything.
- */
+/* Rename all in organized: the first press plans, the second moves. */
 function reshelve() {
   const look = el('button', { className: 'add', type: 'button' }, 'Rename all in organized');
   const go = el('button', { className: 'add', type: 'button', hidden: true }, 'Move them');
@@ -473,10 +401,7 @@ function reshelve() {
     look.disabled = false;
   };
 
-  /*
-   * Deletes files, so it asks — with the number, and what "better" means.
-   * The filed scene is kept either way; only the worse file goes.
-   */
+  /* Deletes the worse file of each pair; the filed scene is kept. */
   armed(keep, () => `Press again to delete the worse file of ${keep.dataset.count} pairs`, async () => {
     keep.hidden = true;
     go.hidden = true;
@@ -494,10 +419,7 @@ function reshelve() {
   return card.node;
 }
 
-/*
- * nfo's and thumbnails: the same card twice, a gentle press and a heavy one.
- * Overwrite asks first — it replaces files that may have been edited by hand.
- */
+/* nfo and thumbnails: fill missing, or overwrite (asks first). */
 function sidecar(what) {
   const nfo = what === 'nfo';
   const label = nfo ? 'nfo’s' : 'thumbnails';
@@ -530,10 +452,7 @@ function sidecar(what) {
 const gb = (bytes) => (bytes ? `${(bytes / 1024 ** 3).toFixed(2)} GB` : '');
 const clock = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '');
 
-/*
- * Stash's phash duplicate finder, as a list. Nothing here deletes — each row
- * opens the scene, where removing one is a decision made looking at it.
- */
+/* Stash's phash duplicate finder, as a list. Delete from the scene page. */
 function duplicates() {
   const pick = el('select', {},
     el('option', { value: '0' }, 'Exact'),

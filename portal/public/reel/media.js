@@ -1,7 +1,4 @@
-/*
- * Getting a thing to play. Three sources answer here and they fail in
- * different ways, so what "not playable" means is decided in one place.
- */
+/* What to play for each slide, and what counts as unplayable. */
 
 import { api, el } from '../util.js';
 import { CLIP_STRIKES, WINDOW } from './config.js';
@@ -20,11 +17,7 @@ export const mediaFor = (item) =>
       }
     : item.kind === 'reddit'
     ? {
-        /*
-         * A RedGIFs clip is video and loops as itself — no window, because the
-         * whole of it is the point. Everything else from Reddit is a picture,
-         * and a picture slide has no video element at all.
-         */
+        /* A RedGIFs clip loops whole; a Reddit picture has no video element. */
         src: item.video ? proxied(item.video) : null,
         poster: item.poster || item.art ? proxied(item.poster || item.art) : null,
         start: 0,
@@ -33,24 +26,13 @@ export const mediaFor = (item) =>
     : item.kind === 'marker'
     ? {
         /*
-         * The rendered clip Stash generates for the marker — `stream`, which
-         * is an mp4 of the moment itself, not the film it came out of.
+         * Stash's rendered marker clip is `stream` (an mp4).
          *
-         * NOT `preview`. That path looks like the obvious one and is a trap:
-         * it serves a 520kB animated WebP, which is a picture, and a <video>
-         * cannot decode a picture. Every marker therefore failed and fell back
-         * to streaming the whole scene — which is the slow, seek-into-a-2GB-
-         * file path this was written to avoid in the first place.
-         *
-         * Where Stash has not rendered a marker, `stream` 404s and the slide
-         * falls back to the scene. Per marker, so a half-finished Generate job
-         * works: the ones that have a clip use it, the rest seek as before.
+         * NOT `preview`: that's an animated WebP, which a <video> can't play, so
+         * every marker fell back to the whole scene. A marker Stash hasn't
+         * rendered 404s on `stream` and falls back per marker.
          */
-        /*
-         * Ours first — 720 high, cut from the source — then Stash's 640x360,
-         * then the scene itself. Each step is tried and falls through on
-         * failure, so a half-finished render improves the reel while it runs.
-         */
+        /* Ours (720p) first, then Stash's, then the scene. */
         src: live?.play === 'source' || live?.clipless >= CLIP_STRIKES
           ? `/media/scene/${item.sceneId}/stream`
           : `/media/marker/${item.id}/clip`,
@@ -79,23 +61,10 @@ export function loadInto(slide, muted) {
 }
 
 /*
- * Settings.
- *
- * Everything that is not a moment-to-moment control: the way in to the two
- * off-library sources, and how much of the reel they are allowed to be.
- *
- * The mixer is expressed as what comes from *away* — RedGIFs and Reddit — and
- * the library takes whatever is left. That way the three always add to a
- * hundred without anyone having to make them, and the library can never be
- * squeezed to nothing by two sliders arguing.
+ * Settings: the off-library sources and the mix. The sliders set RedGIFs
+ * and Reddit; the library gets the rest.
  */
-/*
- * What the clip renderer is up to, and the way to prod it.
- *
- * It runs itself on the hour, so this is mostly a window rather than a
- * control — but a job that takes hours needs somewhere to say how far it has
- * got, or the only way to know is to ask someone who can read a log.
- */
+/* The clip renderer's status (it runs hourly), and a button to run it. */
 export function clipStatus(box) {
   const line = el('div', { className: 'reelsetnote' }, 'Checking rendered clips…');
   const button = el('button', { className: 'reelmute', type: 'button' }, 'Render missing');

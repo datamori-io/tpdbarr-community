@@ -1,34 +1,11 @@
 /*
- * Reddit, for the performers already in the library.
+ * Reddit, for performers whose Stash URLs include a Reddit address.
  *
- * There is nothing to configure. Sixty-seven of the performers in Stash already
- * carry a Reddit address in their URLs — some a user, some a subreddit — so
- * the list of things to follow is read off the library rather than typed in.
- *
- * WHAT WORKS, AND WHAT DOES NOT. Measured 2026-09-02, from this library:
- *
- *   - The JSON API (`/r/x/new.json`) answers 403 to every User-Agent tried,
- *     including none at all. It is not a header problem and there is no header
- *     that fixes it.
- *   - old.reddit.com serves a "Welcome to Reddit" block page, not a listing.
- *   - The Atom feeds — `/r/x/new.rss` and `/user/x/submitted.rss` — answer 200
- *     with real content, and carry enough: title, author, permalink, time, a
- *     preview thumbnail, and for a direct image post the full-size i.redd.it
- *     URL.
- *   - Those feeds allow two or three requests a minute on a fresh budget, and
- *     roughly one every several minutes once that is spent. It is not a rate
- *     that can be tuned to, so the walk does not try — see BACKOFF_MS.
- *   - i.redd.it and preview.redd.it are not rate limited at all.
- *
- * So this cannot fetch while you look at it. It is a slow poller with a cache,
- * and a cold walk of every source takes hours rather than minutes. The page
- * reads the cache, says where the walk has got to, and never waits on Reddit.
- *
- * That is the shape everything that reads Reddit at volume ends up in, and it
- * is the real reason those tools want a session cookie: not politeness,
- * throughput. Nothing here is authenticated, so nothing here has a credential
- * to leak — the trade is that it is slow, and being slow is fine for something
- * nobody is waiting on.
+ * Only the Atom feeds work (`/r/x/new.rss`, `/user/x/submitted.rss`); the
+ * JSON API returns 403 and old.reddit a block page. The feeds allow a few
+ * requests a minute, then far fewer. i.redd.it and preview.redd.it aren't
+ * limited. So this is a slow poller with a cache: the page reads the cache
+ * and never waits on Reddit. Unauthenticated, so no credential to leak.
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -52,14 +29,7 @@ const PACE = 25000;
 // How long a walk of every source stays fresh before the page offers another.
 const STALE_MS = 6 * 60 * 60 * 1000;
 
-/*
- * What a 429 costs. Measured at two or three requests a minute when the budget
- * is fresh, and one every several minutes once it is not — so the real limit
- * is not a rate this can be tuned to, and the walk does not try. It waits, has
- * another go at the same source, and doubles the wait each time it is turned
- * away, up to the cap. That settles on whatever Reddit is actually allowing
- * today without anyone having to work it out.
- */
+/* On a 429, wait and retry the same source, doubling up to the cap. */
 const BACKOFF_MS = 5 * 60 * 1000;
 const BACKOFF_MAX = 60 * 60 * 1000;
 
@@ -105,11 +75,7 @@ export const forget = () => { state = null; };
 
 // ----------------------------------------------------------------- sources
 
-/*
- * Which of the two shapes a performer's Reddit address is, and the feed that
- * goes with it. Anything else on reddit.com — a comment permalink, someone's
- * saved list — is not a thing with a feed, and is left alone.
- */
+/* User or subreddit feed for a Reddit URL; anything else is skipped. */
 function feedFor(url) {
   const clean = String(url || '').split('?')[0].replace(/\/+$/, '');
 
@@ -128,11 +94,7 @@ function feedFor(url) {
 
 let sourceCache = null;
 
-/*
- * Read off the library, not configured. A performer with two Reddit addresses
- * contributes both; the same address on two performers is followed once and
- * credited to the first, because the post is the post either way.
- */
+/* Sources from the library. The same address on two performers is followed once. */
 export async function sources(config, { force = false } = {}) {
   if (!force && sourceCache && Date.now() - sourceCache.at < 60 * 60 * 1000) return sourceCache.list;
 
@@ -156,11 +118,7 @@ export async function sources(config, { force = false } = {}) {
     }
   }
 
-  /*
-   * Then the ones followed by hand. After the performers, so that a handle
-   * already on one keeps that performer's name rather than losing it to a
-   * bare entry — the posts are the same posts either way.
-   */
+  /* Hand-followed sources after the performers, so performer names win. */
   for (const raw of store.extra) {
     const parsed = feedFor(raw);
     if (parsed) add(parsed, null, (parsed.kind === 'sub' ? 'r/' : 'u/') + parsed.handle, true);
@@ -171,11 +129,7 @@ export async function sources(config, { force = false } = {}) {
   return list;
 }
 
-/*
- * Following something by hand. Takes a full URL or the shorthand people
- * actually type — `r/name`, `u/name`, or a bare name, which is read as a
- * subreddit because that is what a bare name usually means.
- */
+/* Follow by hand: a URL, `r/name`, `u/name`, or a bare name (read as a subreddit). */
 export async function follow(config, input) {
   const text = String(input || '').trim();
   if (!text) throw Object.assign(new Error('Nothing to follow.'), { status: 400 });
@@ -198,11 +152,7 @@ export async function follow(config, input) {
   sourceCache = null;
   await save();
 
-  /*
-   * A new source lands at whatever place its name sorts to, and a finished
-   * pass has the cursor at the end — so without this it would not be read
-   * until the next full walk. Rewinding to it means it is read next.
-   */
+  /* Rewind the cursor to the new source so it's read next. */
   const list = await sources(config, { force: true });
   const at = list.findIndex((source) => source.key === parsed.key);
   if (at >= 0 && at < store.cursor) store.cursor = at;
@@ -244,12 +194,8 @@ function decode(text) {
 const pick = (entry, tag) => decode((entry.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`)) || [])[1] || '');
 
 /*
- * The feed is XML around an escaped HTML table. The thumbnail is an attribute
- * and easy; the full-size picture is only in that table, as the href of the
- * anchor Reddit labels `[link]`. A direct image post points that at i.redd.it,
- * a gallery at reddit.com/gallery/… — and a gallery's pictures would each cost
- * another request, which at two a minute is not a trade worth making. So a
- * gallery keeps its thumbnail and says what it is.
+ * The full-size picture is in the escaped HTML table, as the `[link]`
+ * href. Galleries keep their thumbnail (each picture would cost a request).
  */
 function entries(xml, source) {
   const out = [];
@@ -280,9 +226,7 @@ function entries(xml, source) {
       thumb: thumb || null,
       full: direct ? link : null,
       gallery,
-      // Something is linked that is neither a picture we can show nor a
-      // gallery — another host, or a text post. Worth saying rather than
-      // showing an empty tile.
+      // Linked elsewhere or text: say so rather than show an empty tile.
       external: !direct && !gallery && /^https?:/i.test(link) ? link : null,
     });
   }
@@ -293,25 +237,13 @@ function entries(xml, source) {
 // ---------------------------------------------------------------- redgifs
 
 /*
- * RedGIFs, which is where most of the video actually is.
- *
- * Of 981 posts pulled on the first pass, 534 were a direct i.redd.it picture
- * and 187 pointed at RedGIFs — far and away the biggest thing behind a link,
- * and unlike the pictures it is video, which is what a reel wants.
- *
- * Their API hands out a temporary token to anyone who asks: no account, no
- * credential to store. The token lasts about a day, so it is kept until
- * something answers 401 and then asked for again. The media itself serves to a
- * bare request — no Referer, no token — so only the lookup needs any of this.
+ * RedGIFs links, where most of the video is. Anonymous token (about a
+ * day); media needs no token or Referer.
  */
 
 const REDGIFS_ID = /(?:redgifs\.com)\/(?:watch|ifr|i)\/([A-Za-z0-9]+)/i;
 
-/*
- * Resolving a batch, one at a time and giving up quietly. This runs inside the
- * walk, which is already slow — a few extra lookups per source cost nothing
- * next to the wait Reddit imposes between feeds.
- */
+/* Resolve a batch, one at a time, failing quietly. */
 async function resolveRedgifs(posts) {
   for (const post of posts) {
     const id = (String(post.external || '').match(REDGIFS_ID) || [])[1];
@@ -334,11 +266,7 @@ async function resolveRedgifs(posts) {
 
 // --------------------------------------------------------------- allowlist
 
-/*
- * The same rule as the gallery scraper and the artwork proxy: only a URL this
- * module has already put in front of you can be fetched through the proxy, so
- * it cannot be pointed at an arbitrary address by hand.
- */
+/* Only URLs this module offered can go through the proxy. */
 const MAX_KNOWN = 6000;
 const offered = new Set();
 
@@ -383,12 +311,8 @@ async function fetchFeed(source) {
 }
 
 /*
- * One pass over the sources, starting where the last one stopped.
- *
- * This runs for hours on a cold start and that is expected: sixty-seven
- * sources at a pace Reddit sets, with a wait after every refusal. Nothing is
- * awaited by a request — the page asks for a walk, is told one is running, and
- * reads the cache while it fills.
+ * One pass over the sources from where the last stopped. Hours on a cold
+ * start; the page reads the cache meanwhile.
  */
 async function walk(config) {
   const store = await load();
@@ -410,11 +334,7 @@ async function walk(config) {
     }
 
     if (result.limited) {
-      /*
-       * Waiting rather than giving up, and on the same source: the cursor does
-       * not move, so the budget is never spent walking the front of the list
-       * over and over.
-       */
+      /* Wait on the same source; the cursor doesn't move. */
       store.blockedUntil = Date.now() + backoff;
       await save();
       await sleep(backoff);
@@ -450,14 +370,7 @@ async function walk(config) {
   }
 }
 
-/*
- * Resolving the RedGIFs links already sitting in the cache.
- *
- * The walk only resolves what it has just fetched, so everything pulled before
- * RedGIFs was understood would stay a dead link until the next full pass —
- * which takes hours. This catches those up instead. RedGIFs is not the thing
- * rate limiting us, so it can go at a sensible pace.
- */
+/* Resolve RedGIFs links already in the cache without waiting for a full pass. */
 let catching = null;
 
 export function catchUp() {
@@ -496,15 +409,8 @@ export function refresh(config) {
 // ------------------------------------------------------------------- reads
 
 /*
- * Reddit in the reel.
- *
- * One post for every MIX_EVERY clips out of the library, spread through the
- * page rather than dropped in a block at the end. Which posts a page gets is
- * decided by the page number and nothing else, so scrolling back up finds the
- * same ones and no post shows twice.
- *
- * Only posts with something to show get in. A post whose picture Reddit would
- * not part with is a hole in a reel, which is worse than not being there.
+ * Reddit in the reel: one post per MIX_EVERY library clips, chosen by page
+ * so scrolling back is stable. Only posts with something to show.
  */
 const MIX_EVERY = 4;
 
@@ -514,19 +420,10 @@ export async function mixInto(base, { page = 1, take: want = 0, offset = 0, seed
   const usable = store.posts.filter((post) => post.video || post.full || post.thumb);
   if (!usable.length) return base;
 
-  /*
-   * How many of these a page gets. Given explicitly when more than one source
-   * is riding along, so that turning a second one on shares the space out
-   * rather than doubling how much of the page is not the library.
-   */
+  /* Per-page count, shared out when several sources ride along. */
   const take = want || Math.max(1, Math.round(base.items.length / MIX_EVERY));
 
-  /*
-   * Dealt from the visit's seed rather than sliced off the front of the list.
-   * The same fix, and the same reason, as the one in redgifs.mjs: this was
-   * `usable.slice((page - 1) * take, page * take)`, so page one was the same
-   * posts in the same order every session. See shuffle.mjs.
-   */
+  /* Dealt from the visit's seed (see shuffle.mjs). */
   const slice = pageOf(usable, seed, page, take);
   if (!slice.length) return base;
 
@@ -542,10 +439,7 @@ export async function mixInto(base, { page = 1, take: want = 0, offset = 0, seed
   return { ...base, items };
 }
 
-/*
- * One stored post as the reel draws it. Shared by the mix and the dedicated
- * feed so a Reddit slide is the same slide wherever it was dealt from.
- */
+/* One post as the reel draws it, shared by the mix and the feed. */
 function toItem(post) {
   return {
     kind: 'reddit',
@@ -567,10 +461,7 @@ function toItem(post) {
   };
 }
 
-/*
- * A reel of nothing but Reddit, for the dedicated feed. Same pool and the same
- * seeded deal as the mix, without a library page to thread through.
- */
+/* The Reddit-only feed. */
 export async function feed({ page = 1, take = 12, seed = '1' } = {}) {
   const store = await load();
   const usable = store.posts.filter((post) => post.video || post.full || post.thumb);

@@ -1,21 +1,12 @@
 /*
- * Marker Builder — cutting markers by hand.
+ * Marker Builder: cutting markers by hand.
  *
- * Everything else that puts markers in this library is a plugin run by hand
- * and left to its own judgement: timestampTrade first, TPDBMarkers second and
- * only into scenes that have none. Both import within fifteen seconds of an
- * existing marker and *rewrite it in place* rather than skipping it, which is
- * how 156 timestamp.trade markers were retimed and retitled in one pass. So a
- * marker made here is a marker a plugin can still overwrite — the order rule
- * does not stop applying because a human made this one. Mark first, run the
+ * The timestampTrade and TPDBMarkers plugins rewrite any marker within 15
+ * seconds of one they import, including hand-cut ones. Mark first, run the
  * plugins after, or not at all.
  *
- * What this module owns is small: the queue of scenes worth marking, the tags
- * a marker can wear, and the three writes. The judgement is all on the page —
- * this end never guesses a tag or a time.
- *
- * A new marker gets a rendered clip on the next markerclips pass, which is
- * already an idle job (see server.mjs) — nothing here has to ask for one.
+ * This module owns the queue, the tag list and the three writes. New markers
+ * get a clip on the next markerclips pass.
  */
 
 import { gql } from './stash.mjs';
@@ -23,17 +14,8 @@ import { findScenes } from './stashlib.mjs';
 import { remove as dropClips } from './markerclips.mjs';
 
 /*
- * The tags offered first, before anything the library can tell us.
- *
- * They are the author's three, and they are pinned rather than ranked because a
- * ranking is only useful once there is something to rank — on a scene-by-scene
- * workbench the same handful is wanted every time, and hunting for them in a
- * list sorted by a count that changes underneath you is the thing that makes a
- * keyboard workflow stop being one. Anything else the library actually uses
- * follows them, most-used first.
- *
- * A seed that does not exist as a Stash tag yet still shows. It is created the
- * first time it is used, and not before — see `resolveTag`.
+ * Pinned first; then the library's marker tags, most used. A seed Stash
+ * doesn't have yet is created on first use (see `resolveTag`).
  */
 export const SEEDS = ['Kissing', 'Orgasm', 'Undressing'];
 
@@ -58,30 +40,15 @@ const marker = (m) => ({
 
 const byTime = (a, b) => a.seconds - b.seconds || (a.end || 0) - (b.end || 0);
 
-/*
- * Stash keeps times as floats and the page works in tenths — a marker placed
- * on a frame is not usefully more precise than that, and a raw float in the
- * list reads as noise. Rounded on the way in, so what is stored is what was
- * shown when it was placed.
- */
+/* Times rounded to tenths on the way in. */
 const tenths = (n) => Math.max(0, Math.round((Number(n) || 0) * 10) / 10);
 
 // -------------------------------------------------------------------- queue
 
 /*
- * Only what is filed.
- *
- * Marking is work you do once and keep, so it is only worth doing on a scene
- * that has stopped moving. Everything upstream of /organized_scenes is still
- * going through FileFlows — it gets re-encoded and moved, and the file the
- * marks were placed against is not the file that comes out the other end.
- *
- * Narrower than stashlib's own FILED, which is organized_scenes *or* /movies.
- * Films are Emby's, not Stash's, and are not what this bench is for.
- *
- * Written as a single INCLUDES rather than as a criterion joined to the marker
- * one by OR: Stash reads a top-level OR as OR-ing against everything beside
- * it, which would quietly undo the has_markers half.
+ * Only /organized_scenes: earlier files are re-encoded and moved by FileFlows.
+ * Narrower than stashlib's FILED (no /movies). One INCLUDES, not an OR: a
+ * top-level OR would undo the has_markers half.
  */
 const ORGANIZED = { path: { value: '/organized_scenes/', modifier: 'INCLUDES' } };
 
@@ -91,10 +58,7 @@ const ORGANIZED_PATH = '/organized_scenes/';
 
 const filed = (scene) => (scene.files || []).some((f) => String(f?.path || '').includes(ORGANIZED_PATH));
 
-/*
- * A refusal the server means, rather than a crash. Anything without a status
- * gets logged as a fault and answered 500; these are neither.
- */
+/* A deliberate refusal with a status, not a logged 500. */
 function refuse(status, message) {
   const err = new Error(message);
   err.status = status;
@@ -102,16 +66,8 @@ function refuse(status, message) {
 }
 
 /*
- * Which scenes to work on.
- *
- * `unmarked` is the default because it is the only one of the three that is a
- * queue rather than a browse — a scene with no markers is work outstanding,
- * and the count of them is the honest size of the backlog. `marked` is for
- * going back to something, and exists because half of what is in this library
- * was marked by a plugin and some of that is worth correcting by hand.
- *
- * All three are inside the filed folder. "Everything" means every filed scene,
- * not every scene in Stash.
+ * Which scenes to work on. `unmarked` (default) is the backlog; `marked` is
+ * for correcting. All within the filed folder.
  */
 export async function queue(config, { q = '', mode = 'unmarked', page = 1, limit = 60 } = {}) {
   const wanted = ['unmarked', 'marked', 'all'].includes(mode) ? mode : 'unmarked';
@@ -130,9 +86,7 @@ export async function queue(config, { q = '', mode = 'unmarked', page = 1, limit
     page,
     limit,
     q: term || null,
-    // The scope this page wants is its own and is above, in full. The shared
-    // one is empty today, so inheriting it would silently widen this back out
-    // to the whole of Stash the day somebody fills it in.
+    // Scope is defined above, not inherited from the shared (empty) one.
     scoped: false,
   });
 
@@ -140,21 +94,8 @@ export async function queue(config, { q = '', mode = 'unmarked', page = 1, limit
 }
 
 /*
- * The same queue, whole and lean.
- *
- * queue() above answers a page at a time, which is what a list of rows wants.
- * The picker is a shelf now — dropdowns that count what is behind them, a
- * search that narrows as you type, a sort that reorders everything rather than
- * the sixty rows on screen — and none of that can be done a page at a time.
- *
- * It does not send the scenes. The page already holds every scene in the
- * library, memoised, because the library's own shelf fetched them; all it is
- * missing is which of them this bench will accept and which have been marked
- * already. So this sends two lists of ids and the page joins them to what it
- * has, which is 3,000 short strings rather than a second copy of the library.
- *
- * `marked` carries a count as well as an id, because "has markers" and "has
- * eleven markers" are different answers to whether a scene still needs work.
+ * The whole queue as two id lists; the page joins them to the shelf it
+ * already has. `marked` carries a count per scene.
  */
 export async function queued(config) {
   const filedIds = async () => {
@@ -168,11 +109,7 @@ export async function queued(config) {
     return (data.findScenes?.scenes || []).map((s) => String(s.id));
   };
 
-  /*
-   * Only the marked ones carry their markers, and there are 451 of those
-   * against 2,800 filed. Asking every scene for a list it mostly has none of
-   * is the same query an order of magnitude more expensive.
-   */
+  /* Only marked scenes are asked for their markers. */
   const markedIds = async () => {
     const data = await gql(
       config,
@@ -194,26 +131,10 @@ export async function queued(config) {
 // ------------------------------------------------------------- what is cut
 
 /*
- * Every marker in the library, asked of the markers rather than of the scenes.
- *
- * The queue above answers "which scene should I mark", which is the question
- * you ask before doing the work. This is the one you ask afterwards — what did
- * I mark, what did the plugins mark, where is the one I got wrong. Neither can
- * be answered from the other: a scene-shaped list can tell you a scene has
- * eleven markers and cannot tell you that three of them say Orgasm at the same
- * second, and there is no page in Stash's own UI that will either.
- *
- * Scope is deliberately everything rather than the filed folder the bench
- * works in. Half of what is in this library was written by timestampTrade and
- * TPDBMarkers, some of it into scenes that never reached /organized_scenes,
- * and a marker you cannot see is a marker you cannot delete. Each row says
- * whether the bench will open its scene, which is the honest version of the
- * same rule — see `filed` above.
- *
- * `q` is Stash's own marker search, which reads the marker's title and its
- * scene's title. It does not read tag names, and that is not worth working
- * around here: a hand-cut marker has no title at all and is found by its tag,
- * which is what the tag filter beside the box is for.
+ * Every marker in the library, for the management list. Not limited to
+ * filed scenes, so plugin markers anywhere can be fixed; each row says
+ * whether the bench will open it. `q` searches marker and scene titles, not
+ * tag names — use the tag filter.
  */
 
 const LISTED = `
@@ -273,9 +194,7 @@ export async function all(config, { q = '', tag = null, sort = 'created_at', dir
             title: m.scene.title || (m.scene.files?.[0]?.path || '').split('/').pop() || `Scene ${m.scene.id}`,
             date: m.scene.date || null,
             studio: m.scene.studio ? { id: m.scene.studio.id, name: m.scene.studio.name } : null,
-            // Whether the bench will open it. Anything else can still be
-            // retagged, retimed and deleted from the list — it is only the
-            // timeline that insists on a file that has stopped moving.
+            // Whether the bench will open it. Anything can still be retagged, retimed or deleted.
             filed: filed(m.scene),
           }
         : null,
@@ -285,22 +204,13 @@ export async function all(config, { q = '', tag = null, sort = 'created_at', dir
 
 // --------------------------------------------------------------------- tags
 
-/*
- * The tags a marker can wear.
- *
- * Only ones already used on a marker somewhere, because the whole list is 985
- * tags and almost none of them describe a moment — "1080p" and "Blonde" are
- * scene tags and would bury the dozen that are not. The seeds are merged in
- * whether or not the library has reached for them yet, and carry `id: null`
- * when Stash has never heard of them.
- */
+/* Tags already used on a marker, plus the seeds (`id: null` if Stash lacks them). */
 export async function tags(config) {
   const data = await gql(
     config,
     /*
-     * The two names are not the same name, and getting that wrong is a 422
-     * with nothing in it that says which half is wrong: the *filter* field is
-     * `marker_count` and the *output* field on a Tag is `scene_marker_count`.
+     * The filter field is `marker_count`; the output field on a Tag is
+     * `scene_marker_count`. Mixing them up is an unhelpful 422.
      */
     `{ findTags(
          filter: {per_page: -1, sort: "name", direction: ASC}
@@ -322,12 +232,7 @@ export async function tags(config) {
   return { seeds: SEEDS, tags: [...seeded, ...rest] };
 }
 
-/*
- * Every tag, for the moment you want one that has never been on a marker
- * before. Separate from the list above on purpose: that one is the palette,
- * this is the search behind it, and mixing them would put 985 scene tags in
- * front of the three you actually reach for.
- */
+/* Every tag, for one never used on a marker. Separate from the palette. */
 export async function searchTags(config, term = '') {
   const text = String(term || '').trim();
   if (!text) return { tags: [] };
@@ -353,15 +258,9 @@ export async function searchTags(config, term = '') {
 }
 
 /*
- * A tag id from either an id or a name, creating one only as a last resort.
- *
- * The batch tagger deliberately refuses to create tags at all, because a page
- * that lets you type into a batch write is a page that grows a second tag
- * called "Anal " with a trailing space. This page was asked for the opposite —
- * premade or create my own — so it creates, and pays for that with the two
- * guards that make the refusal unnecessary: the name is squeezed to single
- * spaces and trimmed, and an existing tag is matched case-insensitively before
- * anything is made. "kissing" typed in a hurry finds Kissing.
+ * A tag id from an id or a name, creating one only as a last resort.
+ * Names are squeezed to single spaces and trimmed, and matched
+ * case-insensitively first, so "kissing" finds Kissing.
  */
 async function resolveTag(config, { tagId = null, tagName = '' } = {}) {
   if (tagId) return String(tagId);
@@ -399,24 +298,13 @@ const EDIT = `
   scene_markers { ${MARKER} }
 `;
 
-/*
- * One scene, as the workbench needs it — which is much less than the scene
- * page asks for. No related rails, no cast photographs, no identity: this is a
- * video, a length to lay a timeline against, the sprite sheet to draw it with,
- * and what is already marked.
- */
+/* One scene as the bench needs it: video, length, sprite sheet, markers. */
 export async function editor(config, id) {
   const data = await gql(config, `query($id: ID!) { findScene(id: $id) { ${EDIT} } }`, { id: String(id) });
   const scene = data.findScene;
   if (!scene) throw refuse(404, 'Stash has no scene with that id.');
 
-  /*
-   * The same rule the queue filters by, applied to the one scene an address
-   * asks for. Without it the folder only decided what was *offered* and a link
-   * could still open the bench on something still moving through FileFlows —
-   * which is the case the scope exists to prevent, since the file those marks
-   * were placed against is not the file that comes out the other end.
-   */
+  /* Refuse scenes outside the filed folder, even by direct address. */
   if (!filed(scene)) {
     throw refuse(400, 'That scene is not filed yet. The Marker Builder only works on /organized_scenes — mark it once it has come out of FileFlows.');
   }
@@ -429,19 +317,13 @@ export async function editor(config, id) {
       title: scene.title || (file?.path ? file.path.split('/').pop() : `Scene ${scene.id}`),
       date: scene.date || null,
       studio: scene.studio ? { id: scene.studio.id, name: scene.studio.name } : null,
-      // The timeline is laid out against this before the video has loaded
-      // anything, so a scene whose file has no duration gets a timeline that
-      // only appears once the video says how long it is.
+      // No duration: the timeline appears once the video reports one.
       duration: file?.duration ? Math.round(file.duration) : 0,
       width: file?.width || null,
       height: file?.height || null,
       /*
-       * Sprite and vtt are named after the file hash rather than the scene id,
-       * so they cannot be constructed here — but the page asks the portal for
-       * them by scene id anyway, because the vtt Stash serves points at Stash
-       * and the proxied one has been pointed back at the portal. This flag is
-       * only whether there is a sheet to ask for at all: no sprites means a
-       * timeline with no pictures on it, which still works.
+       * Sprite and vtt paths use the file hash; the page asks the portal by scene
+       * id. This flag only says whether a sheet exists.
        */
       vtt: !!scene.paths?.vtt,
     },
@@ -451,15 +333,7 @@ export async function editor(config, id) {
 
 // ------------------------------------------------------------------- writes
 
-/*
- * One marker.
- *
- * `end` is only sent when it is genuinely after the start. A span whose out
- * point landed before its in point is a mis-press, and the useful reading of
- * it is a point marker at the earlier time rather than an error — but it is
- * not this end's job to decide that, so the page sorts the two before it asks
- * and this only refuses what is still wrong.
- */
+/* One marker. `end` only when after the start; the page sorts in/out first. */
 export async function create(config, { sceneId, seconds, end = null, tagId = null, tagName = '', title = '' } = {}) {
   if (!sceneId) throw new Error('A marker needs a scene.');
 
@@ -472,11 +346,8 @@ export async function create(config, { sceneId, seconds, end = null, tagId = nul
     seconds: at,
     primary_tag_id: primary,
     /*
-     * Empty on purpose. Stash shows the primary tag wherever a marker has no
-     * title of its own, so a title repeating the tag is a second copy of the
-     * same fact that then has to be kept in step with it. The plugins write
-     * their provenance in here — [Timestamp], [TsTrade], [TPDBMarker] — and a
-     * hand-cut marker having none is what distinguishes it from theirs.
+     * Empty title: Stash shows the tag. Plugins sign theirs ([Timestamp],
+     * [TsTrade], [TPDBMarker]), which is how hand-cut ones differ.
      */
     title: String(title || ''),
   };
@@ -492,10 +363,7 @@ export async function create(config, { sceneId, seconds, end = null, tagId = nul
   return { marker: marker(data.sceneMarkerCreate) };
 }
 
-/*
- * Change one. Only what is passed is touched, so retagging does not move a
- * marker and nudging a time does not retag it.
- */
+/* Change one. Only what's passed is touched. */
 export async function update(config, id, { seconds = null, end = undefined, tagId = null, tagName = '', title = null } = {}) {
   if (!id) throw new Error('Which marker?');
 
@@ -503,11 +371,7 @@ export async function update(config, id, { seconds = null, end = undefined, tagI
 
   if (seconds != null) input.seconds = tenths(seconds);
 
-  /*
-   * `undefined` means leave it alone; null means clear it. They are different
-   * answers and a span being turned back into a point is a real edit, so this
-   * is the one field where the difference has to survive the round trip.
-   */
+  /* `undefined` leaves `end` alone; null clears it. */
   if (end !== undefined) input.end_seconds = end == null ? null : tenths(end);
 
   if (tagId || tagName) input.primary_tag_id = await resolveTag(config, { tagId, tagName });
@@ -520,17 +384,8 @@ export async function update(config, id, { seconds = null, end = undefined, tagI
   );
 
   /*
-   * A marker that moved has a rendered clip of the wrong few seconds.
-   *
-   * The clips pass names its files after the marker id and skips any marker
-   * that already has one, so a retimed marker would keep the clip cut for
-   * where it used to be — for good, since nothing would ever re-cut it. The
-   * file goes, and the next pass makes a new one.
-   *
-   * Only when the time actually changed. Retagging does not move the window,
-   * and throwing away a minute of x264 to change a word would be a poor trade.
-   * Best effort: a clip that cannot be deleted is not a reason to fail a write
-   * that has already happened.
+   * Retimed: delete its rendered clip so the next pass re-cuts it (the pass
+   * skips markers that have one). Best effort.
    */
   if ('seconds' in input || 'end_seconds' in input) {
     await dropClips([String(id)]).catch(() => {});
@@ -539,12 +394,7 @@ export async function update(config, id, { seconds = null, end = undefined, tagI
   return { marker: marker(data.sceneMarkerUpdate) };
 }
 
-/*
- * Remove one. The rendered clip that goes with it is left where it is: the
- * markerclips pass names its files after the marker id, and the scene-delete
- * path is what sweeps orphans up. A clip for a marker that no longer exists
- * costs 7MB and nothing else asks for it.
- */
+/* Remove one. Its clip is left; scene deletion sweeps orphans. */
 export async function destroy(config, id) {
   if (!id) throw new Error('Which marker?');
   await gql(config, `mutation($id: ID!) { sceneMarkerDestroy(id: $id) }`, { id: String(id) });

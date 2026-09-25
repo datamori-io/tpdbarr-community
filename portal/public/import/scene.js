@@ -54,10 +54,7 @@ function renderScene(paint, scene) {
   ));
 }
 
-/*
- * The same state the cards carry, at page size, with the add as a real button
- * rather than something tucked into a corner.
- */
+/* The card's state at page size, with a real Add button. */
 function sceneActions(scene) {
   const status = scene.status || 'absent';
   const row = el('div', { className: 'detailstate' });

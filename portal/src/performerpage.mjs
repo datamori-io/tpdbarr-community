@@ -1,16 +1,7 @@
 /*
- * The performer page's other half.
- *
- * The same join the studio page makes, asked of a person: Stash says what you
- * hold of them, StashDB says what there is, and the two meet on the performer's
- * stash id. A performer Stash never identified against StashDB still gets the
- * whole library half and says plainly why there is no number.
- *
- * The percentage is not invented here either — it is the tracked coverage the
- * Acquire page shows, read for one performer. Tracking is the switch, because a
- * catalogue read per performer on every page load is not a page load. What is
- * different from a studio is only what is asked of StashDB: a filter on
- * performers rather than on studios, one line down in discover.mjs.
+ * The performer page's StashDB half: Stash says what you hold, StashDB what
+ * exists, joined on the stash id. The percentage is tracked coverage for
+ * this performer; tracking turns it on.
  */
 
 import * as shelf from './stashlib.mjs';
@@ -52,11 +43,7 @@ export async function performerPage(config, id, { page = 1, only = null } = {}) 
   };
 }
 
-/*
- * Tracked, and how far along. Same as the studio's: ensureCoverage returns what
- * it has and measures in the background, so a performer tracked a second ago
- * comes back pending rather than blocking the page on a catalogue read.
- */
+/* Tracked coverage. Returns what it has and measures in the background. */
 async function coverageFor(config, stashdbId) {
   const snapshot = await discover.ensureCoverage(config).catch(() => ({ rows: [] }));
   return snapshot.rows.find((row) => row.kind === 'performer' && row.id === stashdbId) || null;

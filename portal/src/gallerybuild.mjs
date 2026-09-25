@@ -1,21 +1,13 @@
 /*
- * Building a gallery: the one thing in this portal that puts files on a disk
- * Stash owns.
- *
- * The chain is four steps and each can fail on its own, so the job carries
- * which one it is on rather than a spinner:
+ * Building a gallery. The job reports which step it's on:
  *
  *   1. write   — the chosen pictures into <galleryPath>/<name>/
- *   2. scan    — metadataScan on <galleryStashPath>/<name>, so Stash imports them
- *   3. find    — the gallery Stash just made, matched on that path
- *   4. tie     — galleryUpdate with the scene, performer or movie it belongs to
+ *   2. scan    — metadataScan on <galleryStashPath>/<name>
+ *   3. find    — the gallery Stash made, by path
+ *   4. tie     — galleryUpdate with its scene, performers, studio
  *
- * Stash is the library of record here as everywhere else: the portal does not
- * keep a gallery of its own, and if step 2 never finds the folder then there is
- * no gallery — which is why setupState() is checked before a byte is written
- * rather than after. The usual cause is the one thing the portal cannot do for
- * you: Stash's library paths all have excludeImage set, because until now this
- * house only ever scanned video.
+ * setupState() is checked first: Stash's library paths usually exclude
+ * images, and then no gallery appears.
  */
 
 import { mkdir, writeFile, readdir, access } from 'node:fs/promises';
@@ -60,11 +52,7 @@ export function folderName(name) {
   return clean || `gallery-${Date.now()}`;
 }
 
-/*
- * Where things stand before anything is written. Both halves of the path are
- * reported back rather than assumed to agree, because they name one folder
- * through two containers and swapping them is the mistake this makes.
- */
+/* Where things stand before writing. Both paths reported, since swapping them is the usual mistake. */
 export async function setupState(config) {
   const state = {
     path: config.galleryPath || '',
@@ -94,12 +82,7 @@ export async function setupState(config) {
     const data = await gql(config, '{ configuration { general { createGalleriesFromFolders stashes { path excludeVideo excludeImage } } } }');
     state.stashes = data.configuration?.general?.stashes || [];
 
-    /*
-     * The setting the whole feature turns on. Without it a scan of a folder of
-     * pictures produces loose images and no gallery at all — which looks like
-     * the scan silently doing nothing, because the Galleries page stays empty
-     * while the image count climbs.
-     */
+    /* Without createGalleriesFromFolders a scan makes loose images, no gallery. */
     state.foldersAreGalleries = Boolean(data.configuration?.general?.createGalleriesFromFolders);
 
     const under = (root) => state.stashPath === root || state.stashPath.startsWith(root.replace(/\/+$/, '') + '/');
@@ -118,12 +101,9 @@ export async function setupState(config) {
 }
 
 /*
- * Add the gallery folder to Stash's library paths, images included.
- *
- * A settings write on somebody else's application, so it happens on a button
- * and never on the way past. configureGeneral replaces the whole list, so the
- * existing paths are read and sent back with one appended — losing them would
- * mean a rescan of 1767 scenes.
+ * Add the gallery folder to Stash's library paths with images on. On a
+ * button only. configureGeneral replaces the list, so existing paths are
+ * sent back with one appended.
  */
 export async function enableInStash(config) {
   const stashPath = config.galleryStashPath;
@@ -145,15 +125,7 @@ export async function enableInStash(config) {
     stashes.push({ path: stashPath, excludeVideo: true, excludeImage: false });
   }
 
-  /*
-   * createGalleriesFromFolders goes on at the same time, because the path alone
-   * does nothing: Stash would scan the pictures in and leave them as loose
-   * images with no gallery over them.
-   *
-   * It is a global setting rather than a per-path one, but in this Stash it
-   * only reaches this folder — every other library path excludes images, so
-   * there are no other folders of pictures for it to group.
-   */
+  /* Turn on createGalleriesFromFolders too. Global, but only this path has images. */
   const out = await gql(
     config,
     `mutation($s: [StashConfigInput!]) {
@@ -171,15 +143,7 @@ export async function enableInStash(config) {
   };
 }
 
-/*
- * Tell Stash to look at a folder again, and wait until it has.
- *
- * Adding pictures to a gallery that already exists is the same two steps as
- * step 2 and 3 of a build, without the tying: the folder is already a gallery,
- * so what comes back is simply more images in it. Waiting for the scan to
- * finish matters here for the same reason it does there — the page that asked
- * is about to redraw and would otherwise show the old count.
- */
+/* Rescan a gallery folder and wait, so the page redraws with the new count. */
 export async function rescan(config, stashPath) {
   const job = { stashPath };
   await scan(config, job);
@@ -198,17 +162,8 @@ export function snapshot(id) {
 
 export const forgetJobs = () => jobs.clear();
 
-/*
- * -> the job, straight away. Downloading forty pictures and waiting on a Stash
- * scan is a minute of work, and a request that sits open for a minute is a
- * request that dies to a proxy timeout.
- */
-/*
- * Where a gallery of this name would be written, and the same folder as Stash
- * will see it. The upload route needs the first of these before there is a job
- * to ask, because the files arrive one request at a time and the build only
- * starts once they are all in.
- */
+/* -> the job, straight away; the work takes about a minute. */
+/* Where a gallery of this name goes, in both path forms. Uploads need it first. */
 export function folderFor(config, name) {
   const folder = folderName(name);
   return {
@@ -218,14 +173,7 @@ export function folderFor(config, name) {
   };
 }
 
-/*
- * The reverse, for a gallery that already exists: Stash reports where its
- * folder is, and adding pictures to it means writing there.
- *
- * -> null for a gallery outside the managed folder. Stash may well be scanning
- * photo sets this app has never touched, and writing into one of those is not
- * this app's business.
- */
+/* The reverse: Stash's folder -> ours. Null outside the managed folder. */
 export function portalPathFor(config, stashPath) {
   const root = String(config.galleryStashPath || '').replace(/\/+$/, '');
   const here = String(stashPath || '').replace(/\/+$/, '');
@@ -273,11 +221,7 @@ async function run(config, job, items, tie) {
   const already = await readdir(job.path).catch(() => []);
   let index = already.length;
 
-  /*
-   * An upload has already put its files there — the browser sent them one at a
-   * time and the build is only the half that comes after. Nothing to fetch, so
-   * the count of what is on disk stands in for what was written.
-   */
+  /* Uploaded files are already on disk; count them. */
   if (!items.length) {
     job.written = already.length;
     job.total = already.length;
@@ -322,12 +266,8 @@ async function run(config, job, items, tie) {
   await scan(config, job);
 
   /*
-   * Wait for the scan to *finish*, not just for the gallery to turn up.
-   *
-   * A folder gallery takes its title from the folder, and Stash re-saves it as
-   * each picture lands — so tying it while the scan is still running gets the
-   * title wiped a second later. That is not hypothetical: the first gallery
-   * built here came out with an empty title for exactly this reason.
+   * Wait for the scan to finish: Stash re-saves a folder gallery's title
+   * as each picture lands, wiping one set mid-scan.
    */
   await waitForScan(config, job);
 
@@ -346,11 +286,7 @@ async function run(config, job, items, tie) {
   try {
     job.gallery = await describe(config, gallery.id, job, tie);
   } catch (err) {
-    /*
-     * The pictures are in and the gallery exists; only the title and the ties
-     * did not take. Worth saying so rather than swallowing it — a gallery tied
-     * to nothing is the thing this feature was asked for.
-     */
+    /* Pictures in, ties failed: report it. */
     job.gallery = { id: gallery.id, title: null, image_count: gallery.image_count };
     job.tieError = err.message;
   }
@@ -406,12 +342,7 @@ async function scan(config, job) {
   job.scanJob = data.metadataScan || null;
 }
 
-/*
- * Sit on the scan job until Stash says it is done with it. A scan of one small
- * folder is quick, but "quick" is not "instant" and the tie has to come after.
- * A job id Stash has already forgotten reads as finished, which is right — it
- * only forgets a job once it is over.
- */
+/* Wait for the scan job. A forgotten job id counts as finished. */
 const OVER = new Set(['FINISHED', 'CANCELLED', 'FAILED']);
 
 async function waitForScan(config, job, { tries = 60, gap = 1000 } = {}) {
@@ -430,11 +361,7 @@ async function waitForScan(config, job, { tries = 60, gap = 1000 } = {}) {
   }
 }
 
-/*
- * Wait for the scan to land. Polling the gallery rather than the scan job is
- * what actually answers the question — a scan that finished and imported
- * nothing is the failure mode here, and the job would report that as success.
- */
+/* Poll for the gallery itself: a scan can finish having imported nothing. */
 async function waitForGallery(config, job, { tries = 40, gap = 1500 } = {}) {
   for (let i = 0; i < tries; i++) {
     const found = await byPath(config, job.stashPath).catch(() => null);
@@ -458,11 +385,7 @@ async function byPath(config, path) {
   return (data.findGalleries.galleries || []).find((g) => g.image_count > 0) || null;
 }
 
-/*
- * Step four: what it is, and what it belongs to. The ties are ids the caller
- * already had — the scene page knows its own scene, the performer page its own
- * performer — so nothing is matched or guessed here.
- */
+/* Step four: title and ties, from ids the caller already had. */
 async function describe(config, id, job, tie) {
   const input = { id, title: job.name };
   if (tie.date) input.date = tie.date;

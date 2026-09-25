@@ -1,31 +1,11 @@
 /*
  * A sharper filmstrip, cut on demand.
  *
- * Stash generates one sprite sheet per scene and it is always about 81 tiles,
- * whatever the scene's length — on a 23-minute scene that is a picture every
- * 17.4 seconds, on a two-hour film one every 89. That is right for the scrub
- * bar it was made for, where a tile is a hover preview, and wrong for a
- * timeline, where the tiles *are* the ruler: at the bench's default zoom a
- * tile is 7.1 seconds wide, so every frame gets drawn two and a half times and
- * the strip smears rather than showing you the cut you are aiming at.
+ * Stash's sprite sheet is ~81 tiles whatever the length, too coarse for a
+ * timeline. This cuts one picture a second from the source file (about 2%
+ * of realtime). Keyframes would be cheaper but are irregular on x265.
  *
- * So this cuts its own, a picture a second, from the source file.
- *
- * Measured on this library, on the scene the bench was built against — 23m33s,
- * 720p HEVC, 1.2 Mbps: **49 seconds** to produce 1,413 tiles across 15 sheets
- * totalling 4.2 MB. That is about 2% of realtime, which is what makes it worth
- * doing per scene on demand rather than never.
- *
- * Why not keyframes, which would be nearly free? Because this library's files
- * are x265 with scene-cut detection: the keyframes on that scene average eight
- * seconds apart and run to twenty-one at the worst gap. Cheap, irregular, and
- * barely better than what Stash already gives you. Decoding the whole file is
- * the only way to get an even second.
- *
- * Ten by ten at 160x90, so every sheet is exactly 1600x900 — the `tile` filter
- * pads the last one out to a full grid, which means the client needs one size
- * for all of them rather than probing each. A sheet is about 280 KB and only
- * the ones under the window are ever decoded.
+ * Ten by ten at 160x90, so every sheet is 1600x900 (`tile` pads the last).
  */
 
 import { mkdir, readdir, rename, rm, writeFile, readFile } from 'node:fs/promises';
@@ -46,30 +26,12 @@ const PER_SHEET = COLS * ROWS;
 // JPEG quality. 5 is visibly clean at 160 wide and a third the size of 2.
 const QUALITY = 5;
 
-/*
- * A picture a second, until that would be silly.
- *
- * The cap is on tiles rather than on minutes because what costs is the count:
- * 4,000 is about 40 sheets and 12 MB, which a two-hour film reaches at two
- * seconds and a six-hour compilation at six. Everything ordinary lands on 1.
- */
+/* One tile a second, capped at 4,000 tiles (the interval grows for long files). */
 const MAX_TILES = 4000;
 
 /*
- * Said out loud, both of them, because ffmpeg's own defaults leave most of
- * this machine idle. Measured on the same scene, from local disk:
- *
- *   default                       42.3s
- *   -threads N                    37.0s
- *   -threads N -filter_threads N  28.3s
- *
- * A third off for two flags. The decoder's default is not the problem — the
- * filter graph's is: `fps` and `tile` run on one thread unless told, and once
- * the decode is spread out they become the queue everything waits in.
- *
- * It still only reaches about four cores of twelve, and that is the real
- * ceiling: `tile` has to gather a hundred frames before it can emit a sheet,
- * which is a serial dependency no amount of threads removes.
+ * Set threads for decode and the filter graph: `fps` and `tile` are
+ * single-threaded by default and become the bottleneck.
  */
 const THREADS = String(Math.max(1, availableParallelism()));
 
@@ -86,9 +48,8 @@ export const sheetName = (n) => `s_${String(n).padStart(3, '0')}.jpg`;
 export const sheetPath = (sceneId, n) => join(dirFor(sceneId), sheetName(n));
 
 /*
- * -> the manifest, or null. Written last and into a directory that is moved
- * into place whole, so its presence is the only thing that has to be checked:
- * a killed build leaves a `.building` directory that nothing reads.
+ * -> the manifest, or null. Written last in a directory moved into place
+ * whole, so a killed build leaves only an unread `.building` dir.
  */
 export async function indexOf(sceneId) {
   try {
@@ -104,10 +65,7 @@ export async function remove(sceneId) {
   return { removed: String(sceneId) };
 }
 
-/*
- * Every strip held, with what it cost. The bench does not need this; the
- * question "what is this eating" does, and the answer lives nowhere else.
- */
+/* Every strip held, with its size. */
 export async function held() {
   let names;
   try {
@@ -165,14 +123,7 @@ let progress = { sceneId: null, done: 0, total: 0, at: 0 };
 export const busy = () => Boolean(running);
 export const runningFor = () => progress.sceneId;
 
-/*
- * One scene's worth.
- *
- * `-progress` is not parsed for a percentage: ffmpeg reports frames written,
- * which for a `tile` filter is sheets, and counting the sheets on disk says
- * the same thing without a second format to keep in step with. The total is
- * arithmetic — duration over interval over a hundred.
- */
+/* One scene. Progress counts sheets on disk; the total is arithmetic. */
 async function cut(config, sceneId) {
   const { path, duration } = await sceneFile(config, sceneId);
   if (!duration) throw new Error('That file has no duration, so there is nothing to lay a strip against.');
@@ -201,12 +152,7 @@ async function cut(config, sceneId) {
       '-threads', THREADS,
       '-filter_threads', THREADS,
       '-i', path,
-      /*
-       * Scaled to fill and then cropped rather than letterboxed. A strip of
-       * 2.35:1 scope frames with black bars top and bottom wastes a third of
-       * the only 64 pixels of height the timeline has; cropping to 16:9 keeps
-       * the middle, which is where the picture is.
-       */
+      /* Fill and crop to 16:9, not letterbox: the strip is only 64px tall. */
       '-vf', `fps=1/${interval},scale=${TILE_W}:${TILE_H}:force_original_aspect_ratio=increase,crop=${TILE_W}:${TILE_H},tile=${COLS}x${ROWS}`,
       '-q:v', String(QUALITY),
       join(working, 's_%03d.jpg'),
@@ -242,19 +188,13 @@ async function cut(config, sceneId) {
   return indexOf(sceneId);
 }
 
-/*
- * One at a time, and the same reasoning as the marker clips: this is a full
- * decode and it will take every core it is given, so two at once only makes
- * both slower and the machine unusable while you are trying to work on it.
- */
+/* One at a time: a full decode uses every core. */
 export function build(config, sceneId) {
   if (running) return running;
 
   /*
-   * Claimed here rather than inside cut(), which does not reach its own first
-   * line until Stash has answered where the file is. The status route is
-   * called in the same tick as this one — a page that starts a cut and is told
-   * nothing is running would never begin polling.
+   * Claimed here, before cut() awaits Stash, so a status check in the same
+   * tick sees it running.
    */
   progress = { sceneId: String(sceneId), done: 0, total: 0, at: Date.now() };
 
@@ -269,12 +209,8 @@ export function build(config, sceneId) {
 }
 
 /*
- * What the bench asks on open, and again while a cut is running.
- *
- * `building` is only true for *this* scene — another scene's cut is somebody
- * else's business, and a page that showed a progress bar for it would be
- * lying about what it was waiting for. It is reported separately so the
- * button can say why it is refusing rather than just being dead.
+ * The bench's status call. `building` is true only for this scene;
+ * another scene's cut is reported separately.
  */
 export async function view(sceneId) {
   const id = String(sceneId);

@@ -1,7 +1,4 @@
-/*
- * A scene as a card and as a row, and the furniture around a list of them —
- * the view switch, the pager, the subject header the filters put at the top.
- */
+/* Scene cards and rows, and the view switch, pager and subject header. */
 
 import { api, el, gigabytes, minutes } from '../util.js';
 import { blurb, coverageBar, stashdbCard, stashdbState } from '../catalogue.js';
@@ -45,22 +42,14 @@ export function sceneCard(scene, showBecause = true) {
 }
 
 /*
- * State is the point of this tool, so it sits in the body at full size rather
- * than as a translucent mark over the artwork, and Add is always visible.
- *
- * The card itself still opens the site: a whole-card click that quietly
- * monitors a scene and fires a search is a click nobody meant to make.
+ * State in the card body at full size; Add always visible. Clicking the
+ * card opens the site, never adds.
  */
 function cardState(scene) {
   const status = scene.status || 'absent';
   const foot = el('div', { className: 'cardstate' });
 
-  /*
-   * "Do not have" next to "In Stash" is a contradiction on the same card. Stash is
-   * the stronger claim — it is about the file, not about Whisparr — so it wins
-   * and the Whisparr chip is dropped. Add stays, in case a better copy is
-   * wanted.
-   */
+  /* In Stash beats the Whisparr chip. Add stays. */
   if (status !== 'absent' || !scene.stash) {
     foot.append(el('span', { className: 'badge ' + status },
       status === 'absent' ? 'Do not have' : statusLabel(status)));
@@ -86,13 +75,8 @@ function cardState(scene) {
 }
 
 /*
- * One StashDB scene, in the same row as a TPDB one so a search reads as a
- * single page rather than two catalogues stapled together.
- *
- * The two badges are the two questions worth asking of a search result: do I
- * already have this, and is anything already trying to get it. A scene you own
- * still gets the button — wanting a second, better file for something already
- * on the shelf is exactly what the v3 side is for.
+ * A StashDB scene as a row. Badges: do I have it, is something getting it.
+ * Owned scenes keep the button (for a better copy).
  */
 export function stashdbRow(scene, options) {
   const thumb = el('div', { className: 'thumb landscape' });
@@ -100,12 +84,7 @@ export function stashdbRow(scene, options) {
 
   const badges = stashdbState(scene, 'right', options);
 
-  /*
-   * The studio and the cast are filters, not decoration — clicking a name is
-   * the fastest way to ask the only question this page exists to answer, which
-   * is "what else of theirs am I missing". A name StashDB gave no id for stays
-   * plain text rather than becoming a link that searches for nothing.
-   */
+  /* Studio and cast link to filtered searches; names without ids stay plain. */
   const meta = el('div', { className: 'meta' },
     scene.date ? el('span', {}, scene.date) : null,
     scene.duration ? el('span', {}, minutes(scene.duration)) : null,
@@ -113,11 +92,7 @@ export function stashdbRow(scene, options) {
     scene.performers.map((p) => (p.id ? filterLink('performer', p.id, p.name) : el('span', {}, p.name)))
   );
 
-  /*
-   * What it is about, on one line. A row is wider than a card so it carries
-   * more of the blurb, and one line rather than two because a list is for
-   * running your eye down — the whole of it is on the hover title either way.
-   */
+  /* The blurb, one line in a row. */
   const about = blurb(scene.details, scene.title, 220);
 
   return el('div', { className: 'scene' },
@@ -138,10 +113,10 @@ function filterLink(kind, id, name) {
   return el('a', { className: 'metalink', href: acquireHash(params) }, name);
 }
 
-/* ------------------------------------------------------------ the kinds
+/*
+ * ------------------------------------------------------------ the kinds
  *
- * Scenes and movies are two catalogues and one act. The switch says which you
- * are looking at rather than making them two tabs that forget each other.
+ * Scenes or movies.
  */
 export function kindSwitch(params, active) {
   const go = (kind) => () => {
@@ -172,12 +147,7 @@ export function kindSwitch(params, active) {
   );
 }
 
-/*
- * `onGone` is what makes the heading tell the truth. Skipping a scene takes its
- * card off the page, and a count above it that carried on saying eleven was the
- * page disagreeing with itself — so the removal is reported upward rather than
- * done quietly where nothing can hear it.
- */
+/* `onGone` keeps the heading count right when a card leaves. */
 export function resultBody(scenes, onGone) {
   const options = {
     onDispose: (_scene, node) => {
@@ -204,24 +174,11 @@ export function viewSwitch(redraw) {
   list.onclick = pick('list');
   tiles.onclick = pick('grid');
 
-  /*
-   * List or grid, and nothing else. Thumbnail size is the app-wide control in
-   * tilesize.js, which mounts itself into this page's toolbar — a second one
-   * here drove a different mechanism, so the two disagreed and whichever you
-   * pressed the other one was still right about something.
-   */
+  /* List or grid only; thumbnail size is tilesize.js. */
   return el('div', { className: 'viewtools' }, el('div', { className: 'viewswitch' }, list, tiles));
 }
 
-/*
- * The wild card.
- *
- * Not merged into the results above and not run unasked. It is a different
- * catalogue with a different route out — a TPDB card talks to Whisparr v2, a
- * StashDB card to v3 — and a page that blends the two hides which Whisparr a
- * button is about to speak to. It only makes sense for a text search, since
- * none of the filters above mean anything to ThePornDB.
- */
+/* The wild card: ThePornDB, separate and on request, text searches only. */
 export function wildcardBand(params) {
   const term = params.get('q');
   if (!term) return null;
@@ -263,10 +220,8 @@ export function wildcardBand(params) {
 }
 
 /*
- * The last resort: the indexers themselves, through Prowlarr, for a scene
- * neither catalogue has. No catalogue means no Whisparr — a grab goes to
- * Prowlarr's download client and the file arrives unnamed and unfiled, to be
- * built into a scene by hand from the Registry's wild card.
+ * Last resort: Prowlarr search for a scene neither catalogue has. Grabs go
+ * to Prowlarr's client; build the scene afterwards in Wild Card.
  */
 export function indexerBand(initial, { heading = true, auto = false, forRow = null } = {}) {
   const input = el('input', { type: 'search', value: initial, placeholder: 'release name, studio, performer…' });
@@ -275,10 +230,8 @@ export function indexerBand(initial, { heading = true, auto = false, forRow = nu
   const body = el('div', {});
 
   /*
-   * Narrowing what came back, not a new search: "1080 kendra" keeps the
-   * releases whose names contain both, anywhere and in any case, and "-720"
-   * drops the ones that contain that. Commas work as well as spaces. It stays
-   * set across searches, so the same "1080" applies to the next query too.
+   * Narrow what came back: "1080 kendra" keeps both, "-720" drops. Commas or
+   * spaces. Persists across searches.
    */
   const keep = el('input', {
     type: 'search',
@@ -390,11 +343,10 @@ function releaseRow(r, forRow = null) {
   );
 }
 
-/* ------------------------------------------------------------ the percentage
+/*
+ * ------------------------------------------------------------ the percentage
  *
- * A percentage is only worth anything against a catalogue somebody chose, so it
- * is attached to the studio or performer it is about and to nothing else.
- * Tracking one is what turns it on; untracking stops the measuring.
+ * Shown on a studio or performer only when tracked.
  */
 
 // Above the results, when the search is about exactly one studio, performer or
@@ -424,9 +376,7 @@ export function subjectCard(params) {
   return holder;
 }
 
-// The other two, whichever one you are. A subject card is only drawn when the
-// search is about exactly one thing, so each kind has to know what would make
-// that untrue.
+// The subject card appears only when the search is about exactly one thing.
 const KINDS = ['performer', 'studio', 'tag'];
 const others = (kind) => KINDS.filter((k) => k !== kind);
 
@@ -448,24 +398,8 @@ function subjectBody(hit, kind, row, holder) {
     holder.replaceChildren(subjectBody(hit, kind, rows.find((r) => r.kind === kind && r.id === hit.id), holder));
   };
 
-  /*
-   * Tracking, and stopping, as two different things.
-   *
-   * They used to be one button: press Track this to start, press the same
-   * button again to stop. That is the right shape for a toggle and the wrong
-   * one for this — starting costs a measurement and stopping costs the
-   * catalogue's whole queue and the percentage it was driving, and one press
-   * in the wrong place did the second while looking like the first.
-   *
-   * So while it is tracked the state is a label rather than a button, and
-   * stopping is its own quiet control underneath, behind a question. The × on
-   * the Tracked page went for the same reason: on a wall you scan and click
-   * through, an untrack in the corner of every card is an untrack waiting to
-   * happen.
-   */
-  // A measurement in flight fills its own number in rather than waiting for a
-  // reload — tracking something and then watching nothing happen reads as a
-  // button that did not work.
+  /* Tracked is a label; untracking is a separate quiet control behind a question. */
+  // Re-check while a measurement is pending.
   if (row?.pending) setTimeout(() => { if (holder.isConnected) redraw().catch(() => {}); }, 4000);
 
   const start = el('button', { className: 'add', type: 'button' }, 'Track this');
@@ -488,11 +422,8 @@ function subjectBody(hit, kind, row, holder) {
   stop.title = 'Take this out of the measurements';
   stop.onclick = async () => {
     /*
-     * What it costs, in the sentence. Untracking takes the catalogue out of
-     * the wall, the queue and the percentage — and takes nothing away from the
-     * decisions already made, which live per scene and are waiting if it is
-     * ever tracked again. Worth saying, because "did I just lose 148 skips?"
-     * is the question this button otherwise leaves behind.
+     * Untracking removes it from the wall, queue and percentage; your per-scene
+     * decisions are kept.
      */
     const sure = window.confirm(
       `Stop measuring ${hit.name}?
@@ -519,11 +450,7 @@ function subjectBody(hit, kind, row, holder) {
       stop)
     : start;
 
-  /*
-   * A performer photo is a portrait and cropping it to fit is right. A studio
-   * image is a logo, usually wide, and cropping one takes the name off it — so
-   * the kind rides on the element and the stylesheet fits each accordingly.
-   */
+  /* The kind decides how the image fits: portraits crop, logos don't. */
   return el('div', { className: 'subjectbody' },
     hit.image
       ? el('img', { className: 'art ' + kind, src: hit.image, loading: 'lazy', alt: '' })
@@ -531,14 +458,7 @@ function subjectBody(hit, kind, row, holder) {
     el('div', {},
       el('h2', {}, hit.name),
       el('div', { className: 'muted' }, hit.detail || SUBJECT_IS[kind]),
-      /*
-       * A tag is not a catalogue you complete — nobody wants every scene ever
-       * filed under one — so tracking it buys the queue rather than the
-       * percentage, and the bar is hidden where the number would be a fraction
-       * of a sample. `honest` is decided at the other end, on size rather than
-       * on kind: a narrow tag measured whole gets its bar like anything else.
-       * See coverageSnapshot in discover.mjs.
-       */
+      /* Hide the bar when `honest` is false (see coverageSnapshot in discover.mjs). */
       row && row.honest !== false
         ? coverageBar(row)
         : row

@@ -1,33 +1,13 @@
 /*
- * Deleting a scene, and everything that was made from it.
+ * Deleting a scene. `preview` says what would go; the page asks twice,
+ * then calls `remove`.
  *
- * The one irreversible thing in this half of the app, so it is the one that
- * says what it is about to do before it does it. `preview` is that sentence:
- * the file and its size, the galleries filed against the scene, and how many
- * reel clips were cut from its markers. The page shows that, asks twice, and
- * only then calls `remove`.
+ *   - The file: on by default, or the next scan brings the scene back.
+ *   - Galleries: off by default, listed by name.
+ *   - Clips: our /markerclips/<marker>.mp4 files.
  *
- * Three things go, and each is asked for separately because they are three
- * different losses:
- *
- *   - **The file.** Left alone unless asked for, but asked for by default: a
- *     scene deleted from Stash with its file still under a library path comes
- *     back on the next scan, so a record-only delete mostly undoes itself.
- *     The same argument the gallery delete already makes about its folder.
- *   - **Galleries.** A photo set is its own thing that happens to be tied to
- *     this scene, so it is off by default and listed by name.
- *   - **Clips.** Ours, not Stash's — /markerclips/<marker>.mp4, cut from the
- *     file that is going. Nothing else can play them once the scene is gone.
- *
- * Order matters. Markers are read *before* the scene is destroyed, because
- * they go with it and their ids are how the clips are named; the clips and the
- * galleries go next; the scene goes last, so a failure part-way leaves the
- * record that says what happened rather than an orphan.
- *
- * Whisparr is not told. Nothing here touches it — the pipeline's own delete
- * runs the other way round, from Stash outward, and a portal that quietly
- * unmonitored things on your behalf would be a second opinion nobody asked
- * for.
+ * Order: read markers first (clip names use their ids), then clips and
+ * galleries, then the scene last. Whisparr isn't told.
  */
 
 import { gql } from './stash.mjs';

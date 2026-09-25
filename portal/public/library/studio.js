@@ -22,11 +22,7 @@ export async function showStudio(id) {
 }
 
 function studioPage(id, data, mine) {
-  /*
-   * The facts box goes on the state rather than being rebuilt with the header,
-   * which repaints whenever a coverage number lands. Redrawing it there would
-   * throw away what ThePornDB had already filled in.
-   */
+  /* The facts box lives on the state so header repaints don't wipe it. */
   const factsBox = el('div', {}, studioFacts(data.studio, null));
   const state = { subject: SUBJECTS.studio, data: { ...data, factsBox }, view: 'have', performer: null };
 
@@ -90,12 +86,7 @@ function studioPage(id, data, mine) {
     await readCoverage();
   };
 
-  /*
-   * Only the number is re-read. The shelf and the cast have not changed because
-   * a percentage arrived, and a measurement in flight fills itself in rather
-   * than waiting for a reload — tracking something and watching nothing happen
-   * reads as a button that did not work.
-   */
+  /* Re-read only the number; a pending measurement fills itself in. */
   const readCoverage = async () => {
     const { rows } = await api('/api/acquire/tracked');
     if (!holds(mine)) return;
@@ -109,10 +100,7 @@ function studioPage(id, data, mine) {
   const laterCoverage = () =>
     setTimeout(() => { if (holds(mine)) readCoverage().catch(() => {}); }, 4000);
 
-  /*
-   * The want list changed under a card. Only the list and the number on the
-   * button are re-read — the card that did it has already relabelled itself.
-   */
+  /* The want list changed: re-read the list and the button count. */
   const refreshWanted = async () => {
     const { stashdbId } = state.data.studio;
     if (!stashdbId) return;
@@ -129,12 +117,7 @@ function studioPage(id, data, mine) {
   draw();
   if (data.coverage?.pending) laterCoverage();
 
-  /*
-   * ThePornDB after the fact, the same as IAFD on a performer. This page is
-   * already the slowest in the library — a catalogue, a cast and a shelf — and
-   * a fifth request is no reason for any of it to wait. A studio the mirror
-   * cannot place, or places ambiguously, simply never fills these in.
-   */
+  /* TPDB facts after the page draws; unplaceable studios just don't fill. */
   api(`/api/library/studios/${id}/facts`)
     .then(({ site, fill }) => {
       if (!site || !holds(mine)) return;
@@ -154,11 +137,7 @@ function studioHead({ data }, track) {
     ? el('img', { className: 'portrait logo', src: `/media/studio/${studio.id}`, alt: '', loading: 'lazy' })
     : el('div', { className: 'portrait logo noposter' });
 
-  /*
-   * How much of them you hold, and nothing else. The network used to sit here
-   * too and now has a row of its own in the grid below — saying it twice, once
-   * plain and once marked as ThePornDB's, reads as two different networks.
-   */
+  /* How many you hold. The network is in the grid. */
   const line = `${held.toLocaleString()} in your library`;
 
   return [
@@ -186,11 +165,7 @@ function studioHead({ data }, track) {
   ];
 }
 
-/*
- * Who you hold this studio through. Counted in the library rather than in
- * Stash, so "12 here" is twelve you can play, and clicking one asks the same
- * question of whichever view is open.
- */
+/* The cast you hold this studio through; clicking filters the open view. */
 function studioCast({ data, performer }, filterBy) {
   const cast = data.cast || [];
   if (!cast.length) return [];

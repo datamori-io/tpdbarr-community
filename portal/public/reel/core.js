@@ -1,28 +1,14 @@
-/*
- * What the reel has on screen, and how it lets go of it.
- *
- * Nothing in here imports from a sibling. The reel holds video elements and
- * timers that outlive a render, so standing down properly is the one thing
- * every other file in this folder depends on being able to call.
- */
+/* The reel's live session and teardown. No sibling imports. */
 
 import { FULL, RATIO_DEFAULT } from './config.js';
 import { keep } from './keeps.js';
 
 export const view = document.getElementById('view');
 
-/*
- * The reel on screen, or null. Its observer and key handler outlive its DOM,
- * so leaving has to be explicit — app.js calls this on the way past, the same
- * way it does for the library.
- */
+/* The reel on screen, or null. app.js calls leave() on navigation. */
 export let live = null;
 
-/*
- * show() starts a session and show() is not in this file any more. An imported
- * binding is read-only, so the new session is handed over rather than assigned
- * from there. leave() still clears it directly, because leave() lives here.
- */
+/* Set from show(); imported bindings are read-only. */
 export const setLive = (session) => { live = session; };
 
 export function leave() {
@@ -40,11 +26,7 @@ export function leave() {
 
 // ------------------------------------------------------------------- media
 
-/*
- * Dropping the src rather than only pausing: a paused video still holds its
- * buffer and its connection, and a reel scrolled through for a few minutes
- * would otherwise be holding all of them.
- */
+/* Drop the src, not just pause: a paused video keeps its buffer and connection. */
 export function unload(slide) {
   const video = slide.querySelector('video');
   if (!video || !video.getAttribute('src')) return;
@@ -54,14 +36,8 @@ export function unload(slide) {
 }
 
 /*
- * Starting playback, which is not simply calling play().
- *
- * A slide is asked to play the moment its src is set, before it has loaded
- * anything, and a marker then seeks a long way into the file — either can
- * leave the element paused with the play promise quietly rejected. So the ask
- * is repeated once there is data and once the seek has landed, and each of
- * those checks that this is still the slide on screen and that nobody has
- * paused it by hand in the meantime.
+ * Start playback: play() is retried once data arrives and once the seek
+ * lands, if this is still the slide on screen and not paused by hand.
  */
 export function begin(session, index, video) {
   const go = () => {
@@ -75,10 +51,8 @@ export function begin(session, index, video) {
 }
 
 /*
- * Seeking to the marker and staying there. Both listeners live for as long as
- * the slide does rather than being added when it loads, because a slide that
- * scrolled out of range had its src taken away and will fire loadedmetadata
- * again the next time it comes back.
+ * Seek to the marker and loop its window. Listeners live with the slide,
+ * since it reloads when scrolled back into range.
  */
 export function windowed(video, start, end) {
   video.addEventListener('loadedmetadata', () => {
@@ -94,16 +68,7 @@ export function windowed(video, start, end) {
 
 export function addressFor({ source, tag, crop, ratio, roll, seed, pin, exclude, info, play, feed }) {
   const params = new URLSearchParams();
-  /*
-   * Always written, including the default.
-   *
-   * Every other setting here can be left out when it is the default, because
-   * absence and default mean the same thing for them. The feed is different:
-   * what a missing feed means is "use whatever was left set last time", which
-   * is a third state. Encoding mixed as absence made walking round the feeds
-   * stick — right from Reddit produced an address with no feed in it, which the
-   * next render read as "remembered", which was Reddit.
-   */
+  /* Feed is always written: absent means "last used", a third state. */
   if (feed) params.set('feed', feed);
   if (source !== 'markers') params.set('source', source);
   if (tag) params.set('tag', tag);
@@ -113,12 +78,7 @@ export function addressFor({ source, tag, crop, ratio, roll, seed, pin, exclude,
   if (roll) params.set('roll', '1');
   if (info === false) params.set('info', '0');
   if (play === 'source') params.set('play', 'source');
-  /*
-   * Only when Shuffle put it there. A seed in the address pins the reel across
-   * a refresh, which is what Shuffle is for — but the framing and rolling
-   * buttons also rewrite the address, and they have no business quietly
-   * turning a fresh-every-visit reel into a fixed one.
-   */
+  /* Only when Shuffle put it there; other buttons mustn't pin the reel. */
   if (pin && seed) params.set('seed', seed);
   const query = params.toString();
   return '#/binge' + (query ? '?' + query : '');

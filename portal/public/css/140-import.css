@@ -1,9 +1,7 @@
-/* ============================================================== Import
+/*
+ * ============================================================== Import
  *
- * Overview, Images and Integrations. The pieces they do not share with the
- * search are here; everything else reuses .crow, .feed and .chip, because a
- * fifth page with a fifth idea of what a row looks like is how an app stops
- * feeling like one app.
+ * Overview, Images and Integrations. Shared pieces reuse .crow, .feed and .chip.
  */
 
 /* The summary. Four numbers, and the one that is a job rather than a fact is
@@ -26,9 +24,7 @@ a.figure:hover { border-color: var(--accent-hi); }
 .figlabel { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
 .behindline { margin-top: 4px; }
 
-/* Integrations. A lamp is three states, not two — "not set up" is a different
-   answer from "down", and a page that blurs them sends you hunting a network
-   fault that is really an empty settings field. */
+/* Integrations. Three lamp states: up, down, not set up. */
 .services { display: grid; gap: 8px; }
 .srow {
   display: grid;
@@ -59,26 +55,15 @@ a.figure:hover { border-color: var(--accent-hi); }
 .facet.grow { flex: 1; }
 .facet.grow .bigsearch { width: 100%; }
 
-/* --------------------------------------------------------- match & sort
+/*
+ * --------------------------------------------------------- match & sort
  *
- * Three piles of dull work, made quick. The match row grows its candidates in
- * place rather than opening a dialog: you are working down a list, and a list
- * you keep being thrown out of is slower than the thing it replaced.
+ * Candidates grow in place in the row, not in a dialog.
  */
 
 .matchrow { align-items: start; }
-/*
- * 176 rather than 96. These rows are the one place in the portal where you are
- * deciding what a scene *is* off the picture alone — half of them have no
- * title and no studio — and at 96 wide you cannot tell two blondes on a sofa
- * apart, which is exactly the judgement the row is asking you to make.
- */
-/*
- * Scoped under .tracked, which is where these rows live, because that is what
- * they are competing with: `.tracked .crow` sets both the columns and a 96px
- * picture at two classes deep, and a bare `.matchrow` loses to it however far
- * down the sheet it sits.
- */
+/* 176 wide: these rows are judged by the picture. */
+/* Scoped under .tracked to beat `.tracked .crow`'s 96px picture. */
 .tracked .matchrow img.art { width: 176px; height: 99px; object-fit: cover; border-radius: 6px; }
 
 /* A tick, the picture, the scene, the actions. .crow's own three columns do not
@@ -86,9 +71,7 @@ a.figure:hover { border-color: var(--accent-hi); }
 .tracked .matchrow { grid-template-columns: auto 176px 1fr auto; }
 .tracked .matchrow .rowpick { align-self: start; padding-top: 4px; }
 
-/* Search All and find/replace, the same two things the Tagger Bulk plugin adds
-   to Stash's own tagger. Sticky like the tag bar: on a page of two dozen rows
-   the Stop has to be reachable without scrolling back up to it. */
+/* Search All and find/replace. Sticky so Stop stays reachable. */
 .bulkbar { position: sticky; top: 8px; z-index: 5; }
 .bulkbar .facetinput { width: auto; min-width: 170px; }
 .bulkbar .gapbox { min-width: 0; width: 80px; }
@@ -97,29 +80,14 @@ a.figure:hover { border-color: var(--accent-hi); }
 .tracked .matchrow img.art.cutting { opacity: 0.4; }
 .matchrow.matched { border-color: var(--green); opacity: 0.7; }
 
-/*
- * What the filename was read as. Dimmer than the scene's own facts because it
- * is a reading rather than a record — it is the page showing its working, and
- * it must not compete with the date and the studio directly above it.
- */
+/* How the filename was read: dimmer, since it's a reading, not a record. */
 .matchrow .asread { opacity: 0.75; font-style: italic; }
 
 /* Why the finds were guessing. Above the bulk bar and not sticky: it is read
    once, acted on once, and then it takes itself away. */
 .phashbar { border-color: var(--amber); }
 
-/*
- * Which sources a find will actually ask.
- *
- * These chips carried an `.on` class from the day they were written and
- * nothing in the sheet ever styled it — `.chip.on` is only defined inside
- * `.viewswitch`, which this row is not. So all six drew identically whether
- * they were being asked or not, and the one control on the page that decides
- * where the answers come from was the one control you could not read.
- *
- * The accent, matching the pile switcher above it, because they are the same
- * kind of statement: this one is in play.
- */
+/* Selected source chips (`.chip.on` was only styled inside .viewswitch). */
 .sourceline .chip.on {
   background: var(--accent-wash);
   border-color: var(--accent-hi);
@@ -127,11 +95,7 @@ a.figure:hover { border-color: var(--accent-hi); }
 }
 .sourceline .chip.on::before { content: '✓ '; opacity: 0.7; }
 
-/*
- * What a find will write, under who it will ask. Same chips and the same tick,
- * because it is the same kind of statement about the same press — and a second
- * visual language for "this one is in play" would only be a thing to learn.
- */
+/* What a find writes, under who it asks. Same chips. */
 .fieldline { gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
 .fieldline .chip.on {
   background: var(--accent-wash);
@@ -140,35 +104,14 @@ a.figure:hover { border-color: var(--accent-hi); }
 }
 .fieldline .chip.on::before { content: '✓ '; opacity: 0.7; }
 
-/* The last thing on the page, because it is the last thing you do. Not sticky
-   like the bulk bar above: Search All needs a Stop you can always reach, and a
-   write does not want to be one mis-click away all the way down the list. */
+/* File all: last on the page, not sticky. */
 .fileallbar { margin-top: 12px; }
 
 .idpicks { display: grid; gap: 6px; margin-top: 8px; }
-/*
- * The candidate: its picture, what it says it is, and the tick.
- *
- * The picture leads and is the same 176 the scene's own frame is, because
- * deciding between four "possible" answers off a keyword is done by looking,
- * and it was previously drawn at 72 wide at the *far end* of the row — as far
- * from the thing it was meant to be compared with as the layout allowed.
- *
- * The tick keeps the other end to itself. `1fr` in the middle means it sits
- * against the right edge at whatever width the row happens to be, rather than
- * trailing the text.
- */
+/* The candidate: picture (same size as the scene's), text, tick at the right edge. */
 .idpick {
   display: grid;
-  /*
-   * Up to 176 and down to 88, rather than a flat 176.
-   *
-   * These rows sit inside the scene row's own middle column, which is already
-   * sharing a line with a 176-wide frame and the search controls — on a narrow
-   * window that column comes out at 244px, and a rigid 176 here left the title
-   * exactly nought pixels to be read in. The picture gives way first because a
-   * smaller picture is still a picture and a zero-width title is nothing.
-   */
+  /* Picture 88–176 wide, so the title keeps room in a narrow column. */
   grid-template-columns: minmax(88px, 176px) minmax(120px, 1fr) auto;
   gap: 12px;
   align-items: center;
@@ -210,11 +153,7 @@ a.figure:hover { border-color: var(--accent-hi); }
 .idpicktick input { width: 20px; height: 20px; cursor: pointer; }
 .controls.fields { margin: 8px 0 4px; gap: 12px; }
 
-/*
- * The panel above the pile. Three lines rather than one, because they are three
- * different decisions and a single wrapping row of controls reads as a toolbar
- * you have to search rather than three questions you answer.
- */
+/* The pile panel: three lines for three decisions. */
 .sortline, .sourceline { gap: 8px; align-items: center; margin-top: 8px; }
 .sourceline { flex-wrap: wrap; }
 
@@ -224,10 +163,7 @@ a.figure:hover { border-color: var(--accent-hi); }
 .sortline input[type="search"] { flex: 1; min-width: 220px; }
 .sourceline .scraperpick { width: auto; max-width: 220px; }
 
-/*
- * One band per source, never merged — you are looking at StashDB's answer and
- * TPDB's answer side by side, and the whole point is to see that they differ.
- */
+/* One band per source. */
 .bands { display: grid; gap: 10px; margin-top: 8px; }
 .bandhead { margin-bottom: 4px; }
 .sourceband .idpicks { margin-top: 0; }
@@ -258,11 +194,7 @@ a.figure:hover { border-color: var(--accent-hi); }
 .tagbar { position: sticky; top: 8px; z-index: 5; }
 .chip.tag { border-color: var(--line-hi); }
 
-/* ------------------------------------------------------------- thanks
- *
- * A list of other people's work. Reads as a page rather than a table: the
- * interesting part is the sentence about what each one is for, not the name.
- */
+/* ------------------------------------------------------------- thanks */
 .thanks { display: grid; gap: 8px; }
 .thanksrow { grid-template-columns: 1fr auto; align-items: center; cursor: default; }
 .thanksrow:hover { border-color: var(--line); }
@@ -276,12 +208,10 @@ a.figure:hover { border-color: var(--accent-hi); }
 .thankslink { color: var(--muted); border-bottom: 1px dotted var(--line-hi); }
 .thankslink:hover { color: var(--accent-hi); border-bottom-color: var(--accent-hi); }
 
-/* ------------------------------------------------------- the group builder
+/*
+ * ------------------------------------------------------- the group builder
  *
- * A proposal is a poster and an argument. The poster is there because a film
- * is recognised before it is read, and the argument — which scenes, matched
- * how — is a list rather than a paragraph, because every line of it is
- * something you might disagree with individually.
+ * A proposal: poster plus the list of matched scenes.
  */
 .proposals { display: grid; gap: 14px; }
 
@@ -370,20 +300,12 @@ a.figure:hover { border-color: var(--accent-hi); }
 .searchpanel .good, .proposal .good { color: var(--green); }
 .searchpanel .bad, .proposal .bad { color: var(--red); }
 
-/* ------------------------------------------------------- the reel's feeds
- *
- * Which of the four you are on, and a way for a mouse to do what a thumb does
- * by swiping. Over the clip rather than in the bar, because on a phone the bar
- * is off the top of the screen the moment you scroll and this is the control
- * you most want while scrolling.
- */
 /*
- * A window three slots wide with the mark pinned in the middle one.
+ * ------------------------------------------------------- the reel's feeds
  *
- * Every slot is the same width so the strip is a fixed size whatever feed is
- * showing — the alternative, a highlight that moves between differently sized
- * labels, makes the whole control change shape as you move through it.
+ * The feed switcher over the clip, so it stays reachable while scrolling on a phone.
  */
+/* Three equal slots with the mark in the middle, so the control keeps its size. */
 .reelfeeds {
   --slot: 86px;
   position: relative;
@@ -411,10 +333,7 @@ a.figure:hover { border-color: var(--accent-hi); }
   pointer-events: none;
 }
 
-/*
- * The labels, slid so the current one lands under the mark. --at is the index
- * of the feed you are on, set by the script; everything else is arithmetic.
- */
+/* The labels, slid so the current one sits under the mark (--at from the script). */
 .reelfeedtrack {
   display: flex;
   transform: translateX(calc(var(--slot) * (1 - var(--at, 0))));
@@ -444,21 +363,15 @@ a.figure:hover { border-color: var(--accent-hi); }
 
 /* On a phone the labels are the only thing that would push this wider than the
    screen, so they shrink rather than wrap. */
-/*
- * Five labels and a tag control will not fit across a phone, so the strip
- * scrolls sideways inside the bar rather than wrapping it onto two rows. The
- * swipe is the real gesture on a phone anyway; this is the readout.
- */
+/* On a phone the strip scrolls sideways instead of wrapping. */
 @media (max-width: 640px) {
   .reelfeed { font-size: 11px; }
 }
 
-/* ------------------------------------------------------- the reel, full screen
+/*
+ * ------------------------------------------------------- the reel, full screen
  *
- * A reel with page furniture around it is not a reel, and on a phone the header
- * and the status strip were eating the top third before the clip started. While
- * one is up the body wears .reelfull and both go away; the reel offers its own
- * way out instead, top right.
+ * .reelfull hides the header and status strip; the reel has its own close.
  */
 body.reelfull .topbar,
 body.reelfull .statusbar { display: none; }
@@ -467,12 +380,8 @@ body.reelfull main { max-width: none; margin: 0; padding: 0; }
 body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 
 /*
- * In the bar's right zone rather than floating over it.
- *
- * Floating meant padding the bar's right edge to keep the corner clear, which
- * made its padding asymmetric — and a centred column inside asymmetric padding
- * is not centred. It was out by exactly half the padding, 21px, which is the
- * kind of wrong that looks like nothing until you measure it.
+ * In the bar's right zone, not floating: floating made the padding
+ * asymmetric and the centre column 21px off.
  */
 .reelclose {
   flex: none;
@@ -491,11 +400,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 }
 .reelclose:hover { color: var(--text); border-color: var(--line-hi); }
 
-/*
- * The bar has to clear the close button, and on a phone it wraps onto two rows
- * — the feed window on one, the tag control on the next — rather than shrinking
- * both into something neither is usable at.
- */
+/* On a phone the bar wraps: feeds on one row, tag control on the next. */
 @media (max-width: 640px) {
   .reelbar { gap: 6px; padding-left: 8px; }
   .reelfeeds { --slot: 74px; }
@@ -503,11 +408,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 
 /* ------------------------------------------------------------- parameters */
 
-/*
- * Every setting in one place. The connections form is the same node the app
- * has always used — borrowed from its holder rather than rebuilt — so this
- * only has to give it a page to sit on.
- */
+/* Settings page. The connections form is the app's existing node. */
 .params { display: flex; flex-direction: column; gap: 22px; }
 
 .params fieldset {
@@ -560,11 +461,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .reelex.only { border-color: var(--accent-hi); color: var(--text); }
 
 
-/*
- * The nightly release, above the want list it drains — see release.mjs. One
- * line, so it reads as a setting about the list rather than as a panel of its
- * own competing with the cards below it.
- */
+/* The nightly release (release.mjs), one line above the want list. */
 .releasebar {
   display: flex;
   align-items: center;
@@ -599,14 +496,12 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
   .releasebar .chip { min-height: 38px; }
 }
 
-/* ============================================== what you track, as a wall
+/*
+ * ============================================== what you track, as a wall
  *
- * Three sections — performers, studios, tags — each a grid capped at three
- * rows. See renderTracked() in import/tracked.js for why they are apart.
- *
- * auto-fill rather than a fixed count, so the column count is the window's
- * answer rather than a number picked here; tracked.js reads it back off the
- * laid-out grid to work out what three rows means.
+ * Performers, studios, tags, each a grid capped at three rows (see
+ * renderTracked() in import/tracked.js). auto-fill; tracked.js reads the
+ * column count back.
  */
 
 .tracksection { margin-bottom: 22px; }
@@ -633,10 +528,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 }
 .trackcard:hover { border-color: var(--accent-hi); transform: translateY(-2px); }
 
-/*
- * A portrait for a person, a wide crop for a studio's logo, and a square for a
- * tag, which has no artwork at all — the same rule the library's tiles follow.
- */
+/* Portrait for people, wide for studio logos, square for tags. */
 .trackart {
   width: 100%;
   border-radius: var(--radius);
@@ -672,11 +564,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .trackloose { display: flex; align-items: baseline; gap: 2px; }
 .trackwhy { cursor: help; opacity: 0.7; }
 
-/*
- * Untracking is the one thing on this card you must not do by accident, so it
- * is the one thing that is not the card: its own target, in the corner, and
- * only once you are pointing at the card at all.
- */
+/* Untrack: its own corner target, shown on hover. */
 /* The want list's toggle, at the end of its heading. */
 .wantonly { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); }
 
@@ -684,13 +572,10 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
   .wantonly { min-height: 40px; }
 }
 
-/* ------------------------------------------------------------- wild card
+/*
+ * ------------------------------------------------------------- wild card
  *
- * One scene built up out of several sources. The shape of the page is the
- * argument it makes: the ways of asking at the top, everything that answered
- * in the middle, and the record itself at the bottom as one row per field with
- * every answer laid along it. Reading across a row is the comparison you were
- * doing between browser tabs.
+ * Ways of asking at the top, answers in the middle, the record at the bottom.
  */
 
 .wchead .crow { grid-template-columns: 176px 1fr auto; align-items: start; }
@@ -702,9 +587,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
    tabs you already had open. */
 .wcurls { width: 100%; min-height: 64px; font: inherit; font-size: 13px; resize: vertical; }
 
-/* Every answer, the empty ones included — a source that failed stays on screen
-   saying why, because "had nothing" and "returned a 403" are different facts
-   and only one of them means stop asking it. */
+/* Every answer, failures included. */
 .wccontriblist { display: grid; gap: 8px; }
 .wccontrib {
   display: grid;
@@ -736,9 +619,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
   border-radius: 8px;
   background: var(--panel-2);
 }
-/* A field you have changed. Marked on the row rather than only on the chosen
-   option, so the ones you have decided are countable at a glance down the
-   left-hand edge. */
+/* A changed field, marked on the row. */
 .wcrow.picked { border-color: var(--accent-hi); }
 .wclabel { font-weight: 600; font-size: 13px; }
 .wcopts { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
@@ -787,16 +668,13 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .renamebit .chip.danger { border-color: var(--red); color: var(--red); }
 .renamebit .chip.danger:hover { background: var(--red); color: #fff; }
 
-/* A film answer among the scene answers. Marked rather than separated: it sits
-   in arrival order with the rest because the field table reads across all of
-   them equally — it is only its *title* that means something different. */
+/* A film answer, marked in place. */
 .wccontrib.film { border-left: 3px solid var(--amber); }
 
-/* -------------------------------------------------------- catalogue overview
+/*
+ * -------------------------------------------------------- catalogue overview
  *
- * Not a dashboard. No charts, nothing on a timer, and every number is a link
- * to the thing that clears it — Stats is where the library is admired, this is
- * where it is worked on.
+ * Every number links to what clears it.
  */
 
 .catjobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 8px; }
@@ -815,9 +693,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
    having read it, so it does not get a button beside it saying so. */
 .catcount { font-size: 26px; font-weight: 700; line-height: 1.1; color: var(--text); }
 .catlabel { font-weight: 600; font-size: 13px; }
-/* A pile with nothing in it stays on the page rather than disappearing — that
-   it is empty is the useful thing, and a card that vanishes when it is done
-   makes the row jump about between visits. */
+/* Empty piles stay, dimmed, so the row doesn't jump. */
 .catjob.clear { opacity: 0.55; }
 .catjob.clear .catcount { color: var(--green, var(--muted)); }
 
@@ -829,45 +705,24 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .cattable code { font-size: 12px; color: var(--text); }
 .cattable tbody tr:last-child td { border-bottom: 0; }
 
-/* Setting one aside. Sits with the rename offer under the path, and the row
-   stays where it is rather than vanishing — it leaves the pile on the next
-   read, and a row that disappeared under the cursor would take the undo with
-   it. */
+/* Set-aside control under the path. The row stays until the next read. */
 .asidebit { gap: 8px; align-items: center; margin-top: 4px; }
 .asidebit .chip.on { background: var(--accent-wash); border-color: var(--accent-hi); color: var(--text); }
 .matchrow.setaside { opacity: 0.55; border-style: dashed; }
 
-/* ------------------------------------------------------------- the index sheet
+/*
+ * ------------------------------------------------------------- the index sheet
  *
- * Everything in play at one size, because the whole question is which of these
- * pictures is the same picture. Inline rather than a dialog: you are working
- * down a list, and a list you keep being thrown out of is slower than the thing
- * it replaced.
+ * Everything in play at one size, inline.
  */
 .cmpsheet { margin-top: 10px; border-color: var(--accent-hi); }
 .cmplabel { font-weight: 600; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
 
 /*
- * As big as the space allows, rather than a number.
- *
- * These were a fixed 240 wide in a wrapping flex row, which is the size the
- * rest of the page uses for pictures you glance at — and glancing is not what
- * this sheet is for. It is the one place in the portal where the *only* thing
- * deciding the answer is how closely two pictures resemble each other, and at
- * 240 two blondes on a sofa still look like the same photograph.
- *
- * So it is a grid that fits whole tiles at 380 or more and shares out what is
- * left, which on a full window is three or four across at well over 400 and on
- * a narrow one is one big tile rather than four useless ones. A fixed larger
- * number would have overflowed the row's own column, which is where this sheet
- * lives on the match page.
+ * Tiles at 380px or wider, sharing out the rest: three or four across on a
+ * full window, one on a narrow one.
  */
-/*
- * The slot the sheet lives in on a match row: all four of the row's columns
- * rather than the third one. `found` sits in that third column and it is 571px
- * of 1144 on a full window — half a row is not where you put the thing whose
- * whole job is pictures side by side.
- */
+/* Spans all four columns of a match row. */
 .cmpslot { grid-column: 1 / -1; }
 .cmpslot:empty { display: none; }
 
@@ -878,15 +733,7 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 }
 .cmptile { display: grid; gap: 4px; min-width: 0; }
 
-/*
- * Two classes deep, and it has to be.
- *
- * `.crow img` in 020-cards.css sets a 56px square, and a match row *is* a
- * `.crow` — so a bare `.cmpart` lost that fight and every picture in the sheet
- * drew at 56 across however wide its tile was. The height goes with it: that
- * rule pins both, and leaving height alone would have squashed a 16:9 frame
- * into a square.
- */
+/* Two classes deep to beat `.crow img`'s 56px square (width and height). */
 .cmpsheet img.cmpart {
   width: 100%;
   height: auto;
@@ -913,19 +760,16 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .cmpnote.far    { color: var(--muted); }
 
 
-/* ------------------------------------------------- wild card: your own answer
+/*
+ * ------------------------------------------------- wild card: your own answer
  *
- * The picker sits under the row's options rather than among them, because it is
- * a different kind of thing: the chips are answers somebody gave, and this is
- * you. Full width is wrong here — it is one control on a line, not a facet.
+ * The picker sits under the row's options.
  */
 .wcownline { gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
 .wcownline .wcadd { width: auto; max-width: 260px; }
 .wcaddwrap { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-/* The Cover row's own control. Wider than the others because it carries two
-   ways in — a file chooser and an address — and on a narrow screen they want
-   to sit on separate lines rather than squeeze. */
+/* Cover control: file chooser and address wrap on narrow screens. */
 .wcartbox { max-width: 100%; row-gap: 6px; }
 .wcartbox input[type="file"] { font-size: 12px; max-width: 100%; }
 .wcartbox input[type="url"] { min-width: 220px; flex: 1 1 220px; }
@@ -935,27 +779,15 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .wcdrop { font-size: 0.85em; opacity: 0.85; }
 .wcdrop:hover { opacity: 1; border-color: var(--accent-hi); }
 
-/* ------------------------------------------------- a row's picture, alive
+/*
+ * ------------------------------------------------- a row's picture, alive
  *
- * Match and Wild Card rows now carry the same preview and scrub a shelf tile
- * has — see liveArt() in catalogue/liveart.js, which drives them with the
- * library's own hoverPreview(). The overlays need something positioned to sit
- * in, and these rows were a bare <img>, so the image gained a parent.
+ * Match and Wild Card row pictures get a positioned parent for the preview
+ * and scrub overlays (see liveArt() in catalogue/liveart.js). The parent
+ * takes over sizing; each `img.art` rule is a class deeper than the one it
+ * overrides.
  *
- * The parent takes over the sizing the image used to do for itself. Written
- * per page rather than once, because the two pages disagree about how big a
- * row's picture is, and this is not the change that should settle that.
- *
- * Each `img.art` rule below is a class deeper than the rule it is overriding.
- * That is deliberate: the originals set an explicit pixel width on the image,
- * and inside a box that is now the box's job.
- *
- * **There is no rule here for a Wild Card pick, and that is not an oversight.**
- * `.wcpick .art` asks for 128 and has never once got it: the row also carries
- * .matchrow inside .tracked, and that rule is a class deeper, so a pick has
- * always drawn at 176 like everything else. Writing .wcpick here would have
- * either lost the same argument — a dead rule that reads as live — or won it
- * and silently resized a page nobody asked me to resize.
+ * No rule for `.wcpick`: it already draws at 176 via `.tracked .matchrow`.
  */
 .rowart {
   position: relative;
@@ -977,31 +809,19 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
    tiles follow — an always-on bar across a pile is a pattern, not a control. */
 .rowart:hover .tilescrub { opacity: 1; }
 
-/* What the Generate button says while Stash is working. Sits under the button
-   rather than beside it: the actions column is narrow and a percentage that
-   pushed the buttons around as it counted would be worse than no percentage. */
+/* Generate's progress, under the button so the column doesn't shift. */
 .genbit { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
 .genbit .muted:empty { display: none; }
 
 
-/* ------------------------------------------------- match: deleting from a row
+/*
+ * ------------------------------------------------- match: deleting from a row
  *
- * The options only exist between the two presses, so they sit on the same line
- * rather than opening a panel — the row is already four columns and a dialog
- * for three checkboxes would be more ceremony than the decision deserves.
+ * Delete options inline, between the two presses.
  */
 /*
- * Delete goes to the foot of the actions column, hard right.
- *
- * `.trackedactions` is a grid with `align-content: center`, and inside a grid
- * whose rows are packed to their content an `auto` margin has no free space to
- * absorb — so the match variant becomes a flex column, where `margin-top: auto`
- * takes everything left between Generate and the bottom of the row. The
- * children still stretch to the column width, which is what the grid was
- * giving them.
- *
- * On a short row there is no free space and it simply sits under Generate,
- * which is still the bottom right of the row.
+ * A flex column so `margin-top: auto` pushes Delete to the foot (in a
+ * packed grid an auto margin has no space to take).
  */
 .matchactions {
   display: flex;
@@ -1023,20 +843,18 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .matchrow.deleted .title { text-decoration: line-through; }
 
 
-/* --------------------------------------------- match: reading a candidate's page
+/*
+ * --------------------------------------------- match: reading a candidate's page
  *
- * Sits on the badge line with the confidence and the "same picture" flag,
- * because it is the same kind of thing: something the row is telling you about
- * how good its answer is. Small, because it is an offer rather than the point.
+ * On the badge line, small.
  */
 .readbit { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .chip.tiny { padding: 1px 7px; font-size: 0.8em; line-height: 1.6; }
 
-/* ------------------------------------------------------- standing answers
+/*
+ * ------------------------------------------------------- standing answers
  *
- * Under the tracked wall, and deliberately plainer than it: this is a
- * settings control that happens to live on a page you look at, so it reads as
- * a short list of sentences rather than as another thing to scan.
+ * Under the tracked wall, as a plain list of sentences.
  */
 .rulesbox { margin-top: 18px; }
 
@@ -1066,11 +884,10 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 /* What a rule is doing to one catalogue, under its count. */
 .trackruled { margin-top: 2px; opacity: 0.8; }
 
-/* ------------------------------------------------------------- the blocks
+/*
+ * ------------------------------------------------------------- the blocks
  *
- * The decide queue stacked by studio and year. A block is a heading with a
- * button on it and its own grid underneath — deliberately quiet, because the
- * cards are what you are reading and the heading is only there to be answered.
+ * The decide queue grouped by studio and year. Quiet headings.
  */
 .decideblock { margin: 0 0 18px; }
 
@@ -1087,11 +904,10 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .decideblockhead h3 { margin: 0; font-size: 15px; }
 .decideblockhead .spacer { flex: 1 1 auto; }
 
-/* ------------------------------------------------------------- the work band
+/*
+ * ------------------------------------------------------------- the work band
  *
- * The top of the Tracked page: how much there is to do, and the way in. Loud
- * on purpose — it is the one thing on this page that is an instruction rather
- * than a measurement.
+ * Top of the Tracked page: how much to do, and the way in.
  */
 .workband {
   display: flex;
@@ -1110,23 +926,18 @@ body.reelfull .reelwrap { height: 100vh; height: 100dvh; }
 .workband .workcount { min-width: 96px; }
 .workband .workwords { min-width: 180px; }
 
-/* ---------------------------------------------------------- likely a yes
+/*
+ * ---------------------------------------------------------- likely a yes
  *
- * The scenes the ranking put at the top, marked so the order is visible as
- * well as true. Quiet on purpose: it is a hint about where to look first, not
- * a badge claiming to know what you want.
+ * Top-ranked scenes, marked quietly.
  */
 .likely { box-shadow: inset 3px 0 0 var(--accent-hi); }
 
-/* ------------------------------------------------------------- track tabs
+/*
+ * ------------------------------------------------------------- track tabs
  *
- * The second strip on the Tracked page. Same shape as the page-level one, a
- * size down, because it is a division inside a page rather than a move
- * between pages — two identical strips stacked would leave you reading which
- * one you were on.
- *
- * `.subtabs a` is a link only so it looks like the rest of the portal's
- * strips; the click is handled in tracked.js and never reaches the router.
+ * The Tracked page's sub-strip, a size down. `.subtabs a` clicks are
+ * handled in tracked.js, not the router.
  */
 .subtabs {
   margin: 2px 0 18px;

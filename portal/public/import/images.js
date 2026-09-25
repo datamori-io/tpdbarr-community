@@ -3,14 +3,11 @@
 import { api, el } from '../util.js';
 import { SECTION_OF, paint, painterFor, show } from './core.js';
 
-/* ================================================================== images
+/*
+ * ================================================================== images
  *
- * Photo sets for a performer.
- *
- * The gallery builder already knows how to read one of these pages; what it
- * never had was a way to find them. This is that — a performer picked from
- * StashDB, then the places to look, with the build that already existed picking
- * up from there.
+ * Photo sets for a performer picked from StashDB: where to look, then the
+ * gallery builder takes over.
  */
 
 export async function showImages(qs) {
@@ -97,17 +94,8 @@ function imagePanel(params) {
 }
 
 /*
- * Where to look, and then what is there.
- *
- * Three steps, in this order, because skipping the middle one is what made this
- * page appear to do nothing: a performer's page on these sites is a *list* of
- * galleries, and handing that straight to the picture scraper gets you site
- * chrome. So: the sites, then the galleries on one of them, then the pictures
- * in one of those.
- *
- * Nothing is fetched until you ask for it, which is also what keeps the rule
- * the gallery builder has always kept — only a URL the portal itself offered is
- * ever fetched, and every address here is one it offered.
+ * Sites, then the galleries on one, then the pictures in one. Nothing is
+ * fetched until asked; every URL is one the portal offered.
  */
 function renderPlaces(body, places, params) {
   const uuid = params.get('performer');
@@ -163,11 +151,7 @@ function renderPlaces(body, places, params) {
   );
 }
 
-/*
- * The galleries on one site's listing page. A site that hides its list behind
- * JavaScript comes back with none, and says so — an empty grid with no
- * explanation is exactly what "it does nothing" looked like.
- */
+/* One site's gallery list. JavaScript-built lists come back empty, and say so. */
 function renderGalleryList(stage, site, found, name, uuid) {
   if (!found.galleries.length) {
     stage.replaceChildren(el('div', { className: 'empty small' },
@@ -203,11 +187,7 @@ function renderGalleryList(stage, site, found, name, uuid) {
   );
 }
 
-/*
- * The pictures in one gallery, read by the scraper that already existed. From
- * here the build is the gallery builder's own, in the Library — this page found
- * the page, which is the part that was missing.
- */
+/* One gallery's pictures, via the existing scraper. */
 async function readGallery(shots, gallery, name, uuid) {
   shots.replaceChildren(el('div', { className: 'empty' }, `Reading “${gallery.title}”…`));
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -250,11 +230,7 @@ async function readGallery(shots, gallery, name, uuid) {
   }
 }
 
-/*
- * ThePornDB is different in kind from the three sites above: keyed on an id
- * rather than a name, so its pictures are certainly of the right person. That
- * is worth its own band and its own sentence.
- */
+/* ThePornDB, keyed on an id: its own band. */
 function tpdbBand(uuid) {
   const go = el('button', { className: 'chip', type: 'button' }, 'Open their page');
   go.onclick = () => { location.hash = `#/performer/${uuid}`; };

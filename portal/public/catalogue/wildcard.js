@@ -5,29 +5,13 @@ import { SECTION_OF, painterFor, show, state } from '../import/core.js';
 import { compareSheet } from './compare.js';
 import { generateBit, liveArt } from './liveart.js';
 
-/* ================================================================ wild card
+/*
+ * ================================================================ wild card
  *
- * The page for when nothing recognises the file.
- *
- * Match asks "which scene is this" of sources that can answer from a
- * fingerprint, and when one of them can, that is the end of it. This page is
- * the other case — the DVD rip nobody has ever fingerprinted, the file whose
- * name is a film and a scene number — where the honest position is that no
- * single source knows what this is and several of them each know a bit.
- *
- * What you were doing instead was opening three tabs. The film on AdultEmpire,
- * its scene list on HotMovies, the credits somewhere else, and then copying a
- * field at a time into Stash. So this keeps the copying and takes away the
- * tabs: you hand it addresses and you hand it search sources, every answer
- * lands as a **contribution**, and the record is built one field at a time
- * with you saying which contribution wins each one.
- *
- * **Nothing is merged for you and nothing is ranked.** Two sources disagreeing
- * about a date is the thing you came here to settle, and a page that quietly
- * picked one would be hiding the only interesting part of the answer. The one
- * concession is "fill the blanks", which only ever touches fields Stash has
- * nothing in — it cannot overrule anything, so it cannot be wrong in a way you
- * would not see.
+ * For files no fingerprint recognises (DVD rips and the like). Give it URLs
+ * and search sources; each answer is a **contribution**, and the record is
+ * built one field at a time with you choosing which one wins. Nothing is
+ * merged or ranked. "Fill the blanks" only fills empty fields.
  */
 
 const hashFor = (params) => {
@@ -42,12 +26,8 @@ const go = (params) => {
 };
 
 /*
- * The fields a record is made of, in the order they are worth deciding.
- *
- * `list` fields are the two where a contribution offers a set rather than a
- * value, and where "all of them at once" is a sensible thing to want. `image`
- * is a value like any other and is drawn as a picture, because comparing four
- * covers as URLs is not comparing them at all.
+ * Record fields, in deciding order. `list` fields can take a union;
+ * `image` is drawn as a picture.
  */
 const FIELDS = [
   ['title', 'Title', 'text'],
@@ -63,19 +43,12 @@ const FIELDS = [
 ];
 
 /*
- * The sources worth having one press away.
- *
- * There are 193 that can search by name and a picker for all of them, but
- * these five are the ones that know a *film* — which is the question this page
- * exists to answer, and the question StashDB structurally cannot be asked. Any
- * that are not installed simply do not appear.
+ * Name-search sources shown as chips: the ones that know films. Uninstalled
+ * ones are hidden.
  */
 const FAVOURITES = [
   'AdultEmpire',
-  // The AdultEmpire catalogue reached through a door that opens. Same stock,
-  // same box art, same scene indexes — and where AdultEmpire is the one this
-  // portal will not crawl itself, GameLink is scraped by Stash, from this
-  // machine, which is the arrangement that was always fine.
+  // The AdultEmpire catalogue, scraped by Stash on this machine.
   'GameLink',
   'AdultDvdMarketPlace',
   'Hotmovies',
@@ -117,20 +90,11 @@ export async function showWildcard(qs) {
   }
 }
 
-/* ------------------------------------------------------------ which scene
+/*
+ * ------------------------------------------------------------ which scene
  *
- * The same piles, keyword and ordering the match page browses by.
- *
- * They are the same question — "which of these does nothing recognise" — and
- * having to remember a filename to get here was the difference between using
- * this page and not. The three piles come off the match queue itself rather
- * than a second implementation of the same filters, so a pile cannot mean one
- * thing on that page and something else on this one.
- *
- * **Anything** is the fourth and it is not a pile: it is a free search across
- * the whole library, for building up a scene that is already matched. It needs
- * a keyword, because "every scene in the library, newest first" is not a thing
- * anybody came here to page through.
+ * The match page's piles, keyword and ordering, from the match queue itself.
+ * **Anything** is a free search over the whole library and needs a keyword.
  */
 
 const PILES = [
@@ -151,12 +115,7 @@ const SORTS = [
   ['random', 'Shuffled'],
 ];
 
-/*
- * Named here as well as in match.js, and it has to be the same word. The
- * address only carries `sort` when it differs from the default, so a
- * disagreement between the two pages would be an address that sorted one way
- * on one of them and another way on the other.
- */
+/* Must match match.js: the address omits the default sort. */
 const SORT_DEFAULT = 'added';
 
 function pickScene(body, params) {
@@ -167,9 +126,8 @@ function pickScene(body, params) {
   body.replaceChildren(panel, found);
 
   /*
-   * Every control goes through the address, so a pile you were working down is
-   * a pile you can come back to — and writing a record sends you back to the
-   * page of the list you were on rather than to the top of it.
+   * Every control goes through the address; writing a record returns you to
+   * the page of the list you were on.
    */
   const move = (fn) => {
     const next = new URLSearchParams(params);
@@ -210,12 +168,7 @@ function pickScene(body, params) {
   const flip = el('button', { type: 'button', className: 'chip' }, descending ? 'Newest first' : 'Oldest first');
   flip.onclick = () => set('dir', descending ? 'asc' : 'desc', 'desc');
 
-  /*
-   * Ordering is the queue's, and the free search has none to offer — Stash's
-   * own `q` ranks by relevance and there is no honest way to promise "by scene
-   * date" on top of that. A live control that changes nothing is worse than
-   * one that is not there.
-   */
+  /* No ordering for the free search: Stash's `q` ranks by relevance. */
   const said = el('span', { className: 'muted small' }, mode === 'any'
     ? 'Any scene in the library, by keyword — for building up something that is already matched.'
     : 'The same pile the match page works down. Pick one and build its record out of several sources at once.');
@@ -277,14 +230,7 @@ async function loadPicks(found, params, mode) {
   }
 }
 
-/*
- * A match-queue row in the shape this page's rows read.
- *
- * The two endpoints describe a scene slightly differently — the queue carries
- * fingerprints and dead ids this page has no use for, and names the studio as
- * an object where this page wants the name. Converted here, once, rather than
- * teaching the row to read two shapes.
- */
+/* A match-queue row in this page's shape. */
 const fromQueue = (s) => ({
   id: s.id,
   title: s.title || '',
@@ -316,11 +262,7 @@ function pager(params, { page, perPage, count }) {
 }
 
 function sceneChoice(scene) {
-  /*
-   * The pile travels with the choice. Writing a record sends you back to the
-   * list you were working down, on the page you were on — the alternative is
-   * page one of the default pile after every single scene.
-   */
+  /* Carry the pile and page, so writing a record returns you there. */
   const open = () => {
     const next = new URLSearchParams(location.hash.split('?')[1] || '');
     next.set('scene', scene.id);
@@ -335,9 +277,7 @@ function sceneChoice(scene) {
     scene.organized ? 'organised' : null,
   ].filter(Boolean);
 
-  // Same picture as a shelf tile now: hover it for the preview loop, run along
-  // the bottom for the scrub. A pile you are picking a scene out of is exactly
-  // where one still frame was never enough.
+  // Hover plays the preview; the bottom edge scrubs.
   const art = el('img', { className: 'art', src: `/media/scene/${scene.id}/thumb`, loading: 'lazy', alt: '' });
 
   const row = el('div', { className: 'crow matchrow wcpick' },
@@ -356,19 +296,13 @@ function sceneChoice(scene) {
   return row;
 }
 
-/* ------------------------------------------------------------- the bench
+/*
+ * ------------------------------------------------------------- the bench
  *
- * The scene, the ways of asking, the answers, and the record being built. All
- * on one screen on purpose: the whole complaint this page answers is that the
- * information was spread across three tabs.
+ * The scene, the ways of asking, the answers and the record, on one screen.
  */
 function drawBench(body, params, scene, sources) {
-  /*
-   * Every answer that has arrived this visit, in arrival order. Kept here
-   * rather than inside the panels because the field table reads across all of
-   * them and the panels only add to them — a URL read and a keyword search are
-   * two ways of filling the same list.
-   */
+  /* Every answer this visit, in arrival order, shared by the panels and the table. */
   const contributions = [];
 
   const answers = el('div', { className: 'wccontribs' });
@@ -378,29 +312,12 @@ function drawBench(body, params, scene, sources) {
   // whatever Stash already has", which is why an untouched page writes nothing.
   const chosen = new Map();
 
-  /*
-   * Answers are numbered once, on arrival, and only the ones that answered.
-   * The cards and the field table below both refer to a contribution by its
-   * number, so the two must count the same things — numbering each list where
-   * it is drawn had the cards calling HotMovies 7 and the table calling it 6,
-   * because one counted the failures and the other did not.
-   */
+  /* Numbered on arrival, answers only, so cards and table agree. */
   let numbered = 0;
 
   /*
-   * The description, offered once, the first time anybody has one.
-   *
-   * Every other field stays on "Stash has" until you press it, and that is
-   * right for the fields you came here to argue about — two sources disagreeing
-   * about a date is the thing you are here to settle. A description is not that
-   * argument. It is a paragraph of blurb that Stash almost never has and that
-   * you were going to take from whoever offered it, so the page takes it and
-   * shows you which source it came from, ticked, with everything else on the
-   * row still one press away.
-   *
-   * Only into an empty field, and only once a visit — it cannot overrule a
-   * description Stash already holds, and "Undo my choices" stays undone rather
-   * than being re-decided under you by the next contribution.
+   * The first description to arrive is ticked automatically, only into an
+   * empty field and only once a visit.
    */
   let offeredDetails = false;
   const offerDetails = () => {
@@ -429,14 +346,7 @@ function drawBench(body, params, scene, sources) {
     arrived(more);
   };
 
-  /*
-   * The frames already on disk for this scene, so the Cover row can offer them.
-   *
-   * Held here rather than read by the field table, which is redrawn on every
-   * chip press — a fetch per press would be a fetch per press. Nothing here
-   * cuts anything: the panel above is where cutting is asked for, and it hands
-   * its list over through `moreFrames` on load and after every cut.
-   */
+  /* Frames already on disk, for the Cover row. Handed over by the frame panel. */
   let frames = [];
 
   const redraw = () => {
@@ -445,12 +355,7 @@ function drawBench(body, params, scene, sources) {
     saving.refresh();
   };
 
-  /*
-   * The frame panel is the only thing that asks for these — it already does,
-   * on load and again after every cut — and it hands the list over here. A
-   * second fetch from this side would be the same request twice on every visit
-   * for a list one of them already has.
-   */
+  /* The frame panel hands its list over here; no second fetch. */
   const moreFrames = (list) => { frames = list || []; redraw(); };
 
   const saving = savePanel(scene, chosen, params);
@@ -494,37 +399,15 @@ function sceneHead(scene) {
   );
 }
 
-/* --------------------------------------------------- searching by the picture
+/*
+ * --------------------------------------------------- searching by the picture
  *
- * The tool this page was still missing.
- *
- * When the filename is a slug and no source knows the title, the thing you
- * actually do is take a frame to Google Lens or Yandex and find the page that
- * way — and then you are back here pasting the URL into the box above, which
- * is exactly the loop this page is for. So the frames belong on it.
- *
- * **One frame is a coin toss.** The row thumbnail is cut at a quarter in and
- * that is right for filling a row, but a reverse search wants a face, a room,
- * a title card — something an engine has seen on the page you are looking for.
- * So this cuts several across the file and lets you look, and cuts more when
- * none of them are any good.
- *
- * **The portal cannot do the search itself, and does not pretend to.** The
- * engines want either an upload or a publicly reachable URL, and this runs on
- * your LAN — there is no address to hand Yandex that Yandex can fetch. What it
- * can do is put the frame on your clipboard and open the engine on the paste
- * screen, which turns "save the file, find the file, upload the file" into two
- * presses. Same rule the rest of the portal keeps: it offers the place to
- * look, and the fetching is yours.
+ * Frames cut across the file, for reverse image search. The portal can't
+ * search for you (engines can't reach the LAN), so it copies a frame to the
+ * clipboard and opens the engine's paste screen.
  */
 
-/*
- * Where each engine takes a pasted or dropped image.
- *
- * Plain links with nothing substituted into them, because there is nothing to
- * substitute — this is a set of bookmarks, and saying so is more honest than
- * dressing it up as an integration.
- */
+/* Where each engine takes a pasted image. Plain links. */
 const LENSES = [
   ['Google Lens', 'https://lens.google.com/upload'],
   ['Yandex', 'https://yandex.com/images/search?rpt=imageview'],
@@ -599,15 +482,8 @@ function framePanel(scene, onFrames = null) {
 }
 
 /*
- * One frame, and the two things you do with it.
- *
- * **Copy** puts the actual image bytes on the clipboard, not its address — an
- * address on this LAN means nothing to Yandex. Written as a PNG because that
- * is the one image type `navigator.clipboard.write` is required to accept, so
- * the JPEG goes through a canvas on the way.
- *
- * **Save** is the fallback for a browser that refuses the clipboard, and for
- * the engines that only take a file.
+ * One frame: Copy puts the image bytes on the clipboard (as PNG, the one
+ * type `navigator.clipboard.write` must accept); Save is the fallback.
  */
 function frameTile(frame, said) {
   // Not lazy: it is a strip of six that were cut a second ago because somebody
@@ -657,11 +533,10 @@ async function asPng(src) {
     canvas.toBlob((blob) => (blob ? done(blob) : fail(new Error('the frame could not be re-encoded'))), 'image/png'));
 }
 
-/* ------------------------------------------------------------ asking by URL
+/*
+ * ------------------------------------------------------------ asking by URL
  *
- * The half that replaces the copying. You already have the page open; this
- * reads it. Stash picks the scraper off the host, so there is nothing to
- * choose and nothing to configure.
+ * Read pages you already have open. Stash picks the scraper by host.
  */
 function urlPanel(arrived, sources) {
   const box = el('textarea', {
@@ -672,13 +547,7 @@ function urlPanel(arrived, sources) {
   });
 
   const read = el('button', { className: 'add', type: 'button' }, 'Read these pages');
-  /*
-   * Both counts, because they are different sets and the difference is the
-   * point. A film page on AdultEmpire or AdultFilmIndex is read by the second
-   * list and not the first — AdultFilmIndex cannot read a scene at all any
-   * more — and this is the only way to reach those sites, since not one of the
-   * 118 can be searched by name.
-   */
+  /* Scene and film scraper counts; some sites (AdultFilmIndex) only read as films. */
   const said = el('span', { className: 'muted small' },
     `${sources.urls.toLocaleString()} sites can be read as a scene, ${(sources.films || 0).toLocaleString()} as a film.`);
 
@@ -718,12 +587,10 @@ function urlPanel(arrived, sources) {
   );
 }
 
-/* -------------------------------------------------------- asking by keyword
+/*
+ * -------------------------------------------------------- asking by keyword
  *
- * The half that finds the page for you. These are sites that can search
- * themselves — a NAME scrape, which the match page has never used — and the
- * five favourites are there because they are the ones that know a film rather
- * than a scene.
+ * Sites that search themselves (NAME scrapes). The favourites know films.
  */
 function askPanel(arrived, sources, scene) {
   const picked = new Set();
@@ -826,11 +693,10 @@ function askPanel(arrived, sources, scene) {
   );
 }
 
-/* ------------------------------------------------------- what they all said
+/*
+ * ------------------------------------------------------- what they all said
  *
- * Every answer, the empty ones included. A source that failed stays on screen
- * saying why — "AdultEmpire had nothing" and "AdultEmpire returned a 403" are
- * different facts and only one of them means stop asking it.
+ * Every answer, failures included, with why.
  */
 function drawContributions(into, contributions, reread, sceneId) {
   if (!contributions.length) {
@@ -847,11 +713,7 @@ function drawContributions(into, contributions, reread, sceneId) {
 
     const f = c.fields;
     const bits = [
-      // Said first and said plainly. A film answer's title is the film's name,
-      // and taking it as the scene title gives you four scenes all called
-      // "Oil Overload #15" — everything else on it is exactly what you came
-      // for, which is what makes the distinction worth drawing rather than
-      // hiding the answer.
+      // A film answer's title is the film's name, not the scene's.
       c.kind === 'group' ? 'describes the film, not the scene' : null,
       f.date || null,
       f.studioName || null,
@@ -862,17 +724,8 @@ function drawContributions(into, contributions, reread, sceneId) {
     ].filter(Boolean);
 
     /*
-     * Reading the page a search hit points at.
-     *
-     * A search result is thin by nature — AdultEmpire's returns a title and a
-     * link and nothing else — while the page behind that link has the date,
-     * the cast and the cover on it. Measured on this library: the same
-     * HotMovies scene is a title from the keyword search and a title, a date,
-     * a studio, a cast and a cover from its own address.
-     *
-     * So the loop closes here: search to find the page, then read the page.
-     * It is a press rather than automatic because a keyword search that
-     * returned five hits would otherwise fetch five pages nobody asked for.
+     * Read the page a search hit points at: it has the date, cast and cover
+     * the result lacks. On a press, not automatically.
      */
     const read = c.url
       ? el('button', { className: 'chip', type: 'button' }, 'Read its page')
@@ -903,12 +756,7 @@ function drawContributions(into, contributions, reread, sceneId) {
     );
   });
 
-  /*
-   * The index sheet. Here the question is not "which of these is it" — you
-   * already decided that by pasting the address — it is "is this the same
-   * scene at all", and a film's box art against a frame from the middle of it
-   * is exactly the comparison that needs the size.
-   */
+  /* The compare sheet for contributions with art. */
   const withArt = contributions.filter((c) => c.ok && c.fields.image);
   const sheet = el('div', {});
   const look = el('button', { className: 'chip', type: 'button', hidden: !withArt.length }, 'Compare pictures');
@@ -940,27 +788,13 @@ function drawContributions(into, contributions, reread, sceneId) {
   );
 }
 
-/* -------------------------------------------------- filling one in yourself
- *
- * The page's oldest rule is that it will not invent a performer, a studio or a
- * tag: a scraped name Stash does not hold is reported and dropped, because
- * creating records off the back of a guess gives the guess a page of its own.
- *
- * The cost of that rule was a field nobody scraped being a field you could not
- * fill — you knew the studio, Stash was holding the studio, and the row said
- * "nobody offered one". So this is the other half of the rule rather than an
- * exception to it: you may add anything **Stash already has**, chosen from
- * Stash's own list. Still nothing new created, still nothing invented.
- *
- * A list rather than a text box for exactly that reason. A typed name that
- * Stash does not have is a field that silently stays empty at write time, and
- * the one thing worse than a row you cannot fill is a row you think you filled.
- */
 /*
- * Which roster a field is picked from, and nothing for the fields that are not
- * picked from one. Title and Description are prose and a list of them would be
- * meaningless; Date is a date; Cover is a picture and has the frames instead.
+ * -------------------------------------------------- filling one in yourself
+ *
+ * Pick a studio, performer or tag Stash already has, from Stash's list.
+ * A typed name Stash lacks would be silently dropped at write time.
  */
+/* Which roster each field picks from. Title, description, date and cover have none. */
 const ROSTER_OF = { studioName: 'studio', performers: 'performer', tags: 'tag' };
 
 let rosterSeq = 0;
@@ -970,16 +804,7 @@ const askNames = (kind, q) =>
     .then((r) => r.names || [])
     .catch(() => []);
 
-/*
- * What you are allowed to make one of, which is now all three.
- *
- * A studio nobody has imported before is not in Stash for the ordinary reason
- * that nothing has ever carried it, and a performer credited on one DVD is the
- * same. Tags were held back a version longer, on the grounds that a tag you
- * cannot find is usually one that exists under another spelling. True — and
- * already answered by the box: it searches the roster as you type, so by the
- * time the button appears you have looked and it is not there.
- */
+/* All three kinds can be created (on their own button). */
 const CAN_MAKE = new Set(['studio', 'performer', 'tag']);
 
 const makeName = (kind, name) =>
@@ -991,30 +816,9 @@ const makeName = (kind, name) =>
 /*
  * -> a control that adds to this row, or null.
  *
- * **A box that suggests, not a list that truncates.** The first cut of this was
- * a `<select>` of the roster, and it was wrong in the way that matters: the
- * server returns the forty most-used, so it quietly offered 40 of 1,537
- * performers and 40 of 1,174 tags. A list you cannot find your answer in is the
- * same failure as a box that accepts a wrong one, just further from where you
- * would notice it.
- *
- * So it asks the server as you type, and what comes back fills a datalist —
- * which the browser then offers as you keep typing. Empty, it shows the
- * most-used, which is the useful default on a library this size.
- *
- * **It still refuses a name Stash does not have** — silently, at least. The
- * write attaches these by name and only where Stash holds one, so a typed name
- * that does not exist would be a field you think you filled and did not. What
- * you type is checked against what came back, and anything else is said out
- * loud rather than swallowed.
- *
- * Said out loud *and offered*: the refusal comes with a button that creates the
- * record, because a name you typed while looking at the file is not the guess
- * the no-inventing rule was written against. Nothing is created by typing it
- * and nothing by the write — only by that press.
- *
- * `onAdd(name)` gets one name at a time, spelled the way Stash spells it —
- * never the way you typed it. Case and spacing come from the record.
+ * A type-ahead against the server (the roster is thousands long), shown in
+ * a datalist; empty shows the most used. A name Stash lacks is refused out
+ * loud, with a button to create it. `onAdd(name)` gets Stash's spelling.
  */
 function adder(kind, listy, onAdd) {
   const id = `wcnames-${kind}-${++rosterSeq}`;
@@ -1051,16 +855,8 @@ function adder(kind, listy, onAdd) {
   };
 
   /*
-   * The blank half of the box: a name Stash does not have yet.
-   *
-   * It appears only after the box has refused the name, it says the name it
-   * would create, and it takes a press of its own. Typing creates nothing and
-   * the write creates nothing — this button is the only thing on the page that
-   * makes a record, which is what keeps "it will not invent one" true while
-   * still letting you add the studio you are looking at.
-   *
-   * The server hands back the name as Stash spells it, and hands back the
-   * existing one rather than a second if somebody made it in between.
+   * Create the typed name. Only appears after a refusal; the only thing on
+   * the page that creates a record. Returns an existing one if made meanwhile.
    */
   const make = el('button', { className: 'chip wcmake', type: 'button' }, '');
   make.hidden = true;
@@ -1120,22 +916,11 @@ function adder(kind, listy, onAdd) {
   return el('span', { className: 'wcaddwrap' }, box, list, make, said);
 }
 
-/* ------------------------------------------------------- a cover of your own
+/*
+ * ------------------------------------------------------- a cover of your own
  *
- * The Cover row could offer Stash's, every scraper's, and any frame cut out of
- * the file — and not the one you actually have. A scanned DVD sleeve, or a
- * still on a page no scraper here reads, was the one answer on the page you
- * could see and not give.
- *
- * Two ways in and one outcome: the picture is held server-side under an
- * address of its own and becomes an option on the row like any other. Nothing
- * is written by choosing it. It reaches Stash when the row is the one ticked
- * and Write is pressed, and not before — so a picture you picked and thought
- * better of is undone by ticking something else, the same as everything here.
- *
- * The address is fetched by the server rather than handed to Stash as a link,
- * which is what makes a paste from a hotlink-protected site work: the bytes
- * are checked here and travel to Stash as bytes.
+ * A file or an address, held server-side as another option on the Cover
+ * row. Reaches Stash only if ticked when Write is pressed.
  */
 function artbox(onSet) {
   const said = el('span', { className: 'muted small' }, '');
@@ -1212,26 +997,8 @@ function artbox(onSet) {
 }
 
 /*
- * The two fields that are not picked from anything.
- *
- * Studio, performers and tags are attached by name and only where Stash holds
- * one, which is why they get a box that refuses what Stash does not have. A
- * title is prose and a date is a date: there is no roster to check them
- * against, nothing is created by writing one, and the rule that guards the
- * other three has nothing to say about these.
- *
- * Which left them as the one gap on the page. A scene whose sources all missed
- * it, or named it wrongly, could be read off the file name in front of you and
- * still not typed in — the row said "nobody offered one" and meant it.
- *
- * A date input rather than a text box for the date, because the write refuses
- * anything Stash cannot read as one and the browser already knows how to ask.
- * The server still checks it: this is the convenient shape, not the guard.
- *
- * Typing back exactly what Stash already holds clears the choice rather than
- * setting it. A field you have not changed is a field this page does not
- * write, and going the long way round to the value that was there is not a
- * change — it would otherwise show as one, and count in "fields changed".
+ * Title and date can be typed. Date uses a date input; the server still
+ * checks it. Typing back Stash's value clears the choice.
  */
 const TYPED_OF = { title: 'text', date: 'date' };
 
@@ -1248,20 +1015,9 @@ function typer(key, now, scene, onSet) {
   box.value = now ? String(now.value || '') : held;
 
   /*
-   * **A year is four keystrokes and the box only gets one.**
-   *
-   * A date input fires `change` the moment all three of its segments hold
-   * something, so typing 1 9 9 8 into the year fires it at "0001" — and this
-   * page redraws the whole table on a change, which threw the input away with
-   * the caret still in it. You got one digit of a year in before the field
-   * under your hands was replaced by a new one.
-   *
-   * So a year outside living memory is read as a year you are halfway through
-   * typing rather than as your answer. Nothing is set, nothing is redrawn, and
-   * the next keystroke lands in the same box it left.
-   *
-   * The cost is that a genuine 0999 cannot be typed here, which is a trade
-   * worth making for a library of video.
+   * A date input fires `change` once all segments are filled, so typing a year
+   * fires at "0001" and the redraw kills the box. Years outside living memory
+   * are treated as unfinished typing.
    */
   const ready = (typed) => {
     if (!dated || !typed) return true;
@@ -1279,11 +1035,7 @@ function typer(key, now, scene, onSet) {
   box.onchange = commit;
   box.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } };
 
-  /*
-   * Half a year left in the box would read as a date that is set and is not,
-   * which is the one failure this page is built to avoid. Leaving takes it
-   * back to whatever is actually chosen.
-   */
+  /* On leaving, drop a half-typed year back to the chosen value. */
   box.onblur = () => {
     if (ready(box.value.trim())) return;
     box.value = now ? String(now.value || '') : held;
@@ -1292,15 +1044,11 @@ function typer(key, now, scene, onSet) {
   return el('span', { className: 'wcaddwrap' }, box);
 }
 
-/* --------------------------------------------------------- the record
+/*
+ * --------------------------------------------------------- the record
  *
- * One row per field, and along each row every answer anybody gave for it.
- *
- * This is the whole page. Reading across a row is the comparison you were
- * doing between browser tabs, and pressing one of the options is the copy you
- * were doing by hand. What Stash already holds is the first option on every
- * row and it is the one selected until you say otherwise — so a field you do
- * not touch is a field this page will not write.
+ * One row per field with every answer along it. Stash's value is first and
+ * selected; untouched fields aren't written.
  */
 function drawFields(into, scene, contributions, chosen, redraw, frames = []) {
   const answered = contributions.filter((c) => c.ok);
@@ -1308,15 +1056,7 @@ function drawFields(into, scene, contributions, chosen, redraw, frames = []) {
   const value = (v) => (Array.isArray(v) ? v : v == null ? '' : String(v));
   const isEmpty = (v) => (Array.isArray(v) ? !v.length : !String(v || '').trim());
 
-  /*
-   * Take every field Stash has nothing in from the first answer that has one.
-   *
-   * The one automatic thing on the page, and it is safe by construction: it
-   * cannot overrule a value, only fill an absence, so the worst it can do is
-   * offer you something you then change. Anything cleverer — preferring a
-   * source, scoring the answers — would be the page making the judgement you
-   * came here to make.
-   */
+  /* Fill empty fields from the first answer that has one. Never overrules. */
   const fillBlanks = () => {
     let filled = 0;
     for (const [key] of FIELDS) {
@@ -1345,12 +1085,7 @@ function drawFields(into, scene, contributions, chosen, redraw, frames = []) {
         .filter((o) => !isEmpty(o.value)),
     ];
 
-    /*
-     * A set built out of every answer at once. Only where it says something
-     * the individual options do not — two sources naming four performers
-     * between them is the case this exists for, and two sources naming the
-     * same one is not.
-     */
+    /* A union of every answer, only when it differs from each single option. */
     if (kind === 'list') {
       const all = [...new Set(answered.flatMap((c) => c.fields[key] || []))];
       if (all.length && !options.some((o) => Array.isArray(o.value) && o.value.length === all.length)) {
@@ -1358,30 +1093,14 @@ function drawFields(into, scene, contributions, chosen, redraw, frames = []) {
       }
     }
 
-    /*
-     * The frames this scene has already had cut, as covers.
-     *
-     * They are on the page anyway — the panel above cuts them so you can search
-     * by the picture — and a frame from the middle of the file is a better
-     * cover than no cover at all, which is what these scenes otherwise have.
-     * Offered rather than cut: this adds whatever exists and never starts
-     * ffmpeg, because that panel is where cutting is asked for.
-     */
+    /* Frames already cut, offered as covers. Never starts ffmpeg. */
     if (key === 'image') {
       for (const frame of frames) {
         options.push({ label: `Frame at ${frame.pct}%`, value: frame.url, frame: true });
       }
     }
 
-    /*
-     * What you chose yourself, as an option like any other.
-     *
-     * Without this the pick is invisible: the chips are built out of the
-     * answers that arrived, a name you picked from Stash is in none of them,
-     * and the row would show "Stash has" unticked with nothing ticked instead —
-     * a field that is set and looks unset. Pressing it again clears it, which
-     * is what every other chip on the row does.
-     */
+    /* Your own pick as an option on the row, so it shows as selected. */
     if (now && !options.some((o) => !o.mine && sameValue(o.value, now.value))) {
       options.push({ label: now.label || 'Yours', value: now.value, own: true });
     }
@@ -1400,12 +1119,7 @@ function drawFields(into, scene, contributions, chosen, redraw, frames = []) {
       return chip;
     });
 
-    /*
-     * The pick-your-own control, for the three fields that are attached by name
-     * and only where Stash has one. `now` is read here rather than from the
-     * roster: adding to a list means adding to whatever is currently chosen,
-     * not starting again from what Stash holds.
-     */
+    /* The picker for fields attached by name. Adds to what's currently chosen. */
     const from = ROSTER_OF[key];
     const typed = !from && TYPED_OF[key]
       ? typer(key, now, scene, (value) => {
@@ -1415,11 +1129,7 @@ function drawFields(into, scene, contributions, chosen, redraw, frames = []) {
       })
       : null;
 
-    /*
-     * The Cover row's own control: a file off your machine, or an address to
-     * go and get. Set rather than added — a cover is one picture, so this
-     * replaces whatever was ticked, the same as pressing another chip does.
-     */
+    /* The Cover row's upload/URL control. Replaces the choice. */
     const arty = key === 'image'
       ? artbox((url) => { chosen.set(key, { label: 'Yours', value: url }); redraw(); })
       : null;
@@ -1437,11 +1147,7 @@ function drawFields(into, scene, contributions, chosen, redraw, frames = []) {
       })
       : null;
 
-    /*
-     * Taking one back off a list you built. Only offered on a list you have
-     * actually changed — the row's other options are whole answers and are
-     * swapped rather than edited, so there is nothing to remove from them.
-     */
+    /* Remove one entry from a list you changed. */
     const drop = kind === 'list' && Array.isArray(now?.value) && now.value.length
       ? now.value.map((name) => {
         const chip = el('button', { type: 'button', className: 'chip wcdrop' }, `${name} ✕`);
@@ -1485,11 +1191,7 @@ const sameValue = (a, b) => (Array.isArray(a) && Array.isArray(b)
   ? a.length === b.length && a.every((x, i) => x === b[i])
   : a === b);
 
-/*
- * Enough of a value to choose by, and no more. A description runs to a
- * paragraph and a cover is a URL nobody can read — both are shown as what they
- * are rather than as their text.
- */
+/* A short preview of a value to choose by. */
 function preview(value, kind) {
   if (kind === 'image') {
     return value
@@ -1508,23 +1210,8 @@ function preview(value, kind) {
 /* ------------------------------------------------------------- the writing */
 
 /*
- * The write, and the rename that finishes it.
- *
- * **The file is renamed after the record is written, never before.** The name
- * is made of the title and studio and date you just chose, so asking for it
- * ahead of the write would name the file after the guess you arrived with. The
- * preview line is the exception — that one is planned against your unsaved
- * choices on purpose, so the name is in front of you before you tick anything.
- *
- * It is ticked by default, and that is a smaller thing than it sounds: the
- * name is on screen next to the tick, it is one file, and you are pressing a
- * button you came to this page to press. The rule the 2026-09-12 plugin broke
- * was renaming files nobody was looking at — 456 of them, unattended. This is
- * one file with its new name written above the button.
- *
- * Only offered on /pc-import, which is the only mount the server will rename
- * inside anyway. The check here just keeps the tick off a row that would be
- * refused.
+ * Write, then rename (after, so the name uses what you chose). The preview
+ * plans against unsaved choices. Ticked by default; only on /pc-import.
  */
 function savePanel(scene, chosen, params) {
   const done = el('input', { type: 'checkbox' });
@@ -1540,16 +1227,11 @@ function savePanel(scene, chosen, params) {
         willBe)
     : null;
 
-  /*
-   * Re-planned as the choices change, and late rather than often: every chip
-   * press redraws the table, and a request per press would be a request per
-   * press. The name only matters at the moment you read it.
-   */
+  /* Re-planned on a delay as choices change. */
   let timer = null;
   let asked = 0;
-  // Ticked for you until you say otherwise. A refusal forces it off — there is
-  // nothing to rename to yet — and picking a title turns it back on, which it
-  // must not do if turning it off was your decision rather than the plan's.
+  // Ticked until you untick it. A refusal turns it off; a title turns it back
+  // on unless you turned it off.
   let touched = false;
   also.onchange = () => { touched = true; };
   const refresh = () => {
@@ -1623,10 +1305,7 @@ function savePanel(scene, chosen, params) {
   return { node, refresh };
 }
 
-/*
- * A refused rename is a sentence, not a failure. The record was written either
- * way, and the write is the thing that was worth the trip.
- */
+/* A refused rename is a note, not a failure: the record was written. */
 function renameSaid(out) {
   if (!out) return '';
   if (!out.ok) return ` The file was left alone: ${out.why}`;

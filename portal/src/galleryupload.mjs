@@ -1,16 +1,7 @@
 /*
- * Pictures you already have.
- *
- * The third way into a gallery, alongside a web page and ThePornDB: hand it
- * the files. Either one at a time or as a zip, which is how a photo set
- * usually arrives.
- *
- * The zip is read here rather than by a library, because this app has no
- * dependencies and is not about to grow one for something `zlib` already does.
- * Only the two compression methods that exist in practice are handled —
- * stored and deflate — and anything else in the archive is reported rather
- * than silently skipped, since a set that quietly loses four pictures is worse
- * than one that refuses.
+ * Uploading your own pictures, singly or as a zip. The zip is read with
+ * zlib (no dependencies): stored and deflate only; anything else is
+ * reported, not skipped.
  */
 
 import { inflateRawSync } from 'node:zlib';
@@ -44,11 +35,7 @@ const EOCD = 0x06054b50;
 const CENTRAL = 0x02014b50;
 const LOCAL = 0x04034b50;
 
-/*
- * The end-of-central-directory record is the only thing in a zip you can find
- * without reading it forwards, and it lives in the last 64KB — after a comment
- * of unknown length, which is why this scans backwards for the signature.
- */
+/* Find the end-of-central-directory record by scanning back from the end. */
 function endRecord(buffer) {
   const from = Math.max(0, buffer.length - 66_000);
   for (let at = buffer.length - 22; at >= from; at--) {
@@ -97,9 +84,7 @@ export function readZip(buffer) {
       continue;
     }
 
-    // The local header repeats the name and extra lengths, and its extra field
-    // is often a different length from the central one — so the data offset has
-    // to come from here rather than from what we just read.
+    // Take the data offset from the local header; its extra field length can differ.
     const localNameLength = buffer.readUInt16LE(localAt + 26);
     const localExtraLength = buffer.readUInt16LE(localAt + 28);
     const from = localAt + 30 + localNameLength + localExtraLength;
@@ -130,9 +115,8 @@ export function readZip(buffer) {
 /* ---------------------------------------------------------------- writing */
 
 /*
- * Into the folder, numbered from wherever the folder already got to. Same
- * contract as a download: too small is not a picture, and an existing file is
- * never written over.
+ * Write into the folder, numbering on from what's there. Tiny files
+ * skipped; nothing overwritten.
  */
 export async function writeInto(folder, files) {
   await mkdir(folder, { recursive: true });
@@ -162,10 +146,7 @@ export async function writeInto(folder, files) {
   return { written, skipped };
 }
 
-/*
- * One upload, whatever it was. A zip becomes its pictures; anything else is
- * one picture, named by what the browser called it.
- */
+/* One upload: a zip becomes its pictures; anything else is one picture. */
 export function unpack(filename, body) {
   if (isZip(filename)) return readZip(body);
 

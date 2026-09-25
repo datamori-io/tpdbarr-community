@@ -1,17 +1,13 @@
-/* ------------------------------------------------------------- categories
+/*
+ * ------------------------------------------------------------- categories
  *
- * Two pages and an editor. The index reuses .facets and .facet wholesale — a
- * category is a picture with a name under it, which is the same object the
- * studios and performers shelves already draw — so everything here is either
- * the banner at the top of one category, or the editor behind it.
+ * The index reuses .facets; this is the banner and the editor.
  */
 
-/* ------------------------------------------------------------- the banner
+/*
+ * ------------------------------------------------------------- the banner
  *
- * A wide still with the name over it. The picture is one of the category's own
- * scenes, so it is a frame from something in there rather than a decoration:
- * the gradient exists to keep the name readable over whatever that frame turns
- * out to be, and nothing is layered over the middle of it.
+ * A wide still with the name over it; the gradient keeps the name readable.
  */
 
 .catbanner {
@@ -64,11 +60,10 @@
   z-index: 1;
 }
 
-/* --------------------------------------------------------------- the editor
+/*
+ * --------------------------------------------------------------- the editor
  *
- * Four boxes in a column, each one whole question. Not tabs: the answers argue
- * with each other — a rule that catches two hundred scenes changes what the
- * hand-picked list is for — and you should be able to see both at once.
+ * Four boxes in a column, all visible at once.
  */
 
 .catedit {
@@ -94,13 +89,8 @@
 .catbox textarea.filter { resize: vertical; min-height: 64px; font: inherit; }
 
 /*
- * The rule, which is a stack of lines rather than one row of boxes.
- *
- * Every line is the same five slots wide, so the joining word, the field and
- * the operator all line up down the page and the shape of the rule can be read
- * without reading the words. The first line shows "Where" in the slot the
- * others put "and" or "or" in — same width, so nothing shifts when a line is
- * deleted and the second becomes the first.
+ * The rule: every line the same five slots, so columns align. The first
+ * line's "Where" takes the joining word's slot.
  */
 .catrules {
   display: grid;
@@ -114,15 +104,11 @@
   align-items: center;
 }
 
-/* The word in front of a line, and the label standing in for it on the first
- * one. One slot holding both, so hiding either keeps the columns where they
- * are. Right-aligned, so both sit against the field they belong to. */
+/* Join word and "Where" share one right-aligned slot. */
 .catjoin { min-width: 0; }
 .catjoin .shelfpick { width: 100%; }
 
-/* `:not([hidden])` because a bare `display: block` beats the browser's own
- * rule for the attribute, and the label would then sit under the word it is
- * standing in for. */
+/* `:not([hidden])`: a bare display rule beats the hidden attribute. */
 .catlead:not([hidden]) {
   display: block;
 }
@@ -137,11 +123,7 @@
 /* One character wide, and it should stay square. */
 .catruleline > .act:last-child { padding: 6px 10px; }
 
-/*
- * Narrow: the line becomes three short rows — the joining word, then what it
- * looks at and how, then the words themselves with the × beside them. Same
- * reading order as the wide version, just folded.
- */
+/* Narrow: each line folds into three rows. */
 @media (max-width: 760px) {
   .catruleline { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
   .catjoin { grid-column: 1 / -1; }
@@ -151,17 +133,8 @@
   .catruleline > .filter { grid-column: 1 / 3; }
 }
 
-/*
- * The cover picker: the category's own scenes, small, in a strip you scroll.
- *
- * Small on purpose. This is "which of these", not "look at these" — the wall
- * below the editor is where the scenes are actually looked at, and a picker
- * built at tile size would push everything else off the screen.
- */
-/*
- * Uploaded artwork, shown at the size it will actually be seen at. A cover you
- * cannot see is a cover you will upload twice.
- */
+/* Cover picker: small scene stills in a scrolling strip. */
+/* Uploaded artwork, at its real display size. */
 .catart {
   display: flex;
   gap: 12px;
@@ -240,11 +213,10 @@
 .catshot:disabled { opacity: 0.45; cursor: default; }
 .catshot:disabled:hover { border-color: transparent; color: var(--text-2); }
 
-/* ------------------------------------------------------- the two scene lists
+/*
+ * ------------------------------------------------------- the two scene lists
  *
- * Search results and the hand-picked order are the same row: a small still,
- * what it is, and the buttons for it. One shape, because they are the same
- * decision seen from either side.
+ * Search results and the hand order share one row style.
  */
 
 .catfinds,
@@ -297,11 +269,10 @@
   .catacts { width: 100%; justify-content: flex-end; }
 }
 
-/* ------------------------------------------ send a missing one to v3
+/*
+ * ------------------------------------------ send a missing one to v3
  *
- * The same button as a StashDB card's Add, under the words of a faded tile.
- * Disabled once v3 has it rather than hidden, so "already sent" reads as an
- * answer and not as a button that went missing.
+ * Add, under a faded tile. Disabled once sent.
  */
 .facetbody button.filmsend {
   margin-top: 8px;
@@ -321,11 +292,10 @@
   .facetbody button.filmsend { min-height: 40px; padding: 8px 14px; }
 }
 
-/* ------------------------------------------------- the picker on a scene
+/*
+ * ------------------------------------------------- the picker on a scene
  *
- * Every category as a chip, on if the scene is in it. A list rather than a
- * dropdown because there will never be many, and the whole point is to see
- * where this one already sits without opening anything.
+ * Every category as a chip, on if the scene is in it.
  */
 
 .catpicker {
@@ -339,8 +309,6 @@
 .catpicker .chip.on { border-color: var(--accent-hi); color: var(--accent-hi); }
 .catpicker .chip:disabled { opacity: 0.5; cursor: default; }
 
-/* A category's films fade further than the shared 0.55: on a wall of wide
-   stills the owned and unowned ones were too close to tell apart at a glance.
-   Hover still brings the artwork back to full. */
+/* Filmography tiles fade to 0.25 (more than the shared 0.55). Hover restores. */
 .facet.faded.filmtile .facetart { opacity: 0.25; }
 .facet.faded.filmtile:hover .facetart { opacity: 1; }

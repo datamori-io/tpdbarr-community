@@ -1,11 +1,4 @@
-/*
- * Catalog — making a category.
- *
- * A name is all it takes. The rule, the cover and the scenes are all things you
- * decide once you are looking at the page, which is why creating one sends you
- * straight to it — and why the empty form belonged in Settings rather than at
- * the top of the shelf it fills.
- */
+/* Catalog: make a category. A name is enough; the rest is set on its page. */
 
 import { api, el } from '../util.js';
 import { shell } from './core.js';

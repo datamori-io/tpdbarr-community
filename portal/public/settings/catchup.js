@@ -1,12 +1,6 @@
 /*
- * Catch up — filling in what is already answerable.
- *
- * Here rather than on the Match page because it is not matching: nothing is
- * searched for and nothing is guessed. Every scene it touches already carries
- * a stash id, which means somebody or something has already said which scene
- * it is — asking that box for that id is reading, not identifying, and that is
- * what makes it safe to do to two thousand scenes with nobody watching. See
- * catchup.mjs.
+ * Catch up: fill blanks on scenes with a stash id, by reading that id. No
+ * searching or guessing. See catchup.mjs.
  */
 
 import { api, el } from '../util.js';
@@ -27,12 +21,8 @@ function catchUpBox() {
   let timer = null;
 
   /*
-   * Asking again while a run is in flight. The check that the page is still
-   * on screen belongs here rather than in look(), because the first read
-   * happens before this fieldset has been put in the document — guarding the
-   * read itself meant that one was skipped and the page sat on "Reading the
-   * library…" for ever. The run carries on in the portal either way; this is
-   * only about whether there is anything left to tell about it.
+   * The on-screen check lives here, not in look(): the first read runs before
+   * the fieldset is in the document.
    */
   const poll = () => {
     clearTimeout(timer);
@@ -66,11 +56,7 @@ function catchUpBox() {
 
     bar.replaceChildren();
 
-    /*
-     * What it did, or what it would do. Both in the same line, because the
-     * question after a run is the same as the question before one — how much
-     * is left that this can help with.
-     */
+    /* What it did, or would do. */
     const did = state.step === 'done' || state.step === 'stopped'
       ? `Last run filled ${state.fields.toLocaleString()} field${state.fields === 1 ? '' : 's'} on ${state.facts.toLocaleString()} scene${state.facts === 1 ? '' : 's'} and added ${state.markers.toLocaleString()} marker${state.markers === 1 ? '' : 's'} to ${state.scenes.toLocaleString()}. `
       : state.step === 'failed'

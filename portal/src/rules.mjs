@@ -1,37 +1,15 @@
 /*
- * Standing answers, for the scenes you would have said no to anyway.
+ * Standing noes for the decide queue: a no you give once (too short, a
+ * compilation, too old). The queue and the tracked counts both apply them.
  *
- * The decide queue is one card at a time, which is the right shape for a
- * decision and the wrong one for a foregone conclusion. Fourteen studios and
- * thirty-two performers came to 9,381 scenes still to answer for, and most of
- * them were a no on sight — under twenty minutes, a compilation, or older than
- * anything this library is interested in. Answering those one at a time is not
- * deciding, it is typing.
- *
- * So a rule is a no you only have to give once. The queue applies them as it
- * fills and says how many it took, and the tracked counts apply them too — a
- * heading that says 9,381 over a queue holding 1,500 would be the page lying
- * about the size of the job.
- *
- * **Nothing is written.** A rule hides; it does not skip. Skipping is a
- * decision recorded against a scene and undone one at a time; a rule is a view
- * of the pile and undone by deleting the rule, at which point everything it
- * was holding back comes straight back. That difference is the whole reason
- * this is not just the sweep with a filter on it.
- *
- * **What cannot be measured is never hidden.** A scene StashDB has no duration
- * for does not match "shorter than 20 minutes" — it matches nothing, and it
- * reaches you. A rule that hid the unknown would quietly eat the records that
- * are thin for some other reason, which is the opposite of what it is for.
+ * A rule hides, it doesn't skip: nothing is written, and deleting the rule
+ * brings everything back. A scene missing the field a rule reads (e.g. no
+ * duration) is never hidden.
  */
 
 /*
- * The five, and what each reads off a scene.
- *
- * `rich` marks the two that need more than StashDB's brief record — duration
- * and tags are not in the id/title/date shape the coverage pass reads, so a
- * rule using them asks for a bigger record. Kept here rather than in the
- * caller so that adding a sixth kind cannot forget to say what it costs.
+ * The five kinds. `rich` marks those that need duration or tags, which
+ * cost a bigger record.
  */
 export const KINDS = {
   shorter: { label: 'Shorter than', unit: 'minutes', rich: true },
@@ -42,19 +20,11 @@ export const KINDS = {
   studio: { label: 'From studio', unit: 'name', rich: false },
 };
 
-/* ------------------------------------------------------------- where it bites
+/*
+ * ------------------------------------------------------------- where it bites
  *
- * A rule with no `on` is the blanket one: VR is VR wherever it turns up, and
- * that is most of what anybody wants.
- *
- * The other kind is the one a blanket cannot say. "Nothing before 2015" is
- * wrong as a standing answer and right about one performer whose early work
- * you have already been through; "not this studio" is wrong everywhere and
- * right for one person who guested there twice. So a rule can name a
- * catalogue, and then it only looks at scenes inside it.
- *
- * Stored with the name beside the id, the same as a tracked entry, so a rule
- * still reads as a sentence when StashDB is not there to be asked.
+ * No `on`: applies everywhere. With `on`: only inside that catalogue.
+ * Stored with the name, so it reads as a sentence offline.
  */
 export const SCOPES = { performer: 'performer', studio: 'studio', tag: 'tag' };
 
@@ -67,11 +37,7 @@ const cleanScope = (raw) => {
 
 const text = (value) => String(value ?? '').trim().toLowerCase();
 
-/*
- * One rule, cleaned up. Anything that would match nothing — a blank phrase, a
- * length of zero — comes back null rather than being stored as a rule that
- * does not do anything.
- */
+/* One rule, cleaned. A rule that would match nothing returns null. */
 export function clean(raw) {
   const kind = String(raw?.kind || '');
   if (!KINDS[kind]) return null;
@@ -94,23 +60,10 @@ export const cleanAll = (list) => (Array.isArray(list) ? list.map(clean).filter(
 export const needsRich = (rules) =>
   cleanAll(rules).some((rule) => KINDS[rule.kind].rich || rule.on?.kind === 'tag');
 
-/*
- * Whether anything here has to know who is in a scene.
- *
- * Asked separately from `needsRich` because it costs more: the coverage pass
- * reads a stripped record of every scene of every catalogue you follow, and
- * the cast is the one field that is a list of its own. A rule about a
- * performer is worth it; the other four should not pay for it.
- */
+/* Whether any rule needs the cast (a list per scene, so it costs more). */
 export const needsCast = (rules) => cleanAll(rules).some((rule) => rule.on?.kind === 'performer');
 
-/*
- * -> the rule that catches this scene, or null.
- *
- * The first match rather than all of them: the queue only has to say why a
- * scene is not in front of you, and "the first reason" is a shorter sentence
- * than "the reasons".
- */
+/* -> the first rule that catches this scene, or null. */
 export function caughtBy(scene, rules) {
   for (const rule of rules) {
     if (!inScope(scene, rule.on)) continue;
@@ -120,13 +73,8 @@ export function caughtBy(scene, rules) {
 }
 
 /*
- * Is this scene inside the catalogue the rule was written about?
- *
- * By id where the record has one and by name where it does not, the same two
- * passes everything else here uses. A scope that cannot be checked — a rule
- * about a performer, on a record with no cast — is not a match, so the scene
- * reaches you. Silently applying a rule you cannot verify is how a queue
- * starts hiding things for reasons it cannot explain.
+ * Is this scene inside the rule's catalogue? By id, else by name. If it
+ * can't be checked, it isn't a match.
  */
 function inScope(scene, on) {
   if (!on) return true;
@@ -159,19 +107,8 @@ function matches(scene, rule) {
       return Number.isFinite(year) && year > 0 && year > rule.value;
     }
     /*
-     * Tag, title and studio are all keyword, not equality.
-     *
-     * A standing answer is written in the words you would have said out loud,
-     * and out loud "no VR" is a thing about a name, not a studio you could
-     * pick off a list. Exact matching meant a rule of "VR" let CockVR and
-     * VRBangers straight through, and the only way to get them was to write a
-     * rule per studio and keep writing them as new ones appeared. The same
-     * goes for tags: "BDSM" should catch "BDSM Hardcore".
-     *
-     * It over-reaches in the other direction — a two-letter rule will hit
-     * names nobody meant — but a rule hides rather than skips, so an
-     * over-reaching one is visible in the held-back count and undone by
-     * deleting it. Nothing is written against a scene either way.
+     * Tag, title and studio match as keywords ("VR" catches CockVR). An
+     * over-reaching rule shows in the held-back count and is easy to delete.
      */
     case 'tag': {
       const wanted = text(rule.value);
@@ -190,11 +127,7 @@ function matches(scene, rule) {
   }
 }
 
-/*
- * How a rule reads on screen and in a tooltip. One sentence, the same words
- * the editor uses, so a count that says "held back by your rules" can name the
- * one that did it.
- */
+/* A rule as one sentence, for screen and tooltip. */
 export function say(rule) {
   const what = (() => {
     switch (rule.kind) {

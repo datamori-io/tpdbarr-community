@@ -1,7 +1,4 @@
-/*
- * The video page. The player, what you do to a scene while watching it, and the
- * rail of what you read about it.
- */
+/* The video page: player, controls, and the reading rail. */
 
 import { api, clock, el, gigabytes } from '../util.js';
 import { thumbnailCues, withControls } from '../player.js';
@@ -11,11 +8,10 @@ import { scenePicker } from './categories.js';
 import { buildPanel, sideGalleries } from './galleries.js';
 import { rail } from './tiles.js';
 
-/* ---------------------------------------------------------------- the scene
+/*
+ * ---------------------------------------------------------------- the scene
  *
- * The landing page and the player, one view. Playback position goes back to
- * Stash so "continue watching" is the same list whether you last watched here
- * or in Stash itself.
+ * Playback position is written back to Stash, so Continue watching matches Stash.
  */
 
 const REPORT_EVERY = 15000;
@@ -87,51 +83,26 @@ function playerFor(scene, onWide = null) {
     video.removeAttribute('src');
   });
 
-  /*
-   * The scene page still wants the video itself — the marker list under the
-   * player seeks it — so both halves come back rather than only the node that
-   * goes on the page.
-   */
+  /* Return the video too; the marker list seeks it. */
   return {
     video,
     node: withControls(video, {
-      // Stash names the sprite pair after the file hash, so the portal proxies
-      // them; the vtt it serves has already had its sheet url pointed back at
-      // the portal rather than at Stash.
+      // The portal proxies the sprite pair (named by file hash) and rewrites the vtt.
       thumbnails: scene.vtt ? `/media/scene/${scene.id}/vtt` : null,
       markers: scene.markers || [],
       duration: scene.duration || 0,
       onWide,
       /*
-       * A marker without leaving the scene.
-       *
-       * The bench is where marking is *done* — the strip, the ladder, the
-       * arrow keys, the in and out points. This is the other case, which is
-       * the commoner one: you are watching something and a moment goes past
-       * that is worth keeping. Going and finding the same scene on another
-       * page to write down a second you have already watched past is how that
-       * moment gets lost.
-       *
-       * It is the same prompt and the same write as `t` on the bench, so a
-       * tag made here is on the bench's palette and a marker made here is one
-       * the bench can retime. Nothing about it is a lesser kind of marker.
-       *
-       * The list under the player is not redrawn: the player puts the new one
-       * on its own track, and the page's own list is built once from what
-       * Stash said on the way in. It appears there on the next visit, which is
-       * the honest reading of a list of what this scene has.
+       * Add a marker while watching: the same prompt and write as `t` on the
+       * bench. The player adds it to its own track; the page list updates on the
+       * next visit.
        */
       onMark: async (seconds) => {
         try {
           const made = await markHere(scene.id, seconds);
           if (!made) return null;
 
-          /*
-           * Into the shape this page's markers already have. Stash keeps a
-           * hand-cut marker's title empty and lets its tag do the naming, and
-           * stashlib resolves that on the way in — so it is resolved here too
-           * rather than leaving one marker on the track with no label.
-           */
+          /* A hand-cut marker's title is empty; label it with its tag, as stashlib does. */
           const shown = {
             id: made.id,
             title: made.tag?.name || made.title || 'Marker',
@@ -164,11 +135,7 @@ function actions(scene, redraw) {
   return row;
 }
 
-/*
- * What "more of this" means depends on who identified the scene: a TPDB id
- * lands on the acquisition page already in this portal, a StashDB id belongs to
- * Whisparr v3, and neither means Stash never worked out what this is.
- */
+/* "Find more": TPDB id -> this portal's acquisition page, StashDB id -> v3. */
 function findMore(scene) {
   if (scene.identity.tpdb) {
     return el('a', { className: 'act', href: `#/scene/${scene.identity.tpdb}` }, 'Find more on ThePornDB');
@@ -184,14 +151,10 @@ function findMore(scene) {
   return el('span', { className: 'act muted', title: 'Stash has not identified this scene' }, 'Unidentified');
 }
 
-/* ------------------------------------------------------------- whisparr v3
+/*
+ * ------------------------------------------------------------- whisparr v3
  *
- * A StashDB-identified scene has a second life in Whisparr v3. This asks after
- * the page has drawn rather than as part of it: v3 is optional, and a v3 that
- * is down should cost a badge, not the scene.
- *
- * Nothing is claimed until v3 answers — a button that says "Add" before we know
- * whether it is already there is a button that lies half the time.
+ * Asked after the page draws; a down v3 costs a badge. No button until v3 answers.
  */
 const V3_LABEL = {
   downloaded: 'In Whisparr v3',
@@ -209,11 +172,7 @@ function whisparr3Slot(scene) {
   const stashId = scene.identity.stashdb;
   const slot = el('span', { className: 'act muted' }, 'Checking Whisparr v3…');
 
-  /*
-   * One button, one request, and the button says what happened afterwards.
-   * `done` reads the answer because "monitored" and "monitored, searching" are
-   * different outcomes and the difference is the whole point of searchOnAdd.
-   */
+  /* One button, one request; `done` reads the answer to report what happened. */
   const asks = (path, label, working, done, className = 'act primary') => {
     const button = el('button', { className, type: 'button' }, label);
     button.onclick = async () => {
@@ -236,11 +195,7 @@ function whisparr3Slot(scene) {
     return button;
   };
 
-  /*
-   * "Get me another one." Offered on a scene v3 is already holding, because
-   * that is exactly when the copy you have is the one you want replaced — and
-   * left in place afterwards, since asking twice is a fair thing to want.
-   */
+  /* "Get me another" on a scene v3 already holds. Stays after use. */
   const again = () => {
     const button = asks(
       '/again',
@@ -275,11 +230,7 @@ function whisparr3Slot(scene) {
   return slot;
 }
 
-/*
- * The cast as faces rather than names. Stash serves a silhouette for a
- * performer it has no photograph of, which reads as a missing picture rather
- * than a person, so those get the same initial the tiles use.
- */
+/* Cast as faces; Stash's silhouette is replaced with an initial. */
 function castFace(p) {
   return el('a', { className: 'castling', href: `#/library/performer/${p.id}` },
     el('div', { className: 'castart' },
@@ -292,23 +243,14 @@ function castFace(p) {
   );
 }
 
-/*
- * Who is in it belongs beside the title rather than in the rail: it is the
- * first thing anyone looks for under a video, and the rail is what you read
- * afterwards. Right-justified against the block to its left and no taller than
- * it — a twelve-hander scrolls sideways instead of pushing the page down.
- */
+/* The cast beside the title, right-aligned, scrolling sideways if long. */
 export function castStrip(performers) {
   if (!performers.length) return null;
   return el('div', { className: 'headcast' },
     el('div', { className: 'castfaces' }, performers.map(castFace)));
 }
 
-/*
- * The file, as a spec list rather than as more facts in the line under the
- * title. A codec and a bitrate are things you look up when you want them, not
- * things you read every time you open a scene.
- */
+/* The file as a spec list. */
 function fileCard(scene) {
   const f = scene.file;
   const rows = [
@@ -336,24 +278,11 @@ function fileCard(scene) {
 }
 
 /*
- * Making the file smaller, from the card that says how big it is.
- *
- * Here rather than in the row of actions under the player, because this is the
- * one thing on the page that is about the file rather than about the scene —
- * it belongs beside the resolution and the size it is going to change, and not
- * beside Filed and the star rating.
- *
- * It is the only control in the library that destroys anything. So: it says
- * what it will do before it does it, it asks, and while it runs it is the
- * progress rather than a second button. See downscale.mjs for what happens on
- * the other end and what it refuses.
+ * Downscale, on the file card. The only control here that destroys
+ * anything: it says what it will do, asks, and shows progress while
+ * running. See downscale.mjs.
  */
-/*
- * Sizes for this row specifically. `gigabytes()` is right everywhere else in
- * the library, where a file is a gigabyte or several — here it is reporting
- * the result of making something small, and "0.1 GB down to 0.0 GB" is a
- * sentence that says nothing about a 98% saving.
- */
+/* Sizes in MB where GB would round to nothing. */
 const sized = (bytes) => {
   if (!bytes) return '0 MB';
   return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${Math.round(bytes / 1e6)} MB`;
@@ -369,11 +298,7 @@ function shrinkRow(scene) {
   const said = (text, bad = false) =>
     el('div', { className: 'muted small' + (bad ? ' bad' : '') }, text);
 
-  /*
-   * While a job is running the row is that job, whichever scene it belongs to.
-   * One encode at a time is the server's rule, and a page offering a button
-   * that is going to be refused is a page that made you press it to find out.
-   */
+  /* While any encode runs, this row shows it (one at a time, server-side). */
   const watch = (found) => {
     if (found.running || found.step === 'done' || found.step === 'failed') {
       const mine = String(found.sceneId) === String(scene.id);
@@ -409,9 +334,8 @@ function shrinkRow(scene) {
   };
 
   /*
-   * The choices, from resolution.mjs. On a scene not filed yet they are a note
-   * for filing to act on; on a filed one they act now. 720p is the default
-   * either way, because it is what FileFlows does to everything filed.
+   * Choices from resolution.mjs: unfiled scenes remember them; filed scenes
+   * act now. 720p is the default.
    */
   const label = (value) => (value === 'keep' ? 'Keep as is' : `${value}p`);
 
@@ -468,9 +392,8 @@ function shrinkRow(scene) {
   }
 
   /*
-   * Filed: acts now. Keep only writes the flag, so it is one press. An encode
-   * replaces the original, so it is two — the app's own browser answers
-   * confirm() with no, which is why this is not a dialog.
+   * Filed: Keep is one press (writes the flag); an encode is two. Not a
+   * dialog: the app's browser answers confirm() with no.
    */
   function filedChoices(found) {
     const out = [el('span', { className: 'muted small' }, found.flagged ? 'Kept from FileFlows' : 'Now')];
@@ -536,11 +459,7 @@ function shrinkRow(scene) {
 }
 
 
-/*
- * Tags, but not all of them at once. An identified scene carries forty or
- * fifty, which is a column of chips longer than the film it describes; the
- * first handful is what anyone reads, and the rest is one click away.
- */
+/* Show 16 tags, the rest behind a click. */
 const TAGS_SHOWN = 16;
 
 function tagCard(tags) {
@@ -560,16 +479,11 @@ function tagCard(tags) {
 
   return sidecard('Tags', row);
 }
-/* --------------------------------------------------------- deleting a scene
+/*
+ * --------------------------------------------------------- deleting a scene
  *
- * The one thing on this page that cannot be undone, so it is the one that says
- * what it is about to take before it offers to take it: the server is asked
- * what is actually there — the file and its size, the galleries filed against
- * the scene, the reel clips cut from its markers — and that answer is what the
- * dialog reads out. Nothing is guessed in the browser.
- *
- * Then it asks twice. The first press picks what goes; the second is the one
- * that does it, and says so in as many words.
+ * Asks the server what's there (file, galleries, clips) and reads it back,
+ * then asks twice.
  */
 function removeLine(box, label, note) {
   return el('label', { className: 'removeline' },
@@ -608,13 +522,7 @@ async function removeScene(scene) {
     return;
   }
 
-  /*
-   * The file is ticked to start with, and the galleries are not. A scene taken
-   * out of Stash with its file still under a library path comes back on the
-   * next scan, so a record-only delete mostly undoes itself — the same
-   * argument the gallery pencil makes about its folder. A photo set is its own
-   * thing that happens to be tied to this scene, so that one is a decision.
-   */
+  /* File ticked, galleries not. */
   const file = el('input', { type: 'checkbox', checked: true });
   const galleries = el('input', { type: 'checkbox' });
   const clips = el('input', { type: 'checkbox', checked: true });
@@ -649,11 +557,7 @@ async function removeScene(scene) {
 
   note.textContent = '';
 
-  /*
-   * The second ask. It names what it is taking rather than saying "are you
-   * sure" — the list is the warning, and it is built from the boxes as they
-   * stand at the moment you press it.
-   */
+  /* The second press names what it takes. */
   const going = () => [
     'the Stash record',
     held && file.checked ? 'the file' : null,
@@ -714,20 +618,9 @@ async function removeScene(scene) {
 }
 
 /*
- * The scene as a contact sheet, and every frame is a place to jump to.
- *
- * The scrub bar answers "what is at this second" while you are dragging it;
- * this answers the other half — *where in this is the bit I came back for* —
- * by putting the whole scene on screen at once. Twenty-four frames, four
- * across, evenly spaced from the first second to the last.
- *
- * It costs one text file and one image, both of which Stash generated for the
- * scrub bar and both of which this page has usually already fetched. No video
- * is decoded and nothing is asked of the file itself.
- *
- * A scene with no sprite sheet gets no card at all, rather than a card full of
- * grey boxes — `sidecard` drops itself when it has nothing in it, so returning
- * an empty holder is enough.
+ * A contact sheet: 24 frames from Stash's sprite sheet, four across, each
+ * a place to jump to. No extra fetch beyond the sheet and vtt. No sheet,
+ * no card.
  */
 
 const INDEX_ACROSS = 4;
@@ -741,18 +634,12 @@ function indexCard(scene, video) {
 
   thumbnailCues(`/media/scene/${scene.id}/vtt`).then((cues) => {
     if (!cues || !cues.length || !cues[0].crop) {
-      // Nothing to show and nothing to fix from here: a sheet is a Stash
-      // Generate task. The card goes rather than explaining itself in a rail
-      // that is already five cards long.
+      // No sheet: remove the card.
       card.remove();
       return;
     }
 
-    /*
-     * The sheet's own size, from the crops. Every one is the same size and
-     * they tile a grid, so the widest right edge and the lowest bottom edge
-     * are the sheet — no second request to measure the image.
-     */
+    /* Sheet size from the crops' extents. */
     let sheetW = 0;
     let sheetH = 0;
     for (const cue of cues) {
@@ -760,12 +647,7 @@ function indexCard(scene, video) {
       sheetH = Math.max(sheetH, cue.crop.y + cue.crop.h);
     }
 
-    /*
-     * Spread across the cues rather than across the runtime, and they are not
-     * the same thing: the last cue starts before the scene ends, so dividing
-     * the duration would put the final frame past the end of the sheet. Over
-     * the cues, the twenty-fourth is the last picture there is.
-     */
+    /* Spread over the cues, not the runtime (the last cue starts before the end). */
     const cells = [];
     for (let i = 0; i < INDEX_OF; i++) {
       const at = Math.min(cues.length - 1, Math.round((i / (INDEX_OF - 1)) * (cues.length - 1)));
@@ -781,12 +663,7 @@ function indexCard(scene, video) {
       );
       cell.title = `Jump to ${when}`;
 
-      /*
-       * Sized by the cell rather than by the crop, so the grid sets the scale
-       * and the sheet follows it. Measured after the card is in the document —
-       * a cell has no width before then, and a background sized against zero
-       * is a blank square.
-       */
+      /* Sized once the cell is in the document and has a width. */
       cell.dataset.at = String(cue.start);
       cell.dataset.crop = `${cue.crop.x},${cue.crop.y},${cue.crop.w},${cue.crop.h}`;
       cell.style.backgroundImage = `url("${cue.src}")`;
@@ -804,11 +681,7 @@ function indexCard(scene, video) {
 
     grid.replaceChildren(...cells);
 
-    /*
-     * One pass over the cells once they have a width. Done here rather than in
-     * CSS because background-size has to be the whole sheet scaled to the cell,
-     * which is arithmetic no stylesheet can do.
-     */
+    /* background-size needs arithmetic CSS can't do. */
     const scaleCells = () => {
       const wide = grid.firstElementChild?.clientWidth || 0;
       if (!wide) return;
@@ -834,12 +707,7 @@ function indexCard(scene, video) {
 function removeCard(scene) {
   const button = el('button', { className: 'act danger', type: 'button' }, 'Delete scene…');
   button.onclick = () => removeScene(scene);
-  /*
-   * In `.sidelinks` so it fills the card, the same as the buttons in Elsewhere
-   * above it. A lone button shrinks to its own words otherwise, which left the
-   * one control on this page that destroys a file looking like the smallest
-   * thing in the column.
-   */
+  /* In `.sidelinks` so the button fills the card. */
   return sidecard('Remove', el('div', { className: 'sidelinks' }, button));
 }
 
@@ -853,21 +721,15 @@ async function renderScene(data, mine) {
     sideGalleries(`scene=${scene.id}`),
   ]);
 
-  // The switch in the player bar folds the reading column away and gives the
-  // picture the width. The page is built further down, so the button reaches
-  // it through the variable rather than the other way round.
+  // The wide switch folds the rail away; the page is built below.
   let page = null;
   const { video, node: player } = playerFor(scene, (on) => {
     page?.classList.toggle('wide', on);
-    // The page dims around the player rather than only giving it the width.
-    // On the body rather than the page, because what fades is the chrome
-    // above and the rails below — things the scene page does not own.
+    // Dim the chrome on the body, since the page doesn't own it.
     document.body.classList.toggle('videowide', on);
   });
 
-  // The player is built once and never redrawn — rating a scene is no reason
-  // to tear down the video you are watching — so what a redraw touches is kept
-  // apart from it.
+  // The player is built once; redraws only touch the meta around it.
   const meta = el('div', { className: 'scenemeta' });
   const side = el('aside', { className: 'sceneside' });
   const main = el('div', { className: 'scenemain' }, el('div', { className: 'stage' }, player), meta);
@@ -918,11 +780,7 @@ async function renderScene(data, mine) {
       indexCard(scene, video),
       galleryCard,
       tagCard(scene.tags),
-      /*
-       * Which of your own categories hold this scene, and the two presses to
-       * change that. Below the tags on purpose: the tags are what a scraper
-       * said this is, and these are what you say it is.
-       */
+      /* Your categories holding this scene, under the tags. */
       sidecard('Categories', scenePicker(String(scene.id))),
       fileCard(scene),
       // Last in the rail on purpose: the one button here you do not want to
@@ -938,10 +796,8 @@ async function renderScene(data, mine) {
   shell('#/library/scenes',
     page,
     /*
-     * A gallery built from here is tied to this scene, its cast and its studio
-     * before it is drawn — those are ids this page already holds, so nothing
-     * is matched or guessed. ThePornDB is offered as a source only when Stash
-     * identified the scene against it; otherwise there is nothing to ask for.
+     * A gallery built here is tied to this scene, cast and studio. TPDB is
+     * offered only if the scene was identified against it.
      */
     buildPanel({
       label: 'Add a gallery to this scene',

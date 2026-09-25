@@ -1,10 +1,9 @@
 /*
- * Stash client — "do I already have this?"
+ * Stash client: "do I already have this?"
  *
- * ThePornDB runs a stash-box endpoint, so a scene identified against TPDB in
- * Stash carries the TPDB scene UUID as a stash_id. That is the same UUID the
- * metadata service reports as ForeignGuid, which makes for an exact match.
- * Failing that, title + release date gives a probable one.
+ * A scene identified against TPDB's stash-box carries the TPDB UUID, which
+ * the metadata service calls ForeignGuid: an exact match. Otherwise title +
+ * date gives a probable one.
  */
 
 const SCENE_FIELDS = 'id title date studio { name } stash_ids { endpoint stash_id } files { path }';
@@ -12,15 +11,7 @@ const CHUNK = 250;
 
 export class StashError extends Error {}
 
-/*
- * Stash keeps its library in SQLite, and a write holds the whole file — so
- * while a scan is running a perfectly good read comes back "database is
- * locked". It is over in a moment, and the alternative is a page that dies at
- * exactly the time you are most likely to be looking at it: just after a
- * gallery build, with the scan still finishing.
- *
- * Only this one message is retried. Everything else is a real answer.
- */
+/* Stash's SQLite reports "database is locked" during scans. Retry that message only. */
 const LOCKED = /database is locked/i;
 const RETRIES = 2;
 
@@ -65,11 +56,7 @@ export async function tpdbEndpoint(config) {
   const boxes = data.configuration?.general?.stashBoxes || [];
   const tpdb = boxes.filter((b) => /theporndb|metadataapi/i.test(b.endpoint || ''));
 
-  /*
-   * TPDB is commonly configured twice, as ?type=Scene and ?type=Movie. The
-   * endpoint string is stored verbatim on each stash_id, so we have to pick the
-   * scene one — matching against the movie endpoint would find nothing.
-   */
+  /* TPDB is often configured twice (?type=Scene and ?type=Movie). Use the Scene one. */
   const scenes =
     tpdb.find((b) => /type=scene/i.test(b.endpoint)) ||
     tpdb.find((b) => !/[?&]type=/i.test(b.endpoint)) ||
@@ -79,10 +66,8 @@ export async function tpdbEndpoint(config) {
 }
 
 /*
- * Stash stores the API token for each stash-box it is configured with, and TPDB
- * uses one token for both its stash-box and its REST API. So if Stash is
- * connected we can borrow that rather than asking for the same token twice.
- * Never log or return this beyond the TPDB client.
+ * Borrow TPDB's token from Stash (one token covers stash-box and REST).
+ * Never log or return it beyond the TPDB client.
  */
 export async function tpdbToken(config) {
   const data = await gql(config, '{ configuration { general { stashBoxes { endpoint api_key } } } }');
@@ -92,11 +77,8 @@ export async function tpdbToken(config) {
 }
 
 /*
- * The same pair again for StashDB, which is the other stash-box this library
- * was built against — and the one that decides what *should* be in it. Same
- * reasoning as the TPDB pair above: Stash already holds both the endpoint and
- * the token, so neither is asked for twice. Never log or return the token
- * beyond the StashDB client.
+ * StashDB's endpoint and token, borrowed from Stash. Never log or return
+ * the token beyond the StashDB client.
  */
 export async function stashdbEndpoint(config) {
   const data = await gql(config, '{ configuration { general { stashBoxes { endpoint } } } }');
@@ -113,13 +95,8 @@ export async function stashdbToken(config) {
 }
 
 /*
- * Which of these stash-box ids are already in the library.
+ * Which of these stash-box ids are in the library, exact only.
  * -> Map<id (lowercased), stash scene>.
- *
- * matchScenes below answers the same question for a whole TPDB site and falls
- * back to title + date when it has to. This one is the exact half on its own,
- * for any endpoint: a StashDB search asking "do I have this" wants a yes it can
- * trust, and a probable is not that.
  */
 export async function ownedByStashIds(config, endpoint, ids) {
   const owned = new Map();
@@ -168,7 +145,7 @@ async function byStashIds(config, endpoint, guids) {
 }
 
 /*
- * Given the scenes of one site, work out which are already in Stash.
+ * Which scenes of one site are in Stash.
  * Returns Map<tpdbSceneId, {match: 'exact'|'probable', scene}>.
  */
 export async function matchScenes(config, scenes) {
@@ -220,19 +197,10 @@ function normalise(title) {
   return String(title).toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
+/* Performers worth following: favourites, else most scenes. TPDB id required. */
 /*
- * Performers worth following: the ones marked favourite, else the ones with the
- * most scenes in the library. Only those carrying a TPDB id are usable, since
- * that is what TPDB's performer endpoint is keyed on.
- */
-/*
- * The library's cast, with whichever stash-box ids Stash has for each.
- *
- * Both are kept, and neither is required, because the two halves of this app
- * ask for different ones: ThePornDB's feed is keyed on its uuid, and the
- * acquisition search is keyed on StashDB's. Filtering to one of them here is
- * how a performer with twenty-five scenes on the shelf goes missing from a page
- * whose whole job is to list the people you collect.
+ * The library's cast with every stash-box id they have. Neither is
+ * required: TPDB features use one, the StashDB search the other.
  */
 async function libraryCast(config) {
   const data = await gql(
@@ -271,39 +239,24 @@ export async function followedPerformers(config, { limit = 25 } = {}) {
   return pool.sort((a, b) => b.count - a.count).slice(0, limit);
 }
 
-/*
- * Everyone, for the Creators page — where the point is to browse the whole
- * cast of your library rather than to pick a handful worth polling. Favourites
- * lead, then whoever you have most of.
- */
-/*
- * -> {performers, total}. Both, because the page shows a wall and a wall has a
- * limit: reporting the length of what came back as though it were the length of
- * the list is how a page quietly loses people off the end.
- */
+/* Everyone, for the Creators page. Favourites first, then most held. */
+/* -> {performers, total}. */
 export async function libraryPerformers(config, { limit = 500 } = {}) {
   const usable = await libraryCast(config);
 
   const ranked = usable
-    // Stash keeps performer records with nothing attached — an identify run
-    // that matched a name and no file. "0 in your library" is not someone in
-    // your library, so they are left out rather than shown contradicting.
+    // Skip performers with no scenes.
     .filter((p) => p.count > 0)
     .sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.count - a.count || a.name.localeCompare(b.name));
 
   return { performers: ranked.slice(0, limit), total: ranked.length };
 }
 
-/* ------------------------------------------------------------------ groups
+/*
+ * ------------------------------------------------------------------ groups
  *
- * Stash calls a movie a group, and a group carries no stash_ids at all — the
- * field does not exist on the type (checked against 0.31.1). So unlike a
- * scene, a movie cannot be matched on a TPDB id, and there are no fingerprints
- * either: a group is a record about files, not a file.
- *
- * What is left is the name, the date and whatever URL identified it. That is
- * weak, and deliberately reported as such — the trustworthy answer to "do I
- * have this movie?" is scene by scene, on the movie page.
+ * A Stash group (movie) has no stash_ids and no fingerprints. Only name,
+ * date and URL remain, so matches are weak. The movie page answers scene by scene.
  */
 
 const GROUP_TTL = 5 * 60 * 1000;
@@ -345,11 +298,8 @@ export async function groupIndex(config, { force = false } = {}) {
 }
 
 /*
- * -> {match, group, via} or null.
- *
- * A TPDB movie URL on the group is the only exact claim available. After that
- * it is the title, which is why nothing below the URL comes back as anything
- * better than probable — a re-cut and a re-release share a name.
+ * -> {match, group, via} or null. A TPDB movie URL is exact; a title is at
+ * best probable.
  */
 export function matchGroup(index, movie) {
   const slug = movie.url ? String(movie.url).match(/\/movies\/([^/?#]+)/) : null;
@@ -366,15 +316,11 @@ export function matchGroup(index, movie) {
   return named ? { match: 'probable', group: named, via: 'title' } : null;
 }
 
-/* ------------------------------------------------------------ fingerprints
+/*
+ * ------------------------------------------------------------ fingerprints
  *
- * The strongest match available. TPDB publishes PHASH and OSHASH per scene and
- * Stash stores the same kinds for every file, so the two can be compared
- * directly — regardless of how the scene is named or which stash-box it was
- * identified against.
- *
- * The whole library's fingerprints come back in one query (~0.5s for 1700
- * scenes), so matching happens in memory rather than one query per scene.
+ * TPDB's PHASH and OSHASH against Stash's, independent of naming. The whole
+ * library's fingerprints in one query, matched in memory.
  */
 
 const FINGERPRINT_TTL = 5 * 60 * 1000;
@@ -438,11 +384,8 @@ function popcount(n) {
 
 /*
  * -> {match: 'exact'|'probable', scene, via} or null.
- *
- * oshash equality means the same file. phash equality means the same frames.
- * A small phash distance means the same scene at a different size or bitrate,
- * which is strong but not certain, so it lands as probable with the distance
- * recorded.
+ * oshash = same file; phash = same frames; a small phash distance is
+ * probable, with the distance recorded.
  */
 export function matchByFingerprints(index, { phashes = [], oshashes = [] }) {
   for (const hash of oshashes) {
@@ -472,19 +415,11 @@ export function matchByFingerprints(index, { phashes = [], oshashes = [] }) {
   return best ? { match: 'probable', scene: best.scene, via: `phash distance ${best.distance}` } : null;
 }
 
-/* ------------------------------------------------------- title and date
+/*
+ * ------------------------------------------------------- title and date
  *
- * The other half of "do I have this". A stash id is the trustworthy answer,
- * but roughly a third of this library was identified against ThePornDB's
- * stash-box rather than StashDB's — so asking StashDB's ids alone reports
- * scenes as missing that are sitting on the disk under a TPDB id.
- *
- * Title and date together is weak evidence for one scene and decent evidence
- * across a catalogue, which is what coverage is. It lands as `probable` and is
- * counted as held, and every count that uses it says which of the two it was.
- *
- * The whole library comes back in one query and is indexed in memory, because
- * coverage asks this about several thousand scenes at once.
+ * For scenes identified against TPDB instead of StashDB. Counts as held,
+ * labelled `probable`. One query, indexed in memory.
  */
 
 const TITLE_TTL = 5 * 60 * 1000;

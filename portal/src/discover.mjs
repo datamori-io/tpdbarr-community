@@ -1,28 +1,11 @@
 /*
- * The acquisition search.
+ * The acquisition search, on StashDB: its ids follow a scene into Whisparr v3
+ * and Stash. ThePornDB is the separate wild card.
  *
- * One question, asked with filters instead of by scrolling: what exists, and
- * what of it do I not have. StashDB is the catalogue it runs on — not because
- * it is the biggest, but because its ids survive the whole trip. A scene found
- * here goes to Whisparr v3 under a UUID, arrives in Stash carrying the same
- * UUID, and can be recognised again next time. ThePornDB is the wild card at
- * the bottom of the page: same standard of data, different coverage, a
- * different route out, and no id that means anything to Stash until the file
- * lands.
- *
- * Two things this module is careful about.
- *
- * **What "have" means.** Whisparr is a downloader here — a scene sits in it for
- * the hours between grabbing and importing, then Stash imports it and Whisparr
- * is told to delete it. So a Whisparr holding nothing is the expected end
- * state, and every count of what you own is counted in Stash. Whisparr is still
- * asked, so a scene already monitored is not reported back as a gap.
- *
- * **Which stash id.** Roughly a third of this library was identified against
- * ThePornDB's stash-box rather than StashDB's, so matching on StashDB ids alone
- * reports scenes as missing that are on the disk. Title and date is the second
- * pass, and everything that uses it is labelled `probable` rather than being
- * quietly counted as certain.
+ * "Have" is counted in Stash; Whisparr empties as files import, but is still
+ * asked so monitored scenes aren't reported as gaps. About a third of the
+ * library was identified against TPDB, so title and date is a second pass,
+ * labelled `probable`.
  */
 
 import * as stashdb from './stashdb.mjs';
@@ -42,12 +25,10 @@ const LANES = 3; // tracked entities measured at once
 
 export const available = (config) => stashdb.available(config);
 
-/* ------------------------------------------------------- do I have this
+/*
+ * ------------------------------------------------------- do I have this
  *
- * Both passes at once, for a page of scenes. Exact first: a StashDB id in
- * Stash is the same scene and there is nothing to argue about. Then title and
- * date for whatever is left, which is where the TPDB-identified half of the
- * library gets recognised.
+ * Exact first (a StashDB id in Stash), then title and date for the rest.
  */
 export async function annotate(config, scenes) {
   if (!scenes.length) return [];
@@ -91,35 +72,16 @@ export async function annotate(config, scenes) {
 /*
  * -> {available, count, hidden, scenes, page, perPage}
  *
- * `count` is StashDB's count of the whole match, not of what is on screen —
- * every filter goes into the query, so it is a real total. `hidden` is how many
- * of *this page* were dropped for being in the library already, which is the
- * only honest way to report a filter applied after the count: the toggle that
- * brings them back says the same number.
+ * `count` is StashDB's total for the query. `hidden` is how many on this page
+ * were dropped as already held.
  */
-/*
- * How many StashDB pages one decide request will read through before answering.
- *
- * A catalogue you have nearly finished is mostly decided, so the undecided ones
- * are sparse and a single page of twenty-four can hold none at all. Without a
- * bound a request could walk six hundred scenes; without *any* walking, the
- * browser would ask twenty times for one card. Eight is the compromise, and the
- * cursor means an empty answer is still progress rather than a dead end.
- */
+/* StashDB pages one decide request may read. The cursor makes an empty answer progress. */
 const DECIDE_PAGES = 8;
 
 /*
- * The decide queue.
- *
- * Deciding is not browsing, and it cannot be paged. StashDB counts the whole
- * catalogue; what reaches the screen is what is left after the ignored, the
- * held and the already-wanted are dropped — so page four of six hundred can
- * legitimately hold nothing, and every answer given reshuffles which survivors
- * land on which page. Numbering that is a promise the data cannot keep.
- *
- * So this walks StashDB from a cursor until it has a batch worth showing and
- * says where it got to. The browser asks again when the batch on screen runs
- * out, and a null cursor is the end of the catalogue rather than an empty page.
+ * The decide queue. Can't be paged: dropped scenes make page numbers
+ * meaningless. Walks StashDB from a cursor until it has a batch; a null
+ * cursor is the end.
  */
 async function decideBatch(config, params, perPage) {
   const from = Math.max(1, Number(params.cursor) || 1);
@@ -171,33 +133,14 @@ async function decideBatch(config, params, perPage) {
   };
 }
 
-/* ------------------------------------------------------ everything at once
+/*
+ * ------------------------------------------------------ everything at once
  *
- * The same queue, over every catalogue you follow.
- *
- * Deciding was always per-catalogue: open a studio, work down it, come back
- * tomorrow for the next one. That is the right shape for a catalogue and the
- * wrong one for a backlog — the question "what is there to do" had no page
- * that answered it, only forty-eight cards each holding a bit of the answer.
- *
- * **The cursor carries two numbers now.** One catalogue's queue remembers how
- * far down StashDB it has read; this one has to remember which catalogue as
- * well, so the mark is `<which>:<page>`. Run off the end of a catalogue and it
- * steps to the next and starts at page one. A null cursor still means the same
- * thing it always did: there is no more, anywhere.
- *
- * Walked in the order the list is kept rather than worst-first. A queue that
- * always opened on the same enormous studio would be the same studio every
- * day, and the point of pooling them is that you stop choosing.
- *
- * **Scenes are deduplicated within a batch.** A performer you follow shooting
- * for a studio you follow is one scene under two catalogues, and two cards
- * asking the same question is the queue wasting your time twice.
+ * The same queue over every tracked catalogue. The cursor is
+ * `<which>:<page>`. Walked in list order. Scenes are deduplicated within a batch.
  */
 async function pooledBatch(config, params, perPage) {
-  // This can be the first page asked for after a restart, and it reads the
-  // measurements twice over — to step past finished catalogues, and for the
-  // total. Both are wrong if the file has not been read back yet.
+  // May be the first request after a restart; load the measurements first.
   await warmCoverage(config);
 
   const entries = tracked(config);
@@ -212,15 +155,7 @@ async function pooledBatch(config, params, perPage) {
   const seen = new Set();
   let ruled = 0;
 
-  /*
-   * Catalogues already answered for are stepped over rather than read.
-   *
-   * Without this the walk spends its whole allowance of StashDB pages inside
-   * the first catalogue on the list, which on a finished one means eight reads
-   * for nothing and a queue that looks empty until the browser has asked
-   * twenty times. The measurements say which are finished, so this uses them —
-   * and a catalogue not yet measured is read rather than assumed either way.
-   */
+  /* Skip catalogues already finished, per the measurements. Unmeasured ones are read. */
   const done = new Map();
   for (const row of coverageSnapshot(config).rows) {
     if (!row.pending) done.set(keyOf(row), row.undecided || 0);
@@ -263,12 +198,7 @@ async function pooledBatch(config, params, perPage) {
 
   rank(out, mine);
 
-  /*
-   * The size of the job, taken from the measurements the tracked page already
-   * holds rather than counted again here. Null while anything is still being
-   * measured: a total that is missing a catalogue is worse than no total,
-   * because it looks like one.
-   */
+  /* Total from the tracked page's measurements. Null while any is still measuring. */
   const { rows } = coverageSnapshot(config);
   const outstanding = rows.some((row) => row.pending)
     ? null
@@ -291,18 +221,8 @@ async function pooledBatch(config, params, perPage) {
 }
 
 /*
- * Best first, within the batch that was read.
- *
- * **Within the batch and said so.** A true ranking of the whole backlog would
- * mean reading every one of six thousand scenes before drawing the first card,
- * and StashDB hands over a page at a time. So this orders what this request
- * walked — a couple of hundred scenes — and the next batch orders itself when
- * it arrives. What that buys is real: the performer you own forty of is at the
- * top of each screenful instead of wherever the release date left her.
- *
- * Ties keep the order they came in, which is the sort you chose. A scene
- * nothing in your library speaks for scores zero and sits at the bottom rather
- * than being dropped — ranking is an order, never a filter.
+ * Rank within the batch read (a full ranking would mean reading everything).
+ * Ties keep their order; zero scores sink but aren't dropped.
  */
 function rank(scenes, mine) {
   if (!mine) return scenes;
@@ -328,12 +248,7 @@ export async function search(config, params = {}) {
   const { count, scenes } = await stashdb.queryScenes(config, input);
   const annotated = await annotate(config, scenes);
 
-  /*
-   * A decision you already made is dropped unless you asked to see the
-   * decisions — "not for me" that keeps reappearing is not a decision, it is a
-   * nag. The other end of that idea, only the ones still to answer, is the
-   * queue above and never reaches here.
-   */
+  /* Decided scenes are dropped unless you asked to see them. */
   const show = params.show === 'all' ? 'all' : 'open';
 
   let shown = annotated;
@@ -357,11 +272,7 @@ export async function search(config, params = {}) {
   };
 }
 
-/*
- * The wild card. Only ever asked on purpose — it is a different catalogue with
- * a different route out, so blending it into the results above would hide which
- * Whisparr a card is about to talk to.
- */
+/* The wild card, only on request, never blended in. */
 export async function wildcard(config, term, { limit = 24 } = {}) {
   if (!term) return { available: false, scenes: [] };
   if (!(await tpdb.available(config))) return { available: false, scenes: [] };
@@ -377,11 +288,10 @@ export async function wildcard(config, term, { limit = 24 } = {}) {
   return { available: true, scenes };
 }
 
-/* --------------------------------------------------------- the filter chips
+/*
+ * --------------------------------------------------------- the filter chips
  *
- * Asked of StashDB rather than filtered in the browser, because its search
- * matches aliases: "Vixen" finds the studio, and a performer's old name finds
- * them under the new one.
+ * Asked of StashDB so aliases match.
  */
 export async function lookup(config, kind, term, { limit = 10 } = {}) {
   if (!term || !(await available(config))) return [];
@@ -399,11 +309,7 @@ export async function lookup(config, kind, term, { limit = 10 } = {}) {
   return [...performers, ...studios, ...tags];
 }
 
-/*
- * A search arriving as a bookmarked URL has ids and no names. Rather than
- * render chips reading "01a03a3d-…", the ids are turned back into names once,
- * on the way in.
- */
+/* Turn ids from a bookmarked URL back into names. */
 export async function resolveChips(config, { studios = [], performers = [], tags = [] } = {}) {
   if (!(await available(config))) return { studios: [], performers: [], tags: [] };
 
@@ -418,27 +324,18 @@ export async function resolveChips(config, { studios = [], performers = [], tags
   return { studios: s.filter(Boolean), performers: p.filter(Boolean), tags: t.filter(Boolean) };
 }
 
-/* ------------------------------------------------------------- what I track
+/*
+ * ------------------------------------------------------------- what I track
  *
- * The percentage on a studio or a performer only means something against a
- * catalogue somebody chose. Measured automatically against everything, it would
- * be a number about how complete StashDB is rather than about this library —
- * and it would cost a full catalogue read per studio on every page load.
- *
- * So it is a list you keep. Track a studio and it gets measured; untrack it and
- * the measuring stops.
+ * Only tracked catalogues get a percentage.
  */
 
 const trackedList = (config) => ({
   studios: config.tracked?.studios || [],
   performers: config.tracked?.performers || [],
   /*
-   * Tags are tracked the same way, and they are not the same thing. A studio
-   * or a performer is a catalogue you can be complete against; a tag is a
-   * subject you dip into, and nobody wants every scene that has ever been
-   * filed under Blowjob. What they share is the useful half — a list of scenes
-   * to decide about — so they share the machinery and the page says which of
-   * them a percentage means anything for. See coverageSnapshot.
+   * Tags share the machinery, but a percentage rarely means much for a tag.
+   * See coverageSnapshot.
    */
   tags: config.tracked?.tags || [],
   // Carried through every save so that marking a studio does not drop the
@@ -447,20 +344,14 @@ const trackedList = (config) => ({
   ignored: config.tracked?.ignored || [],
 });
 
-/* ------------------------------------------------------------- the rules
+/*
+ * ------------------------------------------------------------- the rules
  *
- * The standing noes, read in one place. Cleaned on the way out rather than
- * trusted from the file: a rule with a blank phrase or a length of zero would
- * match everything or nothing, and both are worse than not being there.
+ * The standing noes. Cleaned on read: a blank rule would match everything or nothing.
  */
 export const decideRules = (config) => rules.cleanAll(config.decideRules);
 
-/*
- * Changing them changes every count on the tracked page, because a scene a
- * rule hides is no longer one you have to answer for. Counted again rather
- * than measured again — the catalogues have not changed, only which of their
- * scenes you would say no to. See recount().
- */
+/* Changing rules recounts (no re-measure). See recount(). */
 export async function setDecideRules(config, list) {
   const clean = rules.cleanAll(list);
   await saveConfig({ decideRules: clean });
@@ -513,18 +404,11 @@ export function isTracked(config, kind, id) {
   return tracked(config).some((e) => e.kind === kind && e.id === id);
 }
 
-/* ------------------------------------------------------------ tracked scenes
+/*
+ * ------------------------------------------------------------ tracked scenes
  *
- * A want list, and the reason it is kept here rather than in Whisparr.
- *
- * Whisparr fetches files. It does not remember what you meant to get: it is
- * emptied as scenes import, things get added to it by hand, and deleting one
- * out of it is routine housekeeping. A list of what you are after cannot live
- * in a place that is designed to be emptied.
- *
- * So a mark is made against the StashDB scene id — the same id the file carries
- * into Stash once it lands, which is what lets a tracked scene be recognised as
- * arrived without asking the downloader anything at all.
+ * The want list, kept here because Whisparr is emptied as scenes import.
+ * Keyed on the StashDB scene id, which the file carries into Stash.
  */
 
 const sceneList = (config) => config.tracked?.scenes || [];
@@ -538,11 +422,7 @@ export function trackedScenes(config, { studio = null, performer = null } = {}) 
   return performer ? here.filter((s) => (s.performers || []).some((p) => p.id === performer)) : here;
 }
 
-/*
- * Enough of the scene to draw it again. Kept rather than fetched because a want
- * list is read far more often than it is written, and a page of it should not
- * cost one StashDB read per card.
- */
+/* Enough of the scene to redraw its card without a StashDB read. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export async function trackScene(config, scene) {
@@ -575,19 +455,9 @@ export async function trackScene(config, scene) {
 }
 
 /*
- * Fill in fields the want list did not used to keep.
- *
- * A mark stores enough of the scene to draw the card again without going back
- * to StashDB, so what a card shows and what a record holds have to agree — and
- * when the card grew a description, two thousand older marks did not have one.
- * Rather than reading StashDB on every page load for a field that never
- * changes, the gap is filled once and stays filled.
- *
- * Only the records actually missing something are asked about, so running this
- * a second time costs one config read and no StashDB at all. Written a chunk at
- * a time against a freshly read config: a backfill of seventy requests is long
- * enough that marking a scene halfway through is a real possibility, and a
- * single save at the end would throw that mark away.
+ * Fill fields older marks lack. Only records missing something are asked
+ * about. Saved a chunk at a time against a fresh config so marks made
+ * meanwhile survive.
  */
 const BACKFILL_CHUNK = 120;
 
@@ -628,28 +498,16 @@ export async function untrackScene(config, id) {
   await recount(await loadConfig());
 }
 
-/* ------------------------------------------------------------ dispositions
+/*
+ * ------------------------------------------------------------ dispositions
  *
- * A tracked studio or performer is a catalogue, and a catalogue is a pile of
- * decisions waiting to be made. Every scene in one is in exactly one of three
- * states:
+ * Every scene in a tracked catalogue is one of:
  *
- *   ignored    — not for me. Out of the results, and out of the numbers.
- *   tracked    — I want this, or I already have it.
- *   undecided  — new since the last time you looked at this catalogue.
+ *   ignored    — not for me; out of results and numbers
+ *   tracked    — wanted, or already held (owning counts, no press needed)
+ *   undecided  — what's left
  *
- * **Owning a scene counts as tracked**, without anyone pressing anything. The
- * alternative is that a studio you have collected for years reads 0 of 0 until
- * you have clicked through six hundred scenes to say you meant to own the ones
- * you own. The decision a scene needs is only ever about a scene you do not
- * have.
- *
- * Undecided is what keeps the percentage honest. It is not a state you set —
- * it is what is left, and it is why a catalogue that has released something new
- * says so rather than quietly diluting a number you thought you understood.
- *
- * The ignore list is ids and nothing else. It grows fastest of the three, it is
- * never drawn as cards, and every question asked of it is "is this id in here".
+ * The ignore list is ids only.
  */
 
 const ignoreList = (config) => config.tracked?.ignored || [];
@@ -680,16 +538,8 @@ export async function ignoreScene(config, id) {
 }
 
 /*
- * Many at once, and one write.
- *
- * ignoreScene() above saves the config per scene, which is right for a button
- * on a card and wrong for a screenful: twenty answers would be twenty rewrites
- * of a file that already holds a thousand ignored ids, and any one of them
- * failing halfway would leave the browser and the disk disagreeing about what
- * had been decided. This is one pass and one save.
- *
- * -> how many were actually added, which is not the same as how many were
- * asked for: a scene already on the list is not skipped twice.
+ * Ignore many in one write.
+ * -> how many were newly added.
  */
 export async function ignoreScenes(config, ids = []) {
   const wanted = [...new Set(
@@ -719,39 +569,18 @@ export async function ignoreScenes(config, ids = []) {
   return { skipped: fresh.length, asked: wanted.length };
 }
 
-/* ------------------------------------------------------- the rest of it
+/*
+ * ------------------------------------------------------- the rest of it
  *
- * Skipping everything a filter still has to say.
- *
- * The queue is one card at a time on purpose, and for most catalogues that is
- * the right shape. It stops being the right shape on a studio with two
- * thousand scenes and nothing in it you want: there the answer is the same for
- * all of them and giving it two thousand times is not a decision, it is a
- * chore.
- *
- * It cannot be done in the request that asks for it. Every id has to come off
- * StashDB, a page at a time, and each page has to be annotated against Stash
- * before anything is written — a scene you already hold or already asked for
- * is not one to skip. On a large catalogue that is a minute or more of
- * somebody else's API, sequentially, because parallel is how you get rate
- * limited off StashDB for the afternoon.
- *
- * So it is a job, with a progress the page can watch, and one at a time.
+ * Skip everything a filter still returns. A background job, one at a time,
+ * because it reads StashDB page by page and checks each against Stash.
  */
 let sweeping = null;
 let sweep = { running: false, done: 0, skipped: 0, count: 0, error: null, subject: '', at: 0 };
 
 export const sweepStatus = () => ({ ...sweep, running: Boolean(sweeping) });
 
-/*
- * Every page from here to the end of the catalogue, ignoring what is still
- * undecided as it goes.
- *
- * Written in batches rather than once at the end, and the reason is what
- * happens when this is stopped or dies halfway: the work done so far is on
- * disk and the queue you come back to is genuinely shorter. A single write at
- * the end would make an interrupted sweep worth nothing.
- */
+/* Written every 200, so an interrupted sweep keeps its progress. */
 const SWEEP_WRITE_EVERY = 200;
 
 async function sweepRun(config, params) {
@@ -824,26 +653,10 @@ export async function unignoreScene(config, id) {
   await recount(await loadConfig());
 }
 
+/* The want list, annotated like search results. `missing` is the count that matters. */
 /*
- * The want list, asked the same questions a search result is: is it in Stash
- * yet, and is the downloader doing anything about it. `missing` is the count
- * that matters — a tracked scene that has arrived is not a gap any more.
- */
-/*
- * Scenes you want that nothing you track would have found for you.
- *
- * The want list and the tracked catalogues overlap heavily by design — most of
- * what is on it was marked while working through a studio or a performer, and
- * those scenes are already counted, measured and queued somewhere else. What
- * is left over is the interesting part: the ones marked off a search, off the
- * feed, off somebody's recommendation, and which no catalogue on this page
- * will ever remind you about again.
- *
- * Matched on the studio and the performers, because those are what a want
- * record actually carries. **Tracked tags are not part of it** — a want record
- * has never stored a scene's tags, so there is nothing here to match them
- * against, and a scene wanted for its tag alone will still show as its own.
- * Said out loud rather than quietly approximated.
+ * Wanted scenes no tracked catalogue covers. Matched on studio and cast;
+ * tags can't be matched (want records don't store them).
  */
 function orphaned(config, scenes) {
   const { studios, performers } = trackedList(config);
@@ -858,27 +671,13 @@ function orphaned(config, scenes) {
 }
 
 /*
- * Do I have this, file-wise?
- *
- * Stash is the library of record, but it is the *end* of the flow: a scene
- * that v3 has already downloaded and not yet handed over sits in neither
- * "arrived" nor anywhere else, and a want list that calls it missing is
- * telling you to go and get something that is already on the disk. Having a
- * file, wherever it is in the process, means having it.
- *
- * Monitored is not having it. v3 wanting a scene is a statement about the
- * future, and the future is exactly what this list is for — so the line is
- * the file itself, not the record.
+ * Having a file anywhere in the pipeline counts, including v3's download.
+ * Monitored doesn't.
  */
 export const haveFile = (scene) => Boolean(scene.stash || scene.whisparr3?.hasFile);
 
 export async function trackedSceneView(config, { studio = null, performer = null, loose = false } = {}) {
-  /*
-   * Asked about one studio or one performer, the filter is meaningless and
-   * actively wrong: the studio page asks this for *its own* wanted scenes, and
-   * dropping everything a tracked catalogue covers would empty it precisely
-   * when that studio is one you track. The toggle belongs to the whole list.
-   */
+  /* On a studio or performer page, don't drop what that catalogue covers. */
   const narrowed = Boolean(studio || performer);
   const all = trackedScenes(config, { studio, performer });
   const wanted = loose && !narrowed ? orphaned(config, all) : all;
@@ -903,23 +702,12 @@ export async function trackedSceneView(config, { studio = null, performer = null
 const measured = new Map(); // keyOf(entry) -> {at, row}
 let measuring = null;
 
-/* -------------------------------------------------- measurements on disk
+/*
+ * -------------------------------------------------- measurements on disk
  *
- * A measurement is a full read of a catalogue off StashDB and a match of it
- * against Stash, six hours' worth of cache and about two minutes for the forty
- * eight of them. Keeping that only in memory meant every restart threw it
- * away: the tracked page opened on dashes, the pooled queue had no idea which
- * catalogues were finished, and the whole thing was bought again from StashDB
- * for no reason other than the process having stopped.
- *
- * So it is written down. It is derived data and it is treated as such — the
- * file is a cache, every row keeps the time it was taken, and anything past
- * the six hours is re-measured exactly as it would have been.
- *
- * **Thrown away when the rules change**, because the rules decide what counts
- * as undecided. The file carries the rules it was measured under; if they do
- * not match what the config now says, it is a file about a different question
- * and is dropped rather than shown.
+ * Coverage is cached to disk so a restart doesn't re-read StashDB. Each row
+ * keeps its time; past six hours it's re-measured. The file is dropped if
+ * the rules it was measured under have changed.
  */
 const CONFIG_DIR = process.env.CONFIG_DIR || './config';
 const COVERAGE_PATH = join(CONFIG_DIR, 'coverage.json');
@@ -940,17 +728,8 @@ async function warmCoverage(config) {
       if (saved?.rules !== rulesStamp(config)) return;
 
       /*
-       * Rows past their life are loaded too, and it used to be the opposite.
-       * The thinking was that a stale row on screen is the one thing a cache
-       * must not do — but the alternative was every card reading "Measuring…"
-       * for two minutes after every restart and every six hours, which is what
-       * made the page slow to paint. ensureCoverage() still sees them as past
-       * their life and re-reads them straight away; they are what is shown
-       * until it has.
-       *
-       * The rules check above still throws the whole file away. A row counted
-       * under different rules is not a slightly old answer, it is the answer
-       * to a different question.
+       * Stale rows are loaded and shown while ensureCoverage() re-reads them.
+       * A rules mismatch still drops the whole file.
        */
       for (const [key, hit] of Object.entries(saved.rows || {})) {
         if (!hit?.row) continue;
@@ -965,11 +744,7 @@ async function warmCoverage(config) {
   return warmed;
 }
 
-/*
- * Written after a pass rather than after each catalogue: a pass is when the
- * numbers are worth keeping, and forty eight writes to say the same thing is
- * forty eight writes.
- */
+/* Written once per pass. */
 async function keepCoverage(config) {
   const rows = {};
   for (const [key, hit] of measured) rows[key] = hit;
@@ -985,43 +760,18 @@ async function keepCoverage(config) {
 }
 
 /*
- * What each catalogue was last measured *from* — the scenes StashDB listed and
- * which of them you held — kept beside the counts, so a decision can be
- * counted without asking anybody anything. Memory only: it is rebuilt by the
- * next pass after a restart, and until then the counts on disk stand in.
+ * What each catalogue was measured from, kept in memory so decisions can be
+ * counted without a fetch. Rebuilt by the next pass after a restart.
  */
 const inputs = new Map(); // keyOf(entry) -> gather() result
 
 /*
- * A decision was made. Count again; do not measure again.
+ * A decision was made: recount, don't re-measure.
  *
- * This used to be forgetCoverage(), and every skip, every unskip and every
- * rule saved called it: the whole cache cleared, the file on disk emptied,
- * and the next look at the Tracked page put all forty-eight cards back to
- * "Measuring…" while StashDB was read from the top. Working down the decide
- * queue meant doing that once a card. It was the slowness, and it was most of
- * the inconsistency too — the page showed a different mix of measured and
- * unmeasured rows every time it was opened, and the totals climbed as they
- * filled in.
- *
- * A decision does not change what a catalogue holds, only which pile each of
- * its scenes goes in, and that is classify() over a list already in memory.
- * So the counts move the moment the decision is saved, by exactly the amount
- * it deserves, and the page never goes blank to get there.
- *
- * Wanting a scene calls this too, which it never did: skipping wiped the
- * cache and wanting left it alone, so the counts were wrong in one direction
- * for up to six hours and then jumped.
- *
- * **Two things still need a real measurement**, and those catalogues are
- * marked stale — kept on screen and re-read in the background, never
- * blanked:
- *  - nothing in memory to count from, which is the first decision after a
- *    restart, when the rows came off disk and the scenes they were counted
- *    from did not;
- *  - a rule that needs a field this copy was fetched without — a tag or a
- *    length rule added to a set that had neither, which means StashDB has to
- *    be asked for the bigger record.
+ * classify() over the list in memory, so counts move at once and the page
+ * never blanks. A real measurement is still needed (row kept, marked stale)
+ * when nothing is in memory after a restart, or a new rule needs a field
+ * this copy lacks.
  */
 export async function recount(config) {
   const standing = decideRules(config);
@@ -1048,26 +798,12 @@ export async function recount(config) {
 
   await keepCoverage(config);
 
-  // Start the re-read now rather than on the next page load, so the numbers
-  // that could not be counted in place are on their way by the time anybody
-  // looks.
+  // Start the re-read now.
   if (stale) ensureCoverage(config).catch(() => {});
 }
 
-/*
- * What the page renders. Anything not measured yet comes back marked pending
- * rather than absent, so a tracked studio appears the moment it is tracked and
- * fills in its number when it has one.
- */
-/*
- * How big a catalogue can be before a percentage of it is a lie.
- *
- * Coverage is measured over the first COVERAGE_CAP scenes StashDB returns, so
- * anything larger is a fraction of a sample rather than of the thing. On a
- * studio that almost never happens. On a tag it is the normal case — and even
- * where it does fit, "8% of Blowjob" is a number about StashDB rather than
- * about this library. So the page is told, and hides the bar for those.
- */
+/* What the page renders. Unmeasured rows come back pending. */
+/* Above COVERAGE_CAP the percentage is of a sample, so the bar is hidden. */
 const HONEST_PCT = COVERAGE_CAP;
 
 export function coverageSnapshot(config) {
@@ -1077,11 +813,7 @@ export function coverageSnapshot(config) {
       ? { ...hit.row, measuredAt: hit.at, pending: false }
       : { ...entry, total: null, have: null, pct: null, pending: true };
 
-    /*
-     * Whether the percentage on this row is worth drawing. Not a property of
-     * the kind: a narrow tag measured whole is as honest as a studio, and it
-     * is the size that decides, not the word.
-     */
+    /* Size decides, not kind. */
     row.honest = row.pending || (!row.capped && (row.total || 0) <= HONEST_PCT);
     return row;
   });
@@ -1096,14 +828,8 @@ export async function ensureCoverage(config, { force = false } = {}) {
   if (measuring) return coverageSnapshot(config);
 
   /*
-   * Also anything with a count but nothing in memory to count it from, which
-   * is every catalogue straight after a restart: the rows come off disk and
-   * the scenes they were counted from do not. Left like that, the first skip
-   * after a restart could not be counted in place — recount() had to mark the
-   * lot stale and wait on a re-read, and every rebuild put the page back into
-   * that state for up to six hours. So the first look after a restart reads
-   * the scenes back in, in the background, behind the counts already on
-   * screen.
+   * Also re-read catalogues with counts but nothing in memory (after a
+   * restart), so the first skip can be counted in place.
    */
   const stale = tracked(config).filter((entry) => {
     const key = keyOf(entry);
@@ -1132,9 +858,7 @@ export async function ensureCoverage(config, { force = false } = {}) {
     } finally {
       measuring = null;
     }
-    // Stamped with the config as it is now. measure() counts against the
-    // current config too, so a decision or a rule saved during the pass is
-    // already in these rows rather than in conflict with them.
+    // Stamped with the current config.
     await keepCoverage(await loadConfig());
   })();
 
@@ -1142,45 +866,21 @@ export async function ensureCoverage(config, { force = false } = {}) {
 }
 
 /*
- * One tracked thing, measured. A studio and a performer go through exactly this
- * — the only difference between them is one line of filter, further down.
- *
- * Two halves, kept apart on purpose: gather() is the network and is slow,
- * classify() is the counting and is instant. See recount() for why.
+ * Measure one tracked catalogue: gather() is the slow network half,
+ * classify() the instant count.
  */
 async function measure(config, entry) {
   const got = await gather(config, entry);
   inputs.set(keyOf(entry), got);
 
-  /*
-   * Counted against the config as it is *now*, not the one the pass was
-   * started with. A pass is two minutes and you are usually working through
-   * the queue while it runs; a skip made while this catalogue was being read
-   * belongs in its count, and counting it against the config from before
-   * the skip is how two loads a minute apart gave two different numbers.
-   */
+  /* Counted against the current config, so decisions made during the pass count. */
   return classify(await loadConfig(), entry, got);
 }
 
 /*
- * The expensive half: what the catalogue *is*, and which of it you hold.
- *
- * Everything here is a fact about StashDB and about the library on disk, and
- * none of it moves when you make a decision — a skip does not change what a
- * studio has released or what Stash has imported. That is the whole reason it
- * is split off from the counting: it is fetched on the six-hour schedule and
- * kept, and a decision is counted against the copy in hand.
- *
- * **A lookup that fails fails the measurement.** These used to fall back to an
- * empty answer — Stash too busy to reply, say, in the middle of a scan — and
- * an empty answer to "which of these do you own" is "none of them". That row
- * went on the wall at 0%, was written to disk and stayed for six hours. Now it
- * throws, the pass logs it, and the row it would have replaced stays where it
- * was. A number that is a few hours old is a number; one built on a timeout
- * is a lie.
- *
- * Whisparr is the exception, and deliberately: it only decides `onTheWay`,
- * which is a footnote on a card rather than part of the percentage.
+ * The slow half: what the catalogue is and which of it you hold. Doesn't
+ * change with decisions. A failed lookup fails the measurement rather than
+ * recording 0%. Whisparr failures are tolerated (only `onTheWay` depends on it).
  */
 async function gather(config, entry) {
   const standing = decideRules(config);
@@ -1222,21 +922,8 @@ async function gather(config, entry) {
 }
 
 /*
- * The cheap half: sorting a catalogue into piles against what you have
- * decided. Pure — no network, nothing awaited — so it can be run again the
- * moment a decision is made, and gives the same answer every time it is given
- * the same decisions.
- *
- * **The denominator is what you decided you want, not what StashDB has.** A
- * studio's catalogue is a fact about StashDB; the share of it you have is a
- * number you cannot act on and never reaches 100. Against the scenes you own
- * plus the ones you marked, the percentage means "am I up to date", which is a
- * question with an answer and a thing to do about it.
- *
- * So the scenes of the catalogue sort into four piles: ignored (gone from both
- * halves of the fraction), held, wanted-but-missing, and undecided. Undecided
- * is the one that keeps it honest — a catalogue that has released six new
- * scenes says six need a decision rather than silently moving the number.
+ * The instant half: sort into ignored, held, wanted-but-missing, undecided.
+ * Pure. The denominator is what you want, not all of StashDB.
  */
 function classify(config, entry, got) {
   const standing = decideRules(config);
@@ -1249,10 +936,7 @@ function classify(config, entry, got) {
   let missing = 0;
   let undecided = 0;
   let ignored = 0;
-  // Held back by a standing rule. Counted apart from undecided rather than
-  // inside it: a card you will never be shown is not one you have to answer
-  // for, and a heading that counted them would be the page overstating the job
-  // by the exact amount the rules just saved you.
+  // Rule-hidden scenes counted apart from undecided.
   let ruled = 0;
 
   for (const scene of got.scenes) {
@@ -1298,11 +982,7 @@ function classify(config, entry, got) {
   };
 }
 
-/*
- * A network is its parent studio: tracking "Vixen Media Group" as a network
- * measures every site under it, which is the question a network-level card is
- * actually asking. StashDB takes the parent's UUID here, not its name.
- */
+/* A network is filtered by its parent studio's UUID. */
 function filterFor(entry) {
   if (entry.kind === 'performer') return stashdb.sceneQuery({ performers: [entry.id] });
   if (entry.kind === 'tag') return stashdb.sceneQuery({ tags: [entry.id] });

@@ -4,23 +4,12 @@ import * as shelf from '../shelf.js';
 import { api, el } from '../util.js';
 import { SECTION_OF, paint, painterFor, show, state } from '../import/core.js';
 
-/* --------------------------------------------------- the group builder
+/*
+ * --------------------------------------------------- the group builder
  *
- * "Which of my loose scenes are actually one film?"
- *
- * Two pages in one, and the order is the point. The top half is the studios
- * that have loose scenes, because a scan costs somebody else's crawl budget and
- * is worth running against a studio you hold two hundred scenes of and not
- * against one you hold two of. The bottom half is what the scans have found,
- * waiting on a yes or a no.
- *
- * Every proposal wears the source that made it. An *exact* one came off
- * ThePornDB's own scene list and needs no judgement; a *probable* one was
- * matched on the cast IAFD lists for that film, which is a guess, and the cast
- * it matched on is shown so it can be judged rather than trusted.
- *
- * Nothing on this page writes to Stash until Build it is pressed, and what it
- * will write is on screen before you press it.
+ * Which loose scenes are really one film? Top: studios with loose scenes,
+ * to scan. Bottom: proposals awaiting yes or no, each labelled with its
+ * source and evidence. Nothing is written until Build it.
  */
 
 const groupsHash = (params) => {
@@ -34,9 +23,7 @@ function goGroups(params) {
   else location.hash = hash;
 }
 
-// While a scan is running the page is a progress bar; four seconds is often
-// enough to feel live and rare enough that a quarter-hour scan is not two
-// hundred requests of its own.
+// Poll every four seconds while scanning.
 const SCAN_POLL = 4000;
 let scanPoll = null;
 
@@ -63,13 +50,8 @@ export async function showGroupBuilder(qs) {
   body.replaceChildren(el('div', { className: 'empty' }, 'Reading the library…'));
 
   /*
-   * `headOnly` is the whole reason the poll is not just refresh().
-   *
-   * Redrawing the proposals while a scan runs would wipe whatever you were in
-   * the middle of — a group you had just built and were answering the missing
-   * scenes of is a form, and a form that redraws itself every four seconds is
-   * not usable. So a tick moves the progress line and nothing else, and the
-   * list is rebuilt once, when the scan stops.
+   * `headOnly`: while scanning, update only the progress line, so a form
+   * you're filling in isn't redrawn.
    */
   const refresh = async (headOnly = false) => {
     const [shelf, found] = await Promise.all([
@@ -109,12 +91,7 @@ export async function showGroupBuilder(qs) {
   }
 }
 
-/*
- * The studio picker and the scan.
- *
- * A studio with no ThePornDB id anywhere in its loose scenes has no catalogue
- * to read, and the row says so rather than offering a button that does nothing.
- */
+/* The studio picker and scan. Studios with no TPDB id say so. */
 function groupPanel(shelf, found, params) {
   const chosen = params.get('studio') || '';
   const scanning = found.scanning;
@@ -168,12 +145,7 @@ function groupPanel(shelf, found, params) {
     say.push(el('span', { className: 'muted small' },
       'None of this studio’s loose scenes carry a ThePornDB id, so there is no catalogue to read.'));
   } else if (studio?.scannedAt) {
-    /*
-     * Two numbers, and the small one is not a failure. A film none of your
-     * loose scenes fits inside cannot hold one, so it is never asked about —
-     * that is why a thousand films read can come down to a handful worth a
-     * question.
-     */
+    /* Films read vs films worth asking about. */
     say.push(el('span', { className: 'muted small' },
       `${(studio.read ?? studio.movies).toLocaleString()} films read` +
       (studio.catalogue && studio.catalogue > studio.read ? ` of ${studio.catalogue.toLocaleString()}` : '') +
@@ -187,12 +159,7 @@ function groupPanel(shelf, found, params) {
       'Reads the studio on ThePornDB, then IAFD for the rest. A big studio takes a while.'));
   }
 
-  /*
-   * The offline pass, always available and not tied to the picker: it reads
-   * what the scene titles already say and asks nobody anything. Deliberately
-   * beside the studio scan rather than inside it — it is a different question,
-   * it costs seconds instead of minutes, and it is the one to try first.
-   */
+  /* The offline titles pass, always available, beside the studio scan. */
   const titles = el('button', { className: 'chip', type: 'button', disabled: Boolean(scanning.running) },
     'Read the titles');
 
@@ -220,12 +187,7 @@ function renderProposals(body, found, refresh) {
   const { proposals, finishing } = found;
   const kids = [];
 
-  /*
-   * The groups you have built that still have a question open, above the ones
-   * you have not looked at. Building a group and saying what to do about what
-   * it is missing are two steps, and the second one is the one a reload used to
-   * lose — so it is the first thing on the page until it is done.
-   */
+  /* Built groups with open questions come first. */
   if (finishing.length) {
     kids.push(el('div', { className: 'feedhead' },
       el('h2', {}, `${finishing.length} built, still to answer`),
@@ -251,11 +213,7 @@ function renderProposals(body, found, refresh) {
   body.replaceChildren(...kids);
 }
 
-/*
- * A group that exists, shown only for the sake of the scenes it is missing.
- * There is nothing to approve here and no way back to a decision — undoing a
- * group is the film shelf's job, and it asks properly.
- */
+/* A built group, shown for its missing scenes only. */
 function finishingCard(proposal) {
   const open = (proposal.missing || []).filter((scene) => !proposal.scenes[scene.key]);
 
@@ -277,13 +235,7 @@ function finishingCard(proposal) {
   );
 }
 
-/*
- * One film, and the case for it.
- *
- * The held scenes are tickable and start ticked: this is the one place where
- * "the evidence is right but that third scene is not part of it" has to be
- * sayable, and dropping a row is cheaper than undoing a group.
- */
+/* One proposal. Held scenes are tickable and start ticked. */
 function proposalCard(proposal, refresh) {
   const chosen = new Map();
   const rows = el('div', { className: 'heldrows' });
@@ -361,30 +313,15 @@ function proposalCard(proposal, refresh) {
         el('span', {}, proposal.date || 'no date'),
         el('span', {}, proposal.studioName),
         proposal.director ? el('span', {}, proposal.director) : null,
-        /*
-         * Exact is green because it needs no judgement from you. Likely is not
-         * — a title match is a good guess and still a guess — so it reads as
-         * every other tier does and the row below says what answered.
-         */
+        /* Only exact is green. */
         el('span', { className: proposal.match === 'exact' ? 'good' : 'muted' }, proposal.match)),
-      /*
-       * The titles tier has no denominator and does not pretend to one. Nothing
-       * knows whether Barely Legal #14 had five scenes or eight, so it counts
-       * what you hold and stops — the alternative is a 100% badge on a film you
-       * own half of, which is the lie the builder in groupbuilder.mjs refuses to
-       * tell.
-       */
+      /* The titles tier has no known size; it counts what you hold. */
       el('div', { className: 'muted small' },
         (proposal.total
           ? `${heldCount} of ${proposal.total} — matched on ${proposal.via}`
           : `${heldCount} scenes name this film in their own titles — nothing says how many it has`) +
         (proposal.iafd?.compilation ? '. IAFD calls this a compilation.' : '')),
-      /*
-       * The film's size is known but the gap cannot be named: something you
-       * hold did not land on any of the breakdown's rows, so one of the empty
-       * rows might be it. Said plainly, because "3 of 5 and no missing list"
-       * otherwise reads as a bug.
-       */
+      /* Size known but the gap can't be named: say so. */
       proposal.total && !proposal.missing.length && proposal.total > heldCount
         ? el('div', { className: 'muted small' },
             `${proposal.total - heldCount} not here. ` +
@@ -412,12 +349,7 @@ function heldRow(row, chosen, studioName) {
   const tick = el('input', { type: 'checkbox', checked: true });
   tick.onchange = () => chosen.set(row.sceneId, tick.checked);
 
-  /*
-   * Where the scene is filed, but only when that is not where the film says it
-   * should be. A DVD gathers scenes from sibling labels, so this is normal
-   * rather than wrong — and it is still the thing to look at twice before
-   * agreeing, which is why it is said out loud and nowhere else.
-   */
+  /* Where a scene is filed, when it differs from the film's studio. */
   const elsewhere = row.studio && studioName && row.studio !== studioName ? row.studio : null;
 
   return el('label', { className: 'heldrow' },
@@ -431,12 +363,7 @@ function heldRow(row, chosen, studioName) {
   );
 }
 
-/*
- * Two of your scenes have exactly this cast, so IAFD's row cannot say which one
- * it means. Both are offered and neither is assumed — leaving it alone builds
- * the group without this scene, which is a smaller wrong than filing the wrong
- * one.
- */
+/* Two of your scenes share this cast; pick one or leave it out. */
 function ambiguousRow(row, chosen) {
   const name = `amb-${Math.random().toString(36).slice(2)}`;
 
@@ -462,15 +389,11 @@ function ambiguousRow(row, chosen) {
   );
 }
 
-/* -------------------------------------------------- what it is missing
+/*
+ * -------------------------------------------------- what it is missing
  *
- * The second question, asked only once the group exists. Three answers, and
- * they are three different sentences: Want means put it on the want list, Add
- * means fetch it now, Skip means this film is complete enough without it.
- *
- * Skip here is local to this page. It deliberately does not touch the want
- * list's own skip list, which means "not for me" and moves the tracked
- * percentage every other page reads.
+ * Once built: Want (want list), Add (fetch now), Skip (not needed). This
+ * Skip is local to the page and doesn't touch the want list's.
  */
 function renderAfterBuild(after, proposal, result) {
   const kids = [
@@ -534,11 +457,7 @@ function missingRow(proposal, scene, answered = null) {
     return button;
   };
 
-  /*
-   * Taking an answer back only forgets the answer. A tracked scene stays
-   * tracked and a fetched one stays fetched — this page did not put the file
-   * there and is not the thing that should take it away.
-   */
+  /* Undo forgets the answer only; tracked or fetched stays. */
   const change = () => {
     const button = el('button', { className: 'chip', type: 'button' }, 'Change');
     button.onclick = async () => {
@@ -558,12 +477,7 @@ function missingRow(proposal, scene, answered = null) {
     return button;
   };
 
-  /*
-   * IAFD named the cast and nothing else, so there is no id to track or fetch
-   * by. Rather than a button that fails, the row offers to go and look for it
-   * on StashDB — the same "Find it" the Match page uses for a scene Stash
-   * cannot name.
-   */
+  /* IAFD-only rows have no id; offer Find it on StashDB instead. */
   const find = el('button', { className: 'chip', type: 'button' }, 'Find it');
   find.onclick = async () => {
     find.disabled = true;
@@ -572,12 +486,7 @@ function missingRow(proposal, scene, answered = null) {
       const found = await api(
         `/api/import/groups/${encodeURIComponent(proposal.id)}/scenes/${encodeURIComponent(scene.key)}/find`);
 
-      /*
-       * How it was asked matters as much as what came back. A cast search is
-       * the real one; a text search means StashDB did not recognise any of
-       * these names and the results are a much weaker guess, so the line says
-       * so rather than letting both look equally trustworthy.
-       */
+      /* Say whether it searched by cast (real) or text (weak). */
       const how = found.by === 'cast'
         ? `Scenes with all of ${found.term}`
         : `No StashDB performer matched, so this searched the names as text: “${found.term}”`;
@@ -586,12 +495,7 @@ function missingRow(proposal, scene, answered = null) {
         ? el('div', { className: 'muted small' }, `Not on StashDB under that name: ${found.unknown.join(', ')}`)
         : null;
 
-      /*
-       * IAFD's stand-in for somebody a film never credited. Saying so matters:
-       * a four-person row searched on three names is a wider net than the row
-       * implies, and a reader who does not know one slot was blank will read a
-       * loose result as a bad match rather than an under-specified one.
-       */
+      /* Note IAFD's uncredited placeholders: the search used fewer names. */
       const blank = (found.unnamed || []).length
         ? el('div', { className: 'muted small' },
             `IAFD did not name ${found.unnamed.length === 1 ? 'one performer' : `${found.unnamed.length} performers`} `
@@ -617,11 +521,7 @@ function missingRow(proposal, scene, answered = null) {
     }
   };
 
-  /*
-   * Naming which candidate it is, which is what turns Track and Add on. The
-   * title still links out to StashDB — the point of looking is to look — and
-   * "That one" is the separate press that commits.
-   */
+  /* "That one" names the candidate, enabling Track and Add. */
   const candidateRow = (card) => {
     const pick = el('button', { className: 'chip', type: 'button' }, 'That one');
     pick.onclick = async () => {
@@ -647,11 +547,7 @@ function missingRow(proposal, scene, answered = null) {
       pick);
   };
 
-  /*
-   * Track and Add both need an id. A scene only IAFD named has none, so those
-   * two are not offered at all — a button that can only fail is worse than no
-   * button, and Find it is the thing that makes them possible.
-   */
+  /* Track and Add only when there's an id. */
   const buttons = () => [
     scene.addressable ? answer('tracked', 'Want') : find,
     scene.addressable ? answer('added', 'Add') : null,

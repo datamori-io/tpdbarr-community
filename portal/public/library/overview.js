@@ -1,21 +1,10 @@
 /*
- * The library's front page, and the Stats tab it used to be.
+ * The library's front page, and the Stats tab.
  *
- * The Overview is laid out the way a video hub is: a section is a header with
- * a MORE beside it, one item given the room to be read, and the rest of that
- * section beside it small. The news block leads because it is the only thing
- * on the page that changed while you were away — everything else is the
- * library, which was there yesterday too.
- *
- * The five feeds are merged into one stream here rather than kept as a shelf
- * each. Five publishers covering one industry file the same story five times;
- * as separate rows that reads as five things happening, and as one stream
- * sorted by date it reads as what it is.
- *
- * Everything the page used to open with — the pipeline flow, the metric
- * cards, the tallies, what is still moving, the Whisparr tidy-up — is on the
- * Stats tab at #/stats now. It answers "how is the collection doing", which is
- * a question you go and ask, not one to be answered at you on the way in.
+ * The Overview is laid out like a video hub: a header with MORE, one big
+ * item, the rest small. The Feed, then news (five feeds merged into one
+ * stream by date), then the library rails. The pipeline, charts and tidy-up
+ * are on #/stats.
  */
 
 import { api, el } from '../util.js';
@@ -31,12 +20,7 @@ export async function showOverview() {
     const { rails: rows } = await api('/api/library/overview');
     if (!holds(mine)) return;
 
-    /*
-     * Drawn in the order asked for rather than the order they arrive in, so
-     * the page does not quietly reshuffle itself the day `rails()` changes.
-     * Anything the server sends that is not on this list still gets a section,
-     * at the end — a new rail should appear, not vanish.
-     */
+    /* Rails in this order; unknown ones are appended. */
     const ORDER = ['continue', 'recent', 'released', 'tracked-performers', 'tracked-studios'];
     const ordered = [
       ...ORDER.map((key) => rows.find((r) => r.key === key)).filter(Boolean),
@@ -54,20 +38,12 @@ export async function showOverview() {
   }
 }
 
-/* ------------------------------------------------------------- the feed
+/*
+ * ------------------------------------------------------------- the feed
  *
- * The highlight, above even the news: the Feed is the new way into the
- * library — the moments rather than the films, one after another, a thumb to
- * move on — and a link in the top bar was not selling it.
- *
- * The preview is the real thing, muted: marker clips from the same endpoint
- * the reel reads, each played for a few seconds and then swapped for the next.
- * Ours first, Stash's if ours is not cut yet, and a clip that plays neither is
- * skipped rather than left as a black box.
- *
- * Its timer outlives the render, so every tick checks the video is still on
- * the page and stops for good when it is not. Leaving the Overview is the
- * teardown; nothing has to remember to call one.
+ * A muted live preview of marker clips from the reel's endpoint, a few
+ * seconds each. Ours, then Stash's; unplayable clips are skipped. Stops
+ * itself once the video leaves the page.
  */
 const TEASE_MS = 6000;
 
@@ -144,15 +120,10 @@ function feedHero() {
   return hero;
 }
 
-/* ------------------------------------------------------------------ news
+/*
+ * ------------------------------------------------------------------ news
  *
- * The lead block, and the only one drawn as a row of big cards: these are the
- * three most recent things published anywhere, and at that size the picture
- * does the work of saying which is worth reading.
- *
- * MORE opens the rest in place rather than going somewhere. There is no news
- * page to go to, and inventing one to hold a list that is already in memory
- * would be a page that exists because a link needed a destination.
+ * The three newest stories as big cards; MORE expands in place.
  */
 const LEAD = 3;
 const MORE_STEP = 8;
@@ -218,13 +189,10 @@ function newsCard(item) {
   return card;
 }
 
-/* -------------------------------------------------------- scene sections
+/*
+ * -------------------------------------------------------- scene sections
  *
- * One shelf, one scrolling row. The section wears the hub's header — a rule, a
- * small grey label, MORE hard right — and the row underneath is the same
- * scroller the rest of the library uses, carrying the whole two dozen the
- * server sent rather than the five a fixed grid had room for. MORE still goes
- * to the shelf page, which is the thing that holds all three thousand.
+ * One scrolling row per shelf; MORE goes to the shelf page.
  */
 function sceneSection(row) {
   const scenes = row.scenes || [];
@@ -243,11 +211,7 @@ function sceneSection(row) {
 const countNote = (row) =>
   row.count ? `${row.count.toLocaleString()} in all` : null;
 
-/*
- * The scroller, with arrows that fade in on hover and hide themselves at
- * either end. The same mechanics as `rail()` in tiles.js, kept here because
- * that one draws a heading of its own and these sections draw the hub's.
- */
+/* Scroller arrows, like `rail()` in tiles.js without its heading. */
 function scroller(items) {
   const track = el('div', { className: 'railtrack' }, items);
 
@@ -269,11 +233,7 @@ function scroller(items) {
   return el('div', { className: 'railbody' }, left, track, right);
 }
 
-/*
- * The rule-and-label every section on this page wears. Small, uppercase and
- * grey on purpose: a hub is read by its pictures, and six headings competing
- * with them at heading size is how that stops working.
- */
+/* Small grey uppercase section labels. */
 function sectionHead(title, note, action = null) {
   return el('div', { className: 'edhead' },
     el('h2', { className: 'edname' }, title),
@@ -282,11 +242,10 @@ function sectionHead(title, note, action = null) {
   );
 }
 
-/* ----------------------------------------------------------------- stats
+/*
+ * ----------------------------------------------------------------- stats
  *
- * Its own tab in the topbar. Everything here was the Overview until the
- * Overview became a landing page; nothing about what it draws has changed,
- * only where it lives and that it now says what it is at the top.
+ * Its own tab.
  */
 export async function showStats() {
   const mine = claim();
@@ -295,10 +254,7 @@ export async function showStats() {
     const { inFlight, counts } = await api('/api/library/overview');
     if (!holds(mine)) return;
 
-    // The tidy panel is asked for separately and appended when it lands. It has
-    // to talk to two Whisparrs and read the whole filed shelf, which is several
-    // seconds — long enough that waiting for it would hold up the whole page
-    // for the sake of a strip at the bottom.
+    // The tidy panel loads separately and is appended; it takes several seconds.
     const tidy = el('div', {});
     const top = counts ? countRow(counts) : null;
 
@@ -317,17 +273,8 @@ export async function showStats() {
 }
 
 /*
- * The pipeline.
- *
- * Left to right in the order a file actually moves: grabbed by Whisparr,
- * hand-edited, encoded, filed. The segments are proportional, so the shape of
- * the bar *is* the state of the pipeline — a fat middle means the encoder is
- * behind, a fat left end means a big grab has just landed and none of it has
- * been through yet.
- *
- * The first segment is the one stage Stash cannot see, so it arrives later
- * with the Whisparr survey and slots in front. Until then the bar is honest
- * about the four stages it does know.
+ * The pipeline bar, left to right as files move; segments proportional.
+ * The first (in Whisparr, invisible to Stash) arrives later.
  */
 const PIPELINE = [
   { key: 'downloaded', label: 'Downloaded', note: 'in Whisparr, no Stash record yet', href: null },
@@ -386,10 +333,10 @@ function pipeline(stages, downloaded) {
   );
 }
 
-/* ------------------------------------------------------------------- cards
+/*
+ * ------------------------------------------------------------------- cards
  *
- * Small charts, each with the sentence it is evidence for. A number in a box
- * says how many; these are meant to say what is going on.
+ * Small charts, each with the sentence it supports.
  */
 
 const metricCard = (title, headline, sub, chart, href) =>
@@ -403,11 +350,7 @@ const metricCard = (title, headline, sub, chart, href) =>
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (key) => MONTHS[Number(key.slice(5, 7)) - 1] || key;
 
-/*
- * How fast it is growing. Bars rather than a line, because these are discrete
- * monthly totals and a line between them would draw a rate through the middle
- * of a month that nobody measured.
- */
+/* Scenes added per month, as bars (discrete totals). */
 function growthCard(added) {
   if (!added || !added.length) return null;
 
@@ -425,9 +368,7 @@ function growthCard(added) {
         width: (width * 0.7).toFixed(2),
         height: Math.max(h, month.n ? 0.6 : 0).toFixed(2),
         rx: 0.6,
-        // Namespaced: the acquisition side already owns a `.bar`, and in SVG2 a
-        // CSS `height` beats the height attribute, so an accidental match
-        // flattens every column to 4px.
+        // Namespaced: `.bar` is taken, and in SVG2 CSS height beats the attribute.
         class: i === added.length - 1 ? 'sparkbar now' : 'sparkbar',
       });
     }),
@@ -447,11 +388,7 @@ function growthCard(added) {
   );
 }
 
-/*
- * A stacked bar, for the two questions shaped as parts of a whole. A segment
- * carries its own percentage when there is room for it, because a legend
- * underneath makes the reader do the matching themselves.
- */
+/* A stacked bar, with percentages on segments that have room. */
 function stackChart(parts, total) {
   const kept = parts.filter((part) => part.n > 0);
 
@@ -473,10 +410,7 @@ function stackChart(parts, total) {
   return el('div', {}, bar, keys);
 }
 
-/*
- * What the files actually are. The tallest file wins on a scene holding both a
- * master and a proxy, so this is the best copy held rather than the average.
- */
+/* Best copy held per scene (tallest file). */
 function qualityCard(q) {
   const total = q.uhd + q.hd + q.sd + q.unknown;
   if (!total) return null;
@@ -495,11 +429,7 @@ function qualityCard(q) {
   );
 }
 
-/*
- * How much of it has ever been played — the one metric here that is about you
- * rather than about the files. A ring because it is a single share of a single
- * whole, and at this size a ring reads faster than a bar.
- */
+/* Share ever played, as a ring. */
 function watchedCard(w) {
   const total = w.played + w.untouched;
   if (!total) return null;
@@ -529,11 +459,8 @@ function watchedCard(w) {
 }
 
 /*
- * Which catalogue each scene is identified against.
- *
- * Not trivia — identity is the join. The coverage percentages, the movie match
- * and the Whisparr tidy-up further down this page all run on a stash id, and
- * the unidentified slice is exactly the set none of them can reach.
+ * Which stash-box each scene is identified against. Unidentified scenes
+ * are what coverage, movie match and tidy can't reach.
  */
 function identityCard(id) {
   const total = id.stashdb + id.tpdb + id.none;
@@ -552,11 +479,7 @@ function identityCard(id) {
   );
 }
 
-/*
- * What years the collection covers. An area rather than bars: unlike the
- * monthly chart this really is a continuous run, and the shape — a long thin
- * tail back to the seventies under a heavy recent decade — is the point.
- */
+/* Years covered, as an area. */
 function yearsCard(years) {
   if (!years || years.length < 3) return null;
 
@@ -585,11 +508,7 @@ function yearsCard(years) {
   );
 }
 
-/*
- * The four sections, still links because that is what this row was for before
- * it grew charts. Deliberately smaller than the metrics above it: these are
- * navigation, and the charts are the reason to look at the page.
- */
+/* Links to the four sections, smaller than the charts. */
 function navRow(counts) {
   const one = (label, held, known, href) =>
     el('a', { className: 'tally', href },
@@ -610,15 +529,7 @@ function navRow(counts) {
   );
 }
 
-/*
- * The whole top block.
- *
- * "Held" means everything Stash holds, since 2026-09-01. It used to mean only
- * what had reached /organized_scenes, which hid 1080 scenes from every count in
- * the app and read as "you do not own this" about a file that was simply
- * mid-encode. The folder is a status, and the pipeline is where statuses now
- * belong.
- */
+/* The top block. Held means everything in Stash. */
 function countRow(counts) {
   const charts = counts.charts || {};
 
@@ -636,12 +547,7 @@ function countRow(counts) {
     navRow(counts)
   );
 
-  /*
-   * Redrawn once the Whisparr survey lands, so the bar can grow its front
-   * segment — the files sitting upstream of Stash, which nothing else on this
-   * page can count. Kept as a method on the node rather than a second render
-   * pass because only this one strip changes.
-   */
+  /* Redraw the bar when the Whisparr survey lands. */
   block.redraw = (downloaded) => {
     if (!counts.stages || downloaded == null) return;
     const current = block.querySelector('.flowpanel');
@@ -651,11 +557,7 @@ function countRow(counts) {
   return block;
 }
 
-/*
- * Yours, still moving: being cut by hand or queued for the encoder. Not a
- * problem to fix, just the state of the pipeline — which is why it is a rail
- * and not a warning.
- */
+/* Scenes still in the pipeline, as a rail. */
 function inFlightRail(moving) {
   return missingRail({
     title: 'Still moving',
@@ -681,18 +583,11 @@ export async function showStage(key) {
   }
 }
 
-/* ------------------------------------------------------------------ tidying
+/*
+ * ------------------------------------------------------------------ tidying
  *
- * What Whisparr is still holding that Stash has already filed.
- *
- * Two buttons and never one, because they are different promises. Unmonitoring
- * says "this landed" and can be taken back in Whisparr's own UI; removing
- * deletes the file Whisparr grabbed, and only after a fortnight of nobody
- * saying otherwise. Rolling them into one button would hide the second inside
- * the first, and the second is the one that cannot be undone.
- *
- * A failure here draws nothing at all. Whisparr is optional in this portal and
- * a red bar on the library page about an instance you do not run is noise.
+ * What Whisparr still holds that Stash has filed. Two buttons: Unmonitor
+ * (reversible) and Remove (deletes, after 15 days). A failure draws nothing.
  */
 async function loadTidy(mount, mine, top = null) {
   let found;
@@ -756,11 +651,7 @@ function tidyPanel(found, mount, mine, top = null) {
   if (due) {
     const remove = el('button', { className: 'act danger', type: 'button' },
       `Remove the ${due} from Whisparr`);
-    /*
-     * A native confirm, the same guard the film Save sits behind. This one
-     * deletes files and writes an import exclusion, and the count in the button
-     * is the only thing between a stray click and a fortnight's grabs.
-     */
+    /* confirm(): this deletes files and adds import exclusions. */
     remove.onclick = () => run(
       remove,
       '/api/tidy/remove',
@@ -798,12 +689,7 @@ Stash keeps its own copies — that is what the ${found.holdDays}-day wait was c
       el('span', { className: 'muted' }, 'a downloader, not a library')
     ),
     lines,
-    /*
-     * `tidybar` and not `toolbar`: the tile-size control mounts itself into the
-     * first `.toolbar` it finds in the view, and on this page that would be
-     * this one — putting a thumbnail-size picker inside the panel that deletes
-     * files.
-     */
+    /* Not `toolbar`: the tile-size control mounts into the first `.toolbar`. */
     el('div', { className: 'tidybar' }, buttons, status)
   );
 }
@@ -815,11 +701,7 @@ function line(what, why) {
   );
 }
 
-/*
- * Which instance the number came from, and how it was matched. Worth saying:
- * v3 joins on the StashDB id and is exact, v2 has no shared key with Stash at
- * all and is matched on title and date, so the two are not equally sure.
- */
+/* Which instance and how it matched: v3 exact (StashDB id), v2 title and date. */
 function describeReady(v3, v2) {
   const parts = [];
   if (v3.unmonitor?.length) parts.push(`${v3.unmonitor.length} in v3`);

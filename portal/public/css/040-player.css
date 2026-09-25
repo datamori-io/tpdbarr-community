@@ -9,12 +9,10 @@
 }
 .player { display: block; width: 100%; max-height: 76vh; background: #000; }
 
-/* ---------------------------------------------------------- player chrome
+/*
+ * ---------------------------------------------------------- player chrome
  *
- * The browser's own bar is replaced by player.js, mostly so the seek track can
- * be something a thumb can hit. Everything below the wrapper is drawn rather
- * than native, so the sizes here are the ones that decide whether this is
- * usable on a phone: a 40px scrub row and 44px buttons under a coarse pointer.
+ * Drawn by player.js: a 40px scrub row and 44px buttons on touch.
  */
 
 .vplayer {
@@ -35,10 +33,7 @@
 .vplayer.fullscreen { display: flex; align-items: center; justify-content: center; }
 .vplayer.fullscreen .player { max-height: 100vh; height: 100vh; object-fit: contain; }
 
-/*
- * The layer that makes the whole picture a seek bar. pan-y so a vertical swipe
- * over the video is still the page scrolling; the horizontal one is ours.
- */
+/* The seek surface. pan-y keeps vertical swipes as page scrolls. */
 .vsurface { position: absolute; inset: 0; touch-action: pan-y; }
 .vplayer.scrubbing .vsurface { cursor: ew-resize; }
 
@@ -83,13 +78,10 @@
 .vspeed.on { color: var(--accent-hi); }
 .vwide.on { color: var(--accent-hi); }
 
-/* Mark this moment. Tinted rather than plain because it is the one button on
-   the bar that writes something down — everything else beside it only changes
-   how the scene is being watched.
-
-   Not `.vmark`: that is already the marker drawn on the track, further down,
-   and it is absolutely positioned — a button wearing it lands on top of the
-   scrub bar. */
+/*
+ * The mark button, tinted: the one control that writes. Not `.vmark`
+ * (that's the track marker, absolutely positioned).
+ */
 .vmarkbtn { color: var(--accent-hi); }
 .vmarkbtn:disabled { opacity: 0.45; cursor: default; }
 
@@ -255,11 +247,7 @@
   pointer-events: none;
 }
 
-/*
- * A thumb is not a mouse pointer: the row it has to land on gets taller, the
- * handle it drags gets bigger, and the volume slider goes away entirely — the
- * phone's own volume keys are the control there.
- */
+/* Touch: taller row, bigger handle, no volume slider. */
 @media (pointer: coarse) {
   .vbar { padding: 34px 8px 12px; }
   .vscrub { height: 40px; }

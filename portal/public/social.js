@@ -1,20 +1,13 @@
 /*
- * Reddit, for the performers already in the library.
- *
- * The page never fetches from Reddit. It reads what the poller in reddit.mjs
- * has cached and, if that is stale, offers to start another walk — which takes
- * hours, because Reddit hands out two or three feed requests a minute and then
- * makes you wait. So the interesting part of this page is telling you honestly
- * where that walk has got to instead of looking hung.
+ * Reddit for your performers. Reads the poller's cache (reddit.mjs); a
+ * walk takes hours, so the page shows how far it's got.
  */
 
 import { api, el } from './util.js';
 
 const view = document.getElementById('view');
 
-// How often to ask again while a walk is running. It moves once every 25s at
-// best and far less when Reddit is refusing, so anything faster than this is
-// asking to be told the same thing.
+// Poll every 10s during a walk.
 const WATCH_MS = 10000;
 
 let live = null;
@@ -38,14 +31,8 @@ const ago = (at) => {
 };
 
 /*
- * A post is a picture if Reddit gave us one. Plenty of entries carry a
- * full-size i.redd.it link and no media:thumbnail at all, so the tile falls
- * back to the full picture rather than showing a hole — lazily, because that
- * one can be a couple of megabytes.
- *
- * A gallery gives us only its 140px crop and would cost another request per
- * picture to open properly, so it says what it is and links out. Anything else
- * is a link.
+ * A post's picture: thumbnail, else the full picture (lazy). Galleries
+ * link out.
  */
 function card(post) {
   const art = post.thumb || post.full;
@@ -122,11 +109,7 @@ function render(session, data) {
     }
   };
 
-  /*
-   * Following something that is not on a performer. Takes what people actually
-   * type — a full URL, `r/name`, `u/name`, or a bare name — and the server
-   * decides which of those it is.
-   */
+  /* Follow something by hand: a URL, `r/name`, `u/name` or a bare name. */
   const entry = el('input', {
     className: 'redditadd',
     type: 'text',

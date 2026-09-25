@@ -1,16 +1,6 @@
 /*
- * Watch state for films on the share.
- *
- * Scenes do not need this: Stash already stores resume_time and play_count, and
- * the scene player reads and writes them there so the two apps agree. Films have
- * no such database behind them — the folder is the record and a folder cannot
- * remember where you stopped. So this is the smallest store that will do, a JSON
- * file next to the config.
- *
- * Keyed on the same id the rest of the movie code uses, which is a hash of the
- * folder name. Rename a folder and its watch state is orphaned. That is a fair
- * trade for not having to keep a database in step with a share someone else
- * writes to, but it is worth knowing.
+ * Watch state for films (scenes use Stash's own). A JSON file beside the
+ * config, keyed on a hash of the folder name — renaming a folder loses its state.
  */
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
@@ -44,11 +34,7 @@ async function load() {
   return state;
 }
 
-/*
- * Written to a temporary file and renamed over the real one, so a crash
- * mid-write cannot leave a half-written file that then parses as an empty
- * history and loses the lot.
- */
+/* Written to a temp file and renamed, so a crash can't empty it. */
 async function flush() {
   timer = null;
   const snapshot = JSON.stringify(state, null, 2);
@@ -83,10 +69,7 @@ export async function watchFor(id) {
   return movies[id] || null;
 }
 
-/*
- * -> Map<id, {resume, plays, progress, finished, lastPlayed}> for a whole page
- * of movies at once, so the shelf does not read the file per tile.
- */
+/* -> Map<id, {resume, plays, progress, finished, lastPlayed}>, for a whole page. */
 export async function watchIndex() {
   const { movies } = await load();
   const out = new Map();

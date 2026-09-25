@@ -1,12 +1,6 @@
 /*
- * Media proxy.
- *
- * Everything the player needs — the video, the hover preview, the poster, the
- * scrub thumbnails — comes from Stash. The browser could fetch those straight
- * from Stash, but then the portal would have to hand it the Stash URL and API
- * key, and the page would break the moment either changed. So it goes through
- * here instead: one origin, no key in the browser, and Range requests passed
- * along untouched so seeking still works.
+ * Media proxy: video, previews, posters and sprites from Stash, through one
+ * origin with no key in the browser. Range requests pass through.
  */
 
 import { Readable } from 'node:stream';
@@ -16,24 +10,14 @@ import { extname, resolve as resolvePath } from 'node:path';
 
 import { gql } from './stash.mjs';
 
-/* ------------------------------------------------- straight off the mount
+/*
+ * ------------------------------------------------- straight off the mount
  *
- * The portal mounts the same volume Stash files scenes into, so for most of
- * the library it is holding the actual file and does not need to ask Stash for
- * it. Serving it here takes Stash out of the playback path: one less hop, and
- * a scene still plays while Stash is unreachable — which on this machine it
- * periodically is, see the WinNAT note.
+ * Stream files straight off the mount when this container can see them, so
+ * playback works without Stash. Everything else (metadata, generated
+ * artefacts, unmounted folders) still comes from Stash.
  *
- * It is a fallback, not a replacement. Stash still answers for everything the
- * folder does not know (all of the metadata), for every generated artefact
- * (posters, sprites, previews live in /generated, which is not mounted here),
- * and for any scene sitting in a folder this container cannot see — Import
- * Folder and the two Whisparrs are Stash's alone unless they get mounted too.
- *
- * **A path from Stash is not a licence to read the disk.** Stash is another
- * service and its answer is data, so a path is only served when it resolves
- * inside one of the media roots below; anything else falls back to the proxy
- * rather than being opened.
+ * A path from Stash is only opened if it resolves inside a media root.
  */
 const MEDIA_ROOTS = [
   '/organized_scenes',
@@ -57,22 +41,15 @@ const VIDEO_TYPES = {
   '.ts': 'video/mp2t',
 };
 
-/*
- * Where Stash says a scene's file is. Cached, because this is asked on every
- * seek and the answer only changes when a file moves through the pipeline —
- * hence a TTL rather than a permanent memo, so a scene that finishes encoding
- * starts being served locally without a restart.
- */
+/* Scene file paths, cached five minutes (a file can move through the pipeline). */
 const PATH_TTL = 5 * 60 * 1000; // the same five minutes the shelf is cached for
 const pathCache = new Map();
 
 export const forgetPaths = () => pathCache.clear();
 
 /*
- * The shelf already asks Stash for every scene's path, so it hands them over
- * rather than letting this ask again one at a time. It is also what makes the
- * fallback worth having: with the cache warm, a filed scene plays with Stash
- * unreachable, because nothing in the path from click to bytes touches it.
+ * The shelf hands over every path it read, so a filed scene can play with
+ * Stash unreachable.
  */
 export function rememberPaths(pairs) {
   const at = Date.now();
@@ -88,19 +65,11 @@ async function scenePath(config, id) {
   try {
     const data = await gql(config, 'query($id: ID!) { findScene(id: $id) { files { path } } }', { id });
     const path = data.findScene?.files?.[0]?.path || null;
-    /*
-     * Only an answer is kept. Caching the absence of one for five minutes was
-     * a bug worth naming: a single Stash hiccup during a burst of requests
-     * demoted that scene to the proxy for the whole window, and it looked for
-     * all the world like the file was not on the mount. A failure here is
-     * almost always transient, so the next request asks again.
-     */
+    /* Only answers are cached: caching a miss demoted scenes to the proxy on a Stash hiccup. */
     if (path) pathCache.set(id, { path, at: Date.now() });
     return path;
   } catch {
-    // Stash unreachable is exactly when the local file matters most — but
-    // without a path there is nothing to open, so this falls through to the
-    // proxy, which will fail the same way and say so.
+    // No path: fall through to the proxy.
     return null;
   }
 }
@@ -111,12 +80,9 @@ const insideRoots = (path) => {
 };
 
 /*
- * -> true if it served the file, false to let the caller fall back to Stash.
- *
- * Range is the whole job. A browser asks for two bytes to find the duration
- * and then seeks by asking for the middle; answering 200 with the lot makes
- * Safari refuse to play at all, so an unsatisfiable range gets a 416 and every
- * other range gets a 206 with the three headers that describe it.
+ * -> true if served, false to fall back to Stash.
+ * Range is the job: Safari refuses a 200 with the whole file, so a bad
+ * range is 416 and every other range a 206.
  */
 async function serveFromDisk(req, res, path) {
   if (!path || !insideRoots(path)) return false;
@@ -196,11 +162,7 @@ const RETURN = [
 
 const stashBase = (config) => String(config.stashUrl || '').replace(/\/+$/, '');
 
-/*
- * Sprite sheets and their vtt are named after the file hash rather than the
- * scene id, so the path can only be got from Stash. Scenes do not get rehashed,
- * so once looked up it is worth keeping.
- */
+/* Sprite and vtt paths use the file hash, so they're looked up once and kept. */
 const spriteCache = new Map();
 
 async function spritePaths(config, id) {
@@ -214,23 +176,14 @@ async function spritePaths(config, id) {
 
 export const forgetSprites = () => spriteCache.clear();
 
-/*
- * -> the Stash URL to fetch, or null if this is not a media path.
- *
- * Stream and preview are id-keyed and stable, so they are built here rather
- * than looked up; only the sprite pair needs a round trip.
- */
+/* -> the Stash URL to fetch, or null. Only the sprite pair needs a lookup. */
 async function resolve(config, kind, id, extra) {
   const base = stashBase(config);
 
   switch (kind) {
     case 'stream':
       return `${base}/scene/${id}/stream`;
-    /*
-     * A marker is a clip inside a scene, so it is the only thing here named by
-     * two ids. Stash generates the clip when the marker is made, so these are
-     * built like the scene paths above rather than looked up.
-     */
+    /* Marker clips: named by scene and marker id, built like the scene paths. */
     case 'markerstream':
       return `${base}/scene/${id}/scene_marker/${extra}/stream`;
     case 'markerpreview':
@@ -253,10 +206,7 @@ async function resolve(config, kind, id, extra) {
     // the right answer — the tile stays the right shape either way.
     case 'group':
       return `${base}/group/${id}/frontimage`;
-    /*
-     * Gallery covers come through here too: Gallery.cover is an ordinary Image,
-     * so it needs no route of its own.
-     */
+    /* Gallery covers are ordinary Images. */
     case 'image':
       return `${base}/image/${id}/image`;
     case 'imagethumb':
@@ -266,13 +216,7 @@ async function resolve(config, kind, id, extra) {
   }
 }
 
-/*
- * The one pair of paths built rather than read that this file is not certain
- * of. Every image Stash knows carries its own `paths`, so a 404 from the built
- * URL asks Stash what it should have been and remembers the answer — which
- * costs one round trip on a Stash whose image routes differ, and nothing at
- * all on one whose do not.
- */
+/* Built image paths are a guess; a 404 asks Stash for the real path and remembers it. */
 const imageCache = new Map();
 
 async function imagePath(config, kind, id) {
@@ -291,19 +235,9 @@ async function imagePath(config, kind, id) {
 export const forgetImages = () => imageCache.clear();
 
 /*
- * The vtt names its sprite sheet, and it names it two different ways.
- *
- * Sometimes that is an absolute Stash URL, which left alone would send the
- * browser straight to Stash — the one thing this proxy exists to avoid.
- * Sometimes, and in this library usually, it is a **bare filename**
- * (`c9f993644270c408_sprite.jpg#xywh=0,0,160,90`), which the browser resolves
- * against the page it is on: the portal's own root, where there is no such
- * file. Both are rewritten to point back here, which is why the prefix is
- * optional rather than required — matching only the absolute form left every
- * scrub preview with an empty box where the picture goes.
- *
- * The fragment is left alone: `[^\s#]*` stops at the `#`, and the crop after
- * it is what tells the player which tile of the sheet to show.
+ * Point the vtt's sprite references back here. They're either absolute
+ * Stash URLs or bare filenames (which would resolve against the portal
+ * root), so the prefix is optional. The `#xywh` fragment is kept.
  */
 function rewriteVtt(body, id) {
   return body.replace(/(?:https?:\/\/)?[^\s#]*_sprite\.(?:jpe?g|png|webp)/gi, `/media/scene/${id}/sprite`);
@@ -315,11 +249,7 @@ export async function proxy(config, req, res, kind, id, extra) {
     return;
   }
 
-  /*
-   * The file first, when this container can see it. Only the stream: the
-   * poster, the preview and the sprites are generated by Stash and live
-   * somewhere this container does not mount.
-   */
+  /* Serve the stream from disk when visible. Generated artefacts aren't mounted. */
   if (kind === 'stream') {
     const path = await scenePath(config, id);
     if (await serveFromDisk(req, res, path)) return;
@@ -341,11 +271,8 @@ export async function proxy(config, req, res, kind, id, extra) {
   const headers = {};
   for (const name of FORWARD) {
     /*
-     * A vtt is the one thing here whose body this proxy writes rather than
-     * relays, so the copy in the browser is ours and not Stash's. Ask Stash
-     * conditionally and it answers 304 about a file that genuinely has not
-     * changed — and the browser reuses a body an older version of rewriteVtt
-     * produced, forever, because the file it is keyed on never will change.
+     * Don't forward conditional headers for the vtt: we rewrite it, and a 304
+     * would keep an old rewrite in the browser forever.
      */
     if (kind === 'vtt' && name !== 'range') continue;
     if (req.headers[name]) headers[name] = req.headers[name];
@@ -377,12 +304,7 @@ export async function proxy(config, req, res, kind, id, extra) {
     const value = upstream.headers.get(name);
     if (value) out[name] = value;
   }
-  /*
-   * Preview clips and posters are worth holding on to; the stream is not. The
-   * vtt is the odd one: it is the only thing here this proxy rewrites on the
-   * way through, so a day-long copy in the browser is a day of whatever that
-   * rewriting got wrong. Five minutes, and it is a few kilobytes of text.
-   */
+  /* Cache previews and posters for a day, the stream not at all, the vtt five minutes. */
   if (!out['cache-control']) {
     out['cache-control'] =
       kind === 'stream' ? 'no-store' : kind === 'vtt' ? 'public, max-age=300' : 'public, max-age=86400';

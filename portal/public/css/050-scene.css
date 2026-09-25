@@ -1,8 +1,7 @@
-/* -------------------------------------------------------------- the scene
+/*
+ * -------------------------------------------------------------- the scene
  *
- * Two columns: the player and what you do with it, then a rail of what you
- * read. Under 1080 it becomes the single stack it used to be, which is the
- * right shape on a narrow screen and the wrong one on a wide monitor.
+ * Two columns (player and actions, reading rail); one stack under 1080px.
  */
 
 .scenepage {
@@ -18,11 +17,8 @@
 .scenepage h1 { margin: 0 0 8px; font-size: 27px; letter-spacing: -0.02em; line-height: 1.2; }
 
 /*
- * The head row. What identifies the scene on the left, who is in it on the
- * right. The faces are a fixed size and the row has a floor taller than one of
- * them, so the cast can never be what decides the height — the title, the
- * studio line and the buttons do. Sideways it is capped too: past about five
- * faces the strip scrolls rather than eating the title's width.
+ * Head row: title block left, cast right. Faces are fixed-size so the cast
+ * never sets the height; past about five it scrolls.
  */
 .scenehead {
   display: grid;
@@ -140,20 +136,11 @@
 .sidetrack::-webkit-scrollbar { display: none; }
 .sidetrack > .facet { flex: 0 0 100%; scroll-snap-align: start; }
 
-/*
- * The switch in the player bar: the column of things you read folds away and
- * the picture takes the width it was leaving for it.
- */
+/* Wide: the rail folds away. */
 .scenepage.wide { grid-template-columns: minmax(0, 1fr); }
 .scenepage.wide .sceneside { display: none; }
 
-/*
- * And the rest of the page steps back. Everything that is not the scene — the
- * top bar, the status line, the section strip, the gallery panel and the rails
- * underneath — fades rather than goes, and comes back the moment you point at
- * it. Nothing is hidden and nothing moves: a control that vanished would have
- * to be found again, and a page that reflowed would lose your place in it.
- */
+/* Everything else fades (back on hover); nothing is hidden or moved. */
 body.videowide .topbar,
 body.videowide .statusbar,
 body.videowide #view > *:not(.scenepage) {
@@ -280,13 +267,7 @@ a.tagchip:hover { border-color: var(--accent-hi); color: var(--text); }
 }
 
 
-/*
- * Scale down — the one control in the library that destroys something, sitting
- * in the card that states what it is about to change.
- *
- * Set apart from the spec list above it by a rule rather than by colour: it is
- * not a warning, it is a different kind of thing from the facts it follows.
- */
+/* Scale down, set apart by a rule. */
 .shrink {
   margin-top: 10px;
   padding-top: 10px;
@@ -319,13 +300,8 @@ a.tagchip:hover { border-color: var(--accent-hi); color: var(--text); }
 }
 
 /*
- * The scene index — twenty-four frames, four across, in the rail. See
- * indexCard() in library/scene.js.
- *
- * Square-ish cells rather than 16:9 ones: at a quarter of the rail's width a
- * 16:9 frame is 78px by 44px, which is too short to read. The crop is scaled
- * to the cell's width and the overflow is taken off the top and bottom, which
- * is where the letterboxing is anyway.
+ * The scene index (see indexCard() in library/scene.js). Squarer cells,
+ * cropped top and bottom, so frames are readable.
  */
 .sceneindex {
   display: grid;

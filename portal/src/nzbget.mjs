@@ -1,14 +1,6 @@
 /*
- * NZBGet on this machine — where a hand-picked usenet release goes.
- *
- * Prowlarr's own download client is the SABnzbd on the Mac, which files into a
- * category nothing here watches. The NZBGet that Whisparr v3 uses sits beside
- * the rest of the pipeline, so a grab from the indexer band is fetched through
- * Prowlarr and handed to this one instead.
- *
- * Its own category, never WhisparrV2/V3: Whisparr watches those and would try
- * to import a download it never asked for. NZBGet takes a category it has no
- * entry for and files it under DestDir/<category> all the same.
+ * Local NZBGet, for hand-picked usenet releases. Its own category, never
+ * WhisparrV2/V3 (Whisparr would try to import it).
  *
  *   POST /jsonrpc  {method: 'append', params: [name, base64, category, priority,
  *                   addToTop, paused, dupeKey, dupeScore, dupeMode, ppParams]}

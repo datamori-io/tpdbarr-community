@@ -1,25 +1,9 @@
 /*
- * Finding a scrapeable address for a film you own.
+ * Find a scrapeable URL for a group Stash can't fill in.
  *
- * Stash can fill a group in completely — name, date, director, synopsis, studio
- * and both covers — but only from a URL, and only from a site it has a scraper
- * for. Fifty-three of the fifty-nine groups in this library have no such address:
- * forty carry no URL at all, and the rest point at timestamp.trade and friends,
- * which no installed scraper reads.
- *
- * So this module does the one thing Stash cannot: it looks a title up.
- *
- * **adultfilmdatabase.com**, for three reasons and not because it is the
- * biggest. Its robots.txt allows the lookup this uses (it disallows exactly one
- * unrelated path); it is not behind an age gate, so nothing here has to forge a
- * consent it was not given; and `AdultFilmDatabase` is already installed as a
- * Stash group scraper, so a URL found here is one Stash can immediately read.
- * AdultEmpire and data18 both scrape beautifully *given* a URL, and neither can
- * be searched without going through a gate or a disallowed endpoint.
- *
- * **Nothing found here is ever attached on its own.** A title match is a guess —
- * this library has five groups called "Forbidden Desires" — so the pass produces
- * candidates and stops. Writing one onto a group is a separate, confirmed act.
+ * Looks titles up on adultfilmdatabase.com: robots.txt allows it, no age
+ * gate, and Stash has a scraper for it. Results are candidates only; a
+ * person confirms before a URL is attached.
  */
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
@@ -30,27 +14,14 @@ import { gql } from './stash.mjs';
 const HOST = 'https://www.adultfilmdatabase.com';
 const LOOKUP = HOST + '/lookup.cfm';
 
-/*
- * Their robots.txt asks for thirty seconds between requests and this obeys it,
- * which is the whole reason the pass runs in the background and reports
- * progress rather than answering a page load. Fifty-three titles is about
- * twenty-seven minutes. One at a time, deliberately: a crawl delay means
- * nothing if four workers each wait it separately.
- */
+/* Their robots.txt asks for 30s between requests; one at a time, in the background. */
 const CRAWL_DELAY = 30 * 1000;
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36';
 const TIMEOUT = 30 * 1000;
 const TTL = 24 * 60 * 60 * 1000;
 
-/*
- * Kept on disk, next to the config.
- *
- * Not an optimisation. A pass costs twenty-eight minutes of somebody else's
- * crawl budget, and holding the result only in memory means every restart
- * spends it again — which is both rude to the source and a guarantee that the
- * dialog says "still looking" every time this container is rebuilt.
- */
+/* Results kept on disk so a restart doesn't repeat the crawl. */
 const CONFIG_DIR = process.env.CONFIG_DIR || './config';
 const PATH = join(CONFIG_DIR, 'groupurls.json');
 
@@ -110,23 +81,11 @@ export function groupUrlSnapshot() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const normalise = (title) => String(title).toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-/*
- * "#132", "no. 132" and a bare "132" are the same film, and this library names
- * groups all three ways — `panty world #8` sits next to `university coeds 18`.
- * Folding the marker out lets those match a catalogue that picks one style.
- */
+/* "#132", "no. 132" and "132" are the same film. */
 const looseKey = (title) =>
   normalise(String(title).replace(/\b(?:no\.?|#|vol\.?|volume|part|pt\.?)\s*(\d+)/gi, ' $1 '));
 
-/*
- * One title, looked up now rather than as part of the slow pass.
- *
- * The features need this more than the groups ever did: they arrived from .nfo
- * files carrying tmdb and imdb ids, so not one of them has a film-catalogue
- * address, and a rescan with nowhere to scrape from is a button that cannot
- * work. This is a single request rather than a crawl, so it answers a dialog
- * without making anyone wait out the thirty-second courtesy delay.
- */
+/* Look up one title now (a single request), for the features dialog. */
 export async function lookUp(title, date = null) {
   if (!title || !title.trim()) return [];
   return rank({ name: title, date }, await search(title));
@@ -179,15 +138,7 @@ async function lookUpAll(config) {
   }
 }
 
-/*
- * Which addresses Stash can already read — asked of Stash, not listed here.
- *
- * This was a hardcoded regex built from the handful of scrapers I had seen
- * match, and it drifted the moment the data changed: Bang is one of two dozen
- * installed group scrapers, it was not in the list, and a group already
- * pointing at bang.com would have been sent off for a thirty-second crawl
- * looking for an address it already had. Asking Stash cannot drift.
- */
+/* URL patterns Stash's installed group scrapers can read, asked of Stash. */
 async function scrapeablePatterns(config) {
   const data = await gql(config, '{ listScrapers(types: [GROUP]) { group { urls } } }');
 
@@ -197,11 +148,7 @@ async function scrapeablePatterns(config) {
     .filter(Boolean);
 }
 
-/*
- * The groups worth looking up: the ones with no address a scraper can read.
- * A group already pointing at data18, Bang or AdultEmpire is finished — it just
- * needs scraping, which is the other half of this feature.
- */
+/* Groups with no URL a scraper can read. */
 async function needing(config) {
   const [data, patterns] = await Promise.all([
     gql(config, '{ findGroups(filter: {per_page: -1, sort: "name", direction: ASC}) { groups { id name urls } } }'),
@@ -211,11 +158,7 @@ async function needing(config) {
     }),
   ]);
 
-  /*
-   * No list means no pass. The other failure — treating every group as
-   * unreadable — would crawl somebody else's server for films that never
-   * needed looking up, and that is the expensive way to be wrong.
-   */
+  /* No patterns, no pass: otherwise every group would be crawled. */
   if (!patterns.length) {
     console.warn('[tpdbarr] no group scrapers known; skipping the URL pass');
     return [];
@@ -261,11 +204,7 @@ async function search(name) {
   return parse(html);
 }
 
-/*
- * A result is an anchor to /video/<id>/<slug>/ with the title inside it. The
- * title is read from the anchor rather than rebuilt from the slug, because the
- * slug has already lost the punctuation the match wants back.
- */
+/* Results are anchors to /video/<id>/<slug>/; the title comes from the anchor text. */
 function parse(html) {
   const out = [];
   const seen = new Set();
@@ -283,11 +222,7 @@ function parse(html) {
   return out;
 }
 
-/*
- * Ordered best-first, and every one carries how it matched so the confirming
- * eye has something to go on. Nothing is filtered out on score: a wrong-looking
- * list is itself the answer that this group is not on the site.
- */
+/* Best first, each with how it matched. Nothing filtered on score. */
 function rank(group, hits) {
   const exact = normalise(group.name);
   const loose = looseKey(group.name);

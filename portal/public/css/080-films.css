@@ -1,9 +1,7 @@
-/* ============================================================= the film wall
-   Portrait everywhere on this page. Group box art and the posters now sitting
-   on the features are both 2:3, and a poster wall is what a film library looks
-   like — the 16:9 still belongs on Scenes, where the subject is a moment
-   rather than a release. .facetart is already 3/4, so this only forces the
-   image to fill it. */
+/*
+ * ============================================================= the film wall
+ * Posters, 2:3.
+ */
 .facets.posters .facetart { aspect-ratio: 2 / 3; }
 .facets.posters .facetart img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -94,11 +92,8 @@
 .coverthumb { width: 54px; border-radius: 4px; border: 1px solid var(--line); }
 
 /*
- * How much of a film you hold, on the poster's corner.
- *
- * Two states, and the difference is the point: a solid badge counted a real
- * scene list, a hollow one matched a name and could be a re-cut of the same
- * title. The hollow one is deliberately quieter — it is a hint, not a fact.
+ * How much of a film you hold: solid = counted from a scene list, hollow
+ * = matched by name.
  */
 .holdbadge {
   position: absolute;
@@ -118,17 +113,13 @@
   color: #08140b;
   text-shadow: none;
 }
-/* Stash's own count — solid like the exact one, because it is a fact rather
-   than a guess, but its own colour: it answers "how much of this is out of the
-   import pipeline", not "how much of the film". */
+/* Stash's own count, own colour. */
 .holdbadge.stash {
   background: var(--blue);
   color: #05101f;
   text-shadow: none;
 }
-/* How much of a tracked catalogue you hold. Its own colour, because it is a
-   different number from the green one: that says how much of a film is here,
-   this says how much of what you decided you want is. */
+/* Tracked coverage, own colour. */
 .holdbadge.coverage {
   background: var(--amber);
   color: #1a1204;
@@ -176,15 +167,10 @@
 }
 .facetbody .meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
 
-/* The meta line wraps to two on a poster this narrow — year, studio, runtime
-   and a scene count do not fit on one — so where a blurb follows it, it holds
-   both lines whether it needs them or not and the row starts its prose
-   together. Tiles with no blurb keep the height they had. */
+/* With a blurb, the meta holds two lines so rows line up. */
 .facetbody:has(.facetdesc) .meta { min-height: 2.4em; }
 
-/* What it is about, on the tiles that have something to say — a film does, a
-   performer does not. Two clamped lines, like the scene tile's. The name above
-   is already one line, so the title needs no such reserve. */
+/* The blurb, two clamped lines. */
 .facetbody .facetdesc {
   margin-top: 4px;
   font-size: 11.5px;
@@ -201,12 +187,10 @@
 .rail.missing { margin-top: 34px; }
 .rail.missing .railtitle { font-size: 15px; font-weight: 600; color: var(--text-2); }
 
-/* -------------------------------------------------------- the monitored rail
+/*
+ * -------------------------------------------------------- the monitored rail
  *
- * The missing rail closes a page, so it is drawn quietly. This one opens one,
- * and what is in it is what you chose — so it is a panel with the accent down
- * its edge, and the shelf underneath stays flat. The two are the same object in
- * the markup; only this bit of paint separates them.
+ * A panel with an accent edge.
  */
 .rail.monitored {
   margin: 0 0 26px;
@@ -228,10 +212,10 @@
   .tally b { font-size: 21px; }
 }
 
-/* ========================================================== a movie's page
-   The scene page's two columns, playing a whole group. What is new is the
-   chapter list under the player: the parts of the film, in the order they
-   play, with the one you are on lit. */
+/*
+ * ========================================================== a movie's page
+ * Two columns, with the chapter list under the player.
+ */
 
 .filmpage .chapterblock { margin-bottom: 18px; }
 .filmpage .chapterhead { font-size: 12px; color: var(--muted); margin-bottom: 8px; }

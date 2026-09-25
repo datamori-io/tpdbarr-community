@@ -1,22 +1,11 @@
 /*
- * Integrations — is everything up, and what is in flight.
- *
- * This replaces the Queue tab, which showed one step of a five-step pipeline as
- * though it were the whole thing. A file that arrives here does this:
+ * Integrations: is everything up, and what's in flight, all read live.
  *
  *   1. Whisparr grabs it                    -> the downloader queue
- *   2. it lands in Whisparr's own root      -> Stash has no record of it yet
+ *   2. it lands in Whisparr's own root      -> not in Stash yet
  *   3. FileFlows encodes it                 -> /Import Folder
  *   4. it gets edited by hand, sometimes    -> /pc-import
  *   5. Stash files it                       -> /organized_scenes
- *
- * "Where is that scene I grabbed on Tuesday" is answerable only if all five are
- * on one page, and until now steps two to five were spread across the library
- * overview and the tidy-up while step one had a tab to itself.
- *
- * Every count here is read live. A pipeline view that is half an hour old is
- * worse than no pipeline view — it is the same complaint the old queue page
- * made about itself.
  */
 
 import * as whisparr from './whisparr.mjs';
@@ -30,12 +19,7 @@ import * as nzbget from './nzbget.mjs';
 import * as shelf from './stashlib.mjs';
 import { whisparr2Configured, stashConfigured, whisparr3Reachable } from './config.mjs';
 
-/*
- * A service, reported the same way whichever it is: is it set up at all, did it
- * answer, and what did it say. "Not configured" is a different answer from
- * "down", and a page that blurs them sends you looking for a network fault that
- * is really an empty settings field.
- */
+/* One service: configured, answered, what it said. "Not configured" isn't "down". */
 async function probe(name, { configured, check }) {
   if (!configured) return { name, configured: false, ok: false, note: 'not set up' };
 
@@ -107,11 +91,7 @@ async function services(config) {
 
 const step = (key, label, note, count, extra = {}) => ({ key, label, note, count, ...extra });
 
-/*
- * The encoder, between the downloaders and the folders. Its own step because it
- * is its own machine: FileFlows counts every file it has been pointed at, which
- * is not the same set as the scenes Stash can see sitting in /Import Folder.
- */
+/* FileFlows' own counts: files it was pointed at, not Stash's scenes. */
 async function encoding(config) {
   const seen = await fileflows.queued(config);
   if (!seen.configured) return [];
@@ -168,14 +148,7 @@ async function downloading(config) {
   return out;
 }
 
-/*
- * The rest of the pipeline is folders, and folders are what Stash can see.
- *
- * The one step it cannot see is the gap between a completed download and a
- * FileFlows run: the file is sitting in Whisparr's own root and Stash has no
- * record of it at all. tidy.mjs already counts that from the Whisparr side, so
- * it is asked for rather than guessed at.
- */
+/* The folder stages, from Stash. Whisparr's root comes from tidy.mjs. */
 async function inTheFolders(config) {
   if (!stashConfigured(config)) return [];
 
@@ -208,17 +181,7 @@ export async function view(config) {
 
   const pipeline = [...grabbing, ...encoder, ...folders];
 
-  /*
-   * The headline deliberately does not add every step up.
-   *
-   * FileFlows counts files it has been pointed at; Stash counts scenes it has a
-   * record for in /Import Folder. Those are largely the same files seen from
-   * two sides — 1342 against 1057 on the afternoon this was written — so
-   * summing them says two and a half thousand things are in flight when it is
-   * closer to half that. Stash's view is the one summed, because every other
-   * number in this portal is counted in Stash; the encoder's queue is reported
-   * beside it as its own figure rather than folded in.
-   */
+  /* The headline sums Stash's view only; FileFlows' queue overlaps it and is shown separately. */
   const counted = pipeline.filter((s) => !s.done && s.key !== 'fileflows');
   const encoderStep = pipeline.find((s) => s.key === 'fileflows') || null;
 

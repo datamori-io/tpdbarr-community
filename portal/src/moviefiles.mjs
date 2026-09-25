@@ -1,22 +1,8 @@
 /*
- * Movies.
- *
- * The third spine, and the one with a different library of record. Scenes live
- * in Stash and are keyed on a Stash id; movies are not in Stash at all. They sit
- * on a share as one folder per film, with Emby's .nfo and artwork already beside
- * them, and *that folder is the truth*. Emby stays the thing that owns the
- * metadata; this module never writes any.
- *
- * So this module is a reader. It walks the folders, believes the .nfo where
- * there is one, falls back to the folder name where there is not, and serves
- * the files straight off the mount. The one exception in the whole app lives
- * next door in gapfill.mjs, which fills in a folder Emby never matched — and
- * only ever creates files that are not there.
- *
- * Zero dependencies, like the rest of the app — which is why the .nfo is read
- * with targeted extraction rather than a real XML parser. These files are
- * machine-written by Emby to a known shape; if that ever stops being true this
- * is the thing that breaks.
+ * Films on the share, one folder each with Emby's .nfo and artwork. The
+ * folder is the truth and Emby owns the metadata; this only reads
+ * (gapfill.mjs is the one writer). The .nfo is read by targeted extraction,
+ * not an XML parser (no dependencies).
  */
 
 import { createReadStream } from 'node:fs';
@@ -85,9 +71,7 @@ function parseNfo(xml) {
   }
 
   const video = xml.match(/<video>([\s\S]*?)<\/video>/i)?.[1] || '';
-  // A film routinely carries more than one — Emby writes tmdb, and the ones we
-  // fill in write tmdb and imdb — and the imdb one is what the gap-filler's
-  // last resort looks the film up by, so all of them are kept.
+  // Keep every id (tmdb, imdb); the gap-filler uses imdb.
   const ids = {};
   const idRe = /<uniqueid\s+type="([a-z]+)"[^>]*>([^<]+)<\/uniqueid>/gi;
   let unique;
@@ -140,9 +124,8 @@ function resolution(height) {
 }
 
 /*
- * Artwork, in the order Emby and Kodi agree on. The .nfo does name its art, but
- * as absolute paths on the machine that wrote it ("/Volumes/Media2Stash/..."),
- * so those are useless here and the folder is looked at instead.
+ * Artwork by the names Emby and Kodi use. The .nfo's art paths are absolute
+ * on another machine, so the folder is read instead.
  */
 function pickArt(names, base) {
   const has = (name) => names.find((n) => n.toLowerCase() === name.toLowerCase());
@@ -220,10 +203,7 @@ async function readFolder(folder) {
     file,
     poster: art.poster,
     fanart: art.fanart,
-    /*
-     * What the folder is missing. This is the whole point of the section: the
-     * ones with no .nfo are the ones worth going and finding metadata for.
-     */
+    /* Whether the folder has an .nfo; the ones without need metadata. */
     hasNfo: Boolean(nfo),
     hasPoster: Boolean(art.poster),
     // Emby's trick-play thumbnails. Not read yet, but worth knowing they exist.
@@ -233,17 +213,9 @@ async function readFolder(folder) {
 }
 
 /*
- * One walk is a readdir per folder plus a stat on every video inside it to find
- * the feature — a few hundred round trips, and the folders live on a CIFS mount
- * across the network.
- *
- * Do not bound this. It looks like it wants a worker pool and it does not: the
- * mount is latency-bound, not bandwidth-bound, so every request in flight is
- * one more round trip already on the wire. Measured over the 51 films, widths
- * of 8/16/32/51 all landed between 9.8s and 15.1s; unbounded came in at 6.3s.
- * Firing them all at once *is* the fast path.
- *
- * The seconds are dealt with below instead, by never making anyone wait them.
+ * One walk: a readdir per folder and a stat per video, over a CIFS mount.
+ * Don't bound it: the mount is latency-bound, and firing everything at
+ * once measured fastest.
  */
 async function walk() {
   let entries;
@@ -276,10 +248,8 @@ export async function scan({ force = false } = {}) {
   if (cache && Date.now() - cache.at < TTL) return cache.movies;
 
   /*
-   * Past the TTL but the folder has not moved: a stale shelf now beats the
-   * right one in nine seconds, so the walk that replaces it runs behind this
-   * answer rather than in front of it. Only the first caller after a restart
-   * ever waits.
+   * Past the TTL: serve the stale shelf and refresh behind it. Only the first
+   * caller after a restart waits.
    */
   if (cache) {
     refresh().catch((err) => console.warn('[tpdbarr] movie rescan failed -', err.message));
@@ -313,10 +283,7 @@ export async function findMovieWatched(movieId) {
   };
 }
 
-/*
- * The section as the UI wants it: the shelf, plus the count of what is not
- * described yet, which is the only thing here that needs a decision.
- */
+/* The shelf, plus how many films aren't described yet. */
 export async function overview({ force = false } = {}) {
   const found = await scan({ force });
   const incomplete = found.filter((m) => !m.hasNfo || !m.hasPoster);
@@ -325,10 +292,7 @@ export async function overview({ force = false } = {}) {
   // while you are watching and the folder does not.
   const movies = await decorate(found);
 
-  /*
-   * Where you stopped, newest first. The equivalent of the scenes rail, except
-   * it has to be built here: Stash is not involved and has nothing to sort by.
-   */
+  /* Continue watching, built here since Stash isn't involved. */
   const continueWatching = movies
     .filter((m) => m.progress > 0.01 && !m.finished)
     .sort((a, b) => String(b.lastPlayed || '').localeCompare(String(a.lastPlayed || '')));
@@ -358,11 +322,7 @@ const CONTENT_TYPE = {
   '.webp': 'image/webp',
 };
 
-/*
- * Range matters more here than anywhere else in the app: without it, seeking a
- * 3GB mkv means downloading 3GB. Same contract the Stash proxy honours, except
- * the bytes come off the mount instead of out of another HTTP call.
- */
+/* Range support, so seeking doesn't download the whole file. */
 export async function serve(req, res, movie, which) {
   const name = which === 'poster' ? movie.poster : which === 'fanart' ? movie.fanart : movie.file;
   if (!name) {

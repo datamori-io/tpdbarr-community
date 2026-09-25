@@ -1,14 +1,6 @@
 /*
- * Prowlarr — the indexers themselves, asked by hand.
- *
- * Everything else in this portal reaches the indexers through a Whisparr: a
- * scene is added, Whisparr searches, Whisparr grabs, Whisparr imports. That
- * only works for a scene one of the two catalogues knows. For the one neither
- * has heard of, the only thing left is to search the indexers by name and pick
- * a release by eye — which is what this is.
- *
- * The same Prowlarr Whisparr v3's indexers are synced from, so the same
- * accounts and the same limits. That is why nothing here runs unasked.
+ * Prowlarr, searched by hand for scenes neither catalogue knows. Same
+ * indexers as Whisparr v3, so nothing runs unasked.
  *
  *   GET  /api/v1/search?query=&type=search&categories=6000
  *     [{guid, indexerId, indexer, title, size, publishDate, age, protocol,
@@ -17,11 +9,9 @@
  *   POST /api/v1/search  {guid, indexerId}
  *     hands that release to Prowlarr's own download client
  *
- * **A grab here is not an import.** Whisparr never hears about it. A usenet
- * release goes to the NZBGet on this machine (nzbget.mjs) when one is set up,
- * anything else to Prowlarr's own download client, and nothing renames it or
- * files it. Getting it into Stash is the manual half — the Registry's wild
- * card builds a scene Stash has no match for.
+ * A grab isn't an import: Whisparr never hears of it. Usenet goes to local
+ * NZBGet (nzbget.mjs) when set up, the rest to Prowlarr's client. Wild Card
+ * builds the Stash record afterwards.
  */
 
 // A search fans out to every indexer and waits on the slowest.
@@ -32,10 +22,8 @@ const TIMEOUT = 20_000;
 const XXX = 6000;
 
 /*
- * guid -> {downloadUrl, title, protocol} from recent searches. The download
- * link carries Prowlarr's API key, so it stays on this side and a grab names
- * the release by guid instead. Capped so a long session does not grow it
- * without end.
+ * guid -> {downloadUrl, title, protocol}. The link holds the API key, so it
+ * stays server-side. Capped.
  */
 const seen = new Map();
 const SEEN_MAX = 2000;
@@ -92,12 +80,7 @@ async function call(config, path, { method = 'GET', body = null, timeout = TIMEO
 
 export const systemStatus = (config) => call(config, '/system/status');
 
-/*
- * -> {releases} for a phrase, newest-grabbed first.
- *
- * `any` drops the XXX category, for the indexer that files things under
- * something else — sukebei has its own tree.
- */
+/* -> {releases}, newest-grabbed first. `any` drops the XXX category. */
 export async function search(config, term, { any = false } = {}) {
   const q = String(term || '').trim();
   if (!q) return { releases: [] };
@@ -132,11 +115,7 @@ export async function search(config, term, { any = false } = {}) {
   return { releases };
 }
 
-/*
- * Hand one release to Prowlarr's download client. The guid and indexer are the
- * pair Prowlarr identifies a result by; it keeps the search cached, so this
- * only works on something it returned recently.
- */
+/* Send one release to Prowlarr's client. Only works on recent results. */
 export async function grab(config, { guid, indexerId }) {
   if (!guid || !indexerId) throw new ProwlarrError('A grab needs the release guid and its indexer.');
   const known = seen.get(guid);
@@ -145,11 +124,7 @@ export async function grab(config, { guid, indexerId }) {
   return { ok: true, title: out?.title || '', to: 'Prowlarr' };
 }
 
-/*
- * A usenet release, fetched through Prowlarr and handed to the NZBGet on this
- * machine. Fetching the link is itself the grab as far as Prowlarr and the
- * indexer are concerned, so it counts against the same limits.
- */
+/* A usenet release, fetched through Prowlarr and sent to NZBGet. Counts as a grab. */
 async function grabToNzbget(config, { downloadUrl, title }) {
   let res;
   try {

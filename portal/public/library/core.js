@@ -1,10 +1,6 @@
 /*
- * The library's spine: which view owns the screen, how one stands down, and the
- * chrome every page here wears.
- *
- * Everything else in this folder imports from this and nothing here imports
- * back — the one rule that keeps the split honest. A page that needs something
- * from another page means the something belongs here instead.
+ * The library's core: which view owns the screen, teardown, and shared
+ * chrome. Pages import from here; nothing here imports back.
  */
 
 import { api, clock, el } from '../util.js';
@@ -13,23 +9,13 @@ import { thumbnailCues } from '../player.js';
 
 export const view = document.getElementById('view');
 
-/*
- * Views own timers and listeners that outlive their DOM, so each one registers
- * how to shut itself down and the next render calls it. Without this the
- * player keeps reporting progress for a scene you navigated away from.
- */
+/* Each view registers its cleanup; the next render calls it. */
 let teardown = null;
 let pending = null;
 
 /*
- * Which view owns the screen.
- *
- * The studios page takes a second to draw two hundred logos. Click away to a
- * faster one while it is still fetching and the slow request lands last,
- * rendering over the page you are now looking at. So every view claims the
- * screen when it starts and stands down if that claim has since passed to
- * someone else — including to the acquisition side, which claims it on the way
- * past in leave().
+ * A token per render, so a slow view that finishes late doesn't draw over
+ * the current one. leave() takes a token for the acquisition side.
  */
 let viewToken = 0;
 export const claim = () => ++viewToken;
@@ -48,11 +34,7 @@ function render(...nodes) {
   window.scrollTo(0, 0);
 }
 
-/*
- * The acquisition side renders straight into #view without going through
- * render(), so it calls this on the way past. Otherwise the player carries on
- * reporting progress for a scene you left ten minutes ago.
- */
+/* Called by the acquisition side, which renders into #view without render(). */
 export function leave() {
   viewToken++;
   if (teardown) teardown();
@@ -64,11 +46,9 @@ export function leave() {
 }
 
 /*
- * A view registers its cleanup while it is being built — which is before
- * render() runs, because the nodes are render()'s arguments. So it lands in
- * `pending` and only becomes the active teardown once the view is actually on
- * screen. Assigning `teardown` directly would mean render() tearing the new
- * player down a moment after building it, taking its src with it.
+ * Cleanup registered while building lands in `pending` and becomes active
+ * only once the view is on screen; otherwise render() would tear down the
+ * new player.
  */
 export function onTeardown(fn) {
   pending = fn;
@@ -77,11 +57,7 @@ export function onTeardown(fn) {
 export const loading = () => render(el('div', { className: 'empty' }, 'Loading…'));
 export const failed = (err) => render(el('div', { className: 'empty' }, err.message));
 
-/*
- * A page that is not one of the library's five sections and so wears none of
- * their chrome. Stats is its own tab in the topbar — putting the section strip
- * on it would highlight nothing and offer five places it is not.
- */
+/* A page outside the five sections, with no section strip (e.g. Stats). */
 export const page = (...nodes) => render(...nodes);
 
 let stashUrl = null;
@@ -109,38 +85,18 @@ function stopPreview() {
   preview = null;
 }
 
-/* ------------------------------------------------------- scrubbing a tile
+/*
+ * ------------------------------------------------------- scrubbing a tile
  *
- * The bottom of the artwork is a timeline; the rest of it is the frame you are
- * pointing at.
- *
- * The preview below plays a scene's own generated loop, which is somebody
- * else's choice of which twenty seconds matter. This is the other question —
- * *what happens in this one* — and it is answered by the sprite sheet Stash
- * already cuts for the scrub bar: eighty-one frames across the whole runtime,
- * one image request, no video decoded at all.
- *
- * **Only the bottom band scrubs.** A tile that changed its picture whenever the
- * cursor crossed it would flicker all the way across a wall of them, and the
- * top of a tile is where the badges are read. So the bottom 15% is the strip,
- * drawn as a bar rather than as frames — there is no room for a picture down
- * there and a bar is what a timeline looks like anyway — and the rest of the
- * tile shows the frame for wherever along it you are.
- *
- * The sheet's own size is worked out from the cues rather than by loading the
- * image and measuring it: every crop is the same size and they tile a grid, so
- * the widest right edge and the lowest bottom edge *are* the sheet. One less
- * request, and no window where the frames are known but not yet scalable.
+ * The bottom 15% of a tile is a timeline over Stash's sprite sheet; the
+ * rest shows the frame for that point. One image request, no video.
+ * Sheet size is worked out from the cues, not by loading the image.
  */
 
 // How much of the tile is the timeline. The same number is in the CSS.
 const SCRUB_BAND = 0.15;
 
-/*
- * Cues per scene, and the promise while they are arriving — keyed so that
- * sweeping back and forth across a tile asks once. A scene with no sheet
- * resolves to null and is never asked again.
- */
+/* Cues per scene, with the pending promise. No sheet -> null, never re-asked. */
 const sheets = new Map();
 
 function sheetFor(id) {
@@ -170,11 +126,7 @@ export function hoverPreview(node, art, id) {
   let loaded = null;
   let scrubbing = false;
 
-  /*
-   * Built on the first hover rather than with the tile. A shelf is six hundred
-   * of these and almost none will ever be pointed at; three spare nodes each is
-   * eighteen hundred nodes nobody asked for.
-   */
+  /* Built on first hover, not with the tile. */
   const build = () => {
     if (strip) return;
     frame = el('div', { className: 'tileframe' });
@@ -189,13 +141,7 @@ export function hoverPreview(node, art, id) {
     const cue = cues[at];
     if (!cue || !cue.crop) return;
 
-    /*
-     * Scaled so one frame covers the artwork. The crops are 16:9 and so is the
-     * tile, so matching the width matches the height too. It covers the whole
-     * tile rather than the top 85%: the strip lies over the bottom of the
-     * picture rather than taking a slice out of it, so the frame keeps its
-     * shape.
-     */
+    /* Scaled so one frame covers the whole tile (both 16:9). */
     const scale = art.clientWidth / cue.crop.w;
     frame.style.backgroundImage = `url("${cue.src}")`;
     frame.style.backgroundSize = `${sheet.w * scale}px ${sheet.h * scale}px`;
@@ -232,11 +178,7 @@ export function hoverPreview(node, art, id) {
     }, HOVER_DELAY);
   });
 
-  /*
-   * Which band the cursor is in decides which answer it gets. A mouse is the
-   * only thing that can be in one: a finger has no hover, and pointerenter on
-   * a touch device fires once on tap and never moves.
-   */
+  /* Mouse only: touch has no hover. */
   art.addEventListener('pointermove', (e) => {
     if (REDUCED.matches || e.pointerType === 'touch') return;
 
@@ -251,11 +193,7 @@ export function hoverPreview(node, art, id) {
     build();
     scrubbing = true;
 
-    /*
-     * The preview and the scrub are two answers to the same question, so the
-     * loop stops while the other one is being asked — otherwise the frame you
-     * are pointing at sits on top of a video still running underneath it.
-     */
+    /* Stop the preview loop while scrubbing. */
     if (preview && preview.node === node) stopPreview();
     clearTimeout(timer);
 
@@ -284,13 +222,7 @@ export function heading(title, note) {
   );
 }
 
-/*
- * More of the same list, appended.
- *
- * Counted in pages rather than in cards, because the missing view drops what
- * you already have out of each page — so how many are on screen says nothing
- * about how many are left.
- */
+/* Show more, appended. Counted in pages, since views drop held scenes per page. */
 export function showMore({ page = 1, perPage = 60, count = 0 }, load) {
   const pages = Math.max(1, Math.ceil(count / (perPage || 60)));
   if (page >= pages) return null;
@@ -318,18 +250,11 @@ export function showMore({ page = 1, perPage = 60, count = 0 }, load) {
   return holder;
 }
 
-/* ================================================================ sections
+/*
+ * ================================================================ sections
  *
- * The library in five tabs. Same device as the acquisition side, and for the
- * same reason: Library, Acquire and Queue are places you go, whereas these are
- * five views of one shelf.
- *
- * Every page below is the same shape — what you hold, then a thin row of what
- * you do not. The missing row comes in two flavours, because the two sources
- * know different things. Stash knows about records it holds no file for: a
- * group from an identify run, a performer who arrived in someone else's cast
- * list. TPDB knows what exists at all. The first is a want list you never had
- * to write; the second is everything else.
+ * The library's five tabs. Each page is what you hold, then a thin row of
+ * what you don't: records Stash has without files, or what TPDB knows.
  */
 
 const LIBRARY_SECTIONS = [
@@ -364,28 +289,22 @@ export function head(title, note) {
 export const loadingIn = (section) => shell(section, el('div', { className: 'empty' }, 'Loading…'));
 export const failedIn = (section, err) => shell(section, el('div', { className: 'empty' }, err.message));
 
-/* ------------------------------------------------------------------ tiles
+/*
+ * ------------------------------------------------------------------ tiles
  *
- * One tile shape for a person, a studio and a movie. They differ only in the
- * artwork's aspect and where a click goes, and a page of three slightly
- * different cards reads worse than a page of one.
+ * One tile shape for people, studios and movies.
  */
 
 // The initial stands in where Stash has no artwork. A letter is a worse
 // picture than a photograph and a much better one than a broken image icon.
 export const initial = (name) => String(name || '?').trim().charAt(0).toUpperCase() || '?';
 
-/* ------------------------------------------------------------- the metrics
+/*
+ * ------------------------------------------------------------- the metrics
  *
- * The top of the Overview is one idea drawn several ways: this library is a
- * pipeline, not a pile.
- *
- * All of it comes from one read of the shelf, tallied server-side in the pass
- * that was already happening — see libraryIndex. There is no chart library:
- * the image has no npm dependencies and is not about to grow one to draw a
- * bar. Every mark is an <svg> built from the palette the rest of the app uses,
- * and colour always means something — grey is upstream and not yours yet,
- * text-colour is yours, coral is whatever the card is actually about.
+ * Overview charts, tallied server-side (libraryIndex). Plain SVG in the
+ * app's palette, no chart library. Grey is upstream, text colour is yours,
+ * coral is the card's subject.
  */
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -402,23 +321,14 @@ export const svg = (tag, props = {}, ...children) => {
 
 export const pct = (n, total) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
-// Stash leaves plenty of fields blank. A blank is a real answer about the
-// shelf — over half of it, in the case of a scene's kind — so it is one of the
-// choices rather than a silent gap.
+// "Not said" is a real filter value for blank fields.
 export const UNSAID = 'Not said';
 
-/* ------------------------------------------------------------------ movies
+/*
+ * ------------------------------------------------------------------ movies
  *
- * Stash's, like every other section here. The film wall reads
- * /api/library/films, where a group is a release made of several scene files
- * and a feature is one long file that is the whole release — both of them Stash
- * records, both edited back into Stash.
- *
- * What is left of the share reader is one page: #/library/movie/<id>, off
- * /api/moviefiles, which still walks the mount and believes the .nfo Emby wrote
- * beside each folder. Nothing on the wall links to it — a feature's card opens
- * the scene page and a group's opens its scene list — so it answers a bookmark
- * and nothing else.
+ * The film wall reads /api/library/films (Stash groups and features).
+ * #/library/movie/<id> still reads the share (/api/moviefiles), for bookmarks only.
  */
 
 export const runtime = (seconds) => (seconds ? clock(seconds) : null);
@@ -429,12 +339,7 @@ export const spoken = (value) =>
 
 const stars = (rating) => Math.round((rating || 0) / 20);
 
-/*
- * Filed, and a rating out of five. The two things you decide while looking at
- * something rather than while cataloguing it, and the two Stash keeps for a
- * gallery as well as for a scene — so both wear the same control, pointed at
- * whichever half of the API owns the thing.
- */
+/* Filed and a star rating, shared by scenes and galleries. */
 export function filedAndStars(item, base, redraw) {
   const filed = el('button', {
     className: 'act' + (item.organized ? ' on' : ''),
@@ -443,12 +348,7 @@ export function filedAndStars(item, base, redraw) {
 
   filed.onclick = async () => {
     filed.disabled = true;
-    /*
-     * Marking a scene filed moves its file into /organized_scenes now, which
-     * is usually a rename the Mac does to itself and occasionally a real
-     * transfer off this machine — so the button says it is working rather
-     * than sitting there looking pressed. See filer.mjs.
-     */
+    /* Filing moves the file, so show it's working. See filer.mjs. */
     if (!item.organized) filed.textContent = 'Filing…';
     try {
       const next = await api(`${base}/organized`, {
@@ -457,15 +357,7 @@ export function filedAndStars(item, base, redraw) {
       });
       item.organized = next.organized;
 
-      /*
-       * The flag is set either way; the file is the part that can fail. A
-       * reason it could not be moved belongs on screen rather than in a log,
-       * because it is nearly always something you can fix — no date on the
-       * record, no studio, a file already sitting at that name. Said on the
-       * button, which is where you are looking, and cleared by the redraw a
-       * few seconds later. A file that was already filed is not a failure and
-       * says nothing.
-       */
+      /* Show why a file couldn't be moved on the button; silent if already filed. */
       const trouble = next.filed && !next.filed.moved && !next.filed.already
         ? next.filed.why
         : null;
@@ -504,11 +396,7 @@ export function filedAndStars(item, base, redraw) {
   return [filed, rating];
 }
 
-/*
- * A chip is a link when there is somewhere to go and plain text when there is
- * not. Tags have no page of their own, and a chip that looks clickable and
- * quietly does nothing is worse than one that never offered.
- */
+/* A chip is a link only when there's somewhere to go. */
 export function chips(className, items, href) {
   if (!items.length) return null;
   return el('div', { className },
@@ -517,12 +405,10 @@ export function chips(className, items, href) {
       : el('span', { className: 'tagchip flat' }, item.name))));
 }
 
-/* ------------------------------------------------------------- the side rail
+/*
+ * ------------------------------------------------------------- the side rail
  *
- * Everything on a scene page is either something you do or something you read.
- * The doing stays under the player; the reading — who is in it, what it is
- * tagged, what the file is — moves into a rail beside it, so the column runs
- * four things deep instead of nine.
+ * The scene page's reading column.
  */
 export function sidecard(title, ...body) {
   const kids = body.flat().filter(Boolean);
@@ -536,16 +422,10 @@ export function sidecard(title, ...body) {
 export const mbps = (bits) => (bits ? (bits / 1e6).toFixed(1) + ' Mbps' : null);
 export const day = (stamp) => (stamp ? String(stamp).slice(0, 10) : null);
 
-/* =============================================================== galleries
+/*
+ * =============================================================== galleries
  *
- * The still half of the library. Everything here is a Stash gallery — the
- * portal keeps none of its own, for the same reason the rest of this half
- * counts Stash rather than Whisparr.
- *
- * A gallery ties to a scene and to a performer because Stash carries both
- * fields. It ties to a *movie* through its scenes, because the Gallery type
- * has no group field — the same answer the acquisition side gives for movies,
- * and for the same reason: the honest join is the one the data actually has.
+ * Stash galleries. Movies are tied through the gallery's scenes (no group field).
  */
 
 export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;

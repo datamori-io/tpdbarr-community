@@ -1,9 +1,7 @@
 /*
- * Datamori palette. Five swatch colours are the spine:
- * #c8c9c9 light grey, #7e7e7e mid grey, #3a3839 dark grey, #1a1a1a near black,
- * #a01527 crimson. Crimson is dark enough that it only works as a fill, so the
- * coral the logo network is drawn in does the job wherever the accent has to
- * read as text or a border on a dark panel.
+ * Datamori palette: #c8c9c9 light grey, #7e7e7e mid grey, #3a3839 dark
+ * grey, #1a1a1a near black, #a01527 crimson. Crimson only works as a fill;
+ * the logo's coral is the accent for text and borders.
  */
 :root {
   --bg: #141314;
@@ -24,13 +22,7 @@
   --blue: #2f81f7;
   --amber: #d29922;
   --red: #da3633;
-  /*
-   * Crimson is a fill, not a colour to read: at 14px on a dark panel #da3633
-   * is barely brighter than the panel. So red pairs the way the accent does —
-   * --red fills, --red-hi is the one that goes on text and borders. It
-   * replaces the hand-typed near-misses of itself that had accumulated —
-   * #ff9492, #ff8f8c, and a bare #da3633 on a one-character button.
-   */
+  /* --red fills; --red-hi is for text and borders. */
   --red-hi: #ff8f8c;
   --radius: 10px;
 
@@ -38,21 +30,12 @@
   color-scheme: dark;
   accent-color: var(--accent);
 
-  /*
-   * Thumbnail track sizes. Every artwork grid picks one of these three steps
-   * rather than inventing its own minimum, so a card on one page is the same
-   * width as a card on the next. Aspect ratio still varies by subject — 16:9
-   * stills, 2:3 posters, 1:1 people — only the track width is shared.
-   */
+  /* Three shared thumbnail track widths. */
   --tile-sm-base: 140px;
   --tile-md-base: 180px;
   --tile-lg-base: 240px;
 
-  /*
-   * The per-page size control moves this one number; the three steps follow.
-   * The bases still shrink on narrow screens, so a chosen size stays relative
-   * to the screen rather than overriding it.
-   */
+  /* The per-page size control moves this. Bases still shrink on narrow screens. */
   --tile-mult: 1;
 
   --tile-sm: calc(var(--tile-sm-base) * var(--tile-mult));
@@ -91,11 +74,7 @@
 /* The toolbar already pushes its own trailing controls right. */
 .toolbar .spacer + .sizepick { margin-left: 0; }
 
-/*
- * One focus ring everywhere, in the brand coral, instead of the browser gold.
- * Scoped to things you can actually operate — a bare :focus-visible also rings
- * the <dialog>, which takes focus the moment it opens.
- */
+/* One coral focus ring on operable elements (a bare :focus-visible rings <dialog> too). */
 :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--accent-hi);
   outline-offset: 1px;

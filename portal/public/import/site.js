@@ -140,10 +140,7 @@ function sceneRow(scene) {
   );
 }
 
-/*
- * Artwork is pulled from TPDB in the background, so patch it into the rows as
- * it lands rather than making the page wait for it.
- */
+/* Artwork arrives in the background and is patched into rows. */
 export let artTimer = null;
 
 // A TPDB stash id is the most certain thing we have; then fingerprints; then

@@ -15,11 +15,8 @@
 .brand { display: flex; align-items: center; flex: none; }
 
 /*
- * The logo files are black line art on a near-white ground, so on a dark bar
- * they are inverted and then blended: after the invert the paper is near-black,
- * and `lighten` lets the panel swallow it, leaving only the strokes. The
- * hue-rotate puts the coral network dots back to coral, which a plain invert
- * would turn cyan. The window crops the wordmark out of its wide margins.
+ * Black-on-white logos on a dark bar: invert, then `lighten` drops the
+ * paper; hue-rotate brings the coral dots back. The window crops the margins.
  */
 .brandmark {
   position: relative;
@@ -37,18 +34,7 @@
   mix-blend-mode: lighten;
 }
 
-/*
- * Which of the two arrs you are looking at, and the one place you go when you
- * do not want to choose — inside one outline, stacked.
- *
- * The Feed used to be the second of four nav items, which made it a peer of
- * Data Mart and Registry when it is not one: those are places you go to look
- * something up, and this is where you go instead of looking. Sitting it under
- * the name says that, and the outline drawn round both is what makes it one
- * object rather than a word with a button loose underneath it.
- *
- * The gap is 1px. Anything looser and the two lines stop being one block.
- */
+/* The name and Feed stacked in one outline. 1px gap. */
 .brandblock { display: flex; align-items: center; gap: 11px; flex: none; }
 
 .brandpill {
@@ -61,22 +47,12 @@
   border-radius: var(--radius);
   background: var(--panel-2);
 }
-/*
- * The pill is one thing, so it lights as one thing: border and both lines
- * together. It used to be the border and TPDBARR only, because Feed carried
- * its own hover — which left half a control looking hovered and half of it
- * not, and the half that stayed grey was the half that is actually a link.
- */
+/* The pill lights as one: border and both lines. */
 .brandpill:hover { border-color: var(--accent-hi); }
 .brandpill:hover .brandtag,
 .brandpill:hover .feedlink { color: var(--accent-hi); }
 
-/*
- * The tracking leaves a gap after the last letter that the first letter has
- * nothing to match, so a centred TPDBARR sits visibly left of centre. Pulling
- * that trailing space back off the right is what actually centres it over the
- * word below.
- */
+/* Pull back the tracking's trailing space so TPDBARR centres. */
 .brandtag {
   font-size: 11.5px;
   letter-spacing: 0.18em;
@@ -115,21 +91,14 @@
   font: inherit;
   cursor: pointer;
 }
-/* Coral on the border, like every other hoverable thing here — the pill
-   beside it does it, and a nav that only lightens looks unclickable next
-   to one that does. */
+/* Coral border on hover, like everything else. */
 .topnav a:hover, .topnav button:hover {
   background: var(--panel-2);
   border-color: var(--accent-hi);
   color: var(--text);
 }
 
-/*
- * Where you are, and it stays lit through every page of that half — not just
- * the section's own overview. Coral on the word as well as the border, because
- * the border alone is what a hover says and "you are here" has to survive the
- * cursor being somewhere else entirely.
- */
+/* The current section: coral on word and border, across all its pages. */
 .topnav a.on {
   color: var(--accent-hi);
   border-color: var(--accent-hi);
@@ -261,18 +230,9 @@ button.primary:disabled { opacity: 0.45; cursor: default; }
 .artnote { font-size: 12.5px; color: var(--muted); margin-right: 10px; }
 .scene .title { font-weight: 600; }
 /*
- * The line under a title: date, length, studio, cast.
- *
- * The separator used to be a middot on `span + span`, which was right when
- * every item was a span. The studio and the cast are links now — they are
- * filters, not decoration — so they matched nothing and three names ran
- * together into one word. It goes on every item but the first, whatever the
- * item is.
- *
- * The dot is drawn by the item that follows it, so inside a link it would be
- * part of the link: `pointer-events: none` keeps the gap between two names
- * from being a third thing to click, and the colour is set rather than
- * inherited so it stays a separator rather than becoming link-coloured.
+ * The meta line under a title. The dot goes before every item but the
+ * first (items can be links); `pointer-events: none` and a set colour keep
+ * it from being part of the link.
  */
 .scene .meta {
   display: flex;
@@ -290,35 +250,12 @@ button.primary:disabled { opacity: 0.45; cursor: default; }
   pointer-events: none;
 }
 
-/* ------------------------------------------------- rows in a list of scenes
+/*
+ * ------------------------------------------------- rows in a list of scenes
  *
- * Half a Small grid tile, which is the size a row actually wants.
- *
- * The default 84px was set when a row was the only shape there was. Next to
- * the grid it reads as a compromise: too small to look at, big enough to set
- * the height of every row and make a list of sixty a scroll. A list is read by
- * running your eye down the titles — the still is there to place the scene,
- * not to be looked at — and the grid is one press away when it is the picture
- * you want.
- *
- * **As tall as the words beside it**, which is the size a row actually has to
- * give. The 84px still was set when a row was the only shape there was, and
- * every value tried since was a number picked out of the air — too small and
- * it is a sliver with a band of empty row above and below it, too big and the
- * list stops being a list. The three lines a row carries (title, the meta
- * line, one line of blurb) measure 62px, so that is the height, and 16:9 gives
- * the width.
- *
- * Multiplied by the page's own scale, so the S/M/L/XL control moves a list
- * exactly as it moves a grid. M is the height that matches the text; the other
- * three steps are the room either side of it, and past M the picture is what
- * sets the height of the row.
- *
- * A row whose title wraps to two lines is taller than this and keeps its still
- * centred. Sizing the still off each row's own height instead would be a
- * circle — the row is as tall as its contents, one of which would be as tall
- * as the row — and a list whose pictures were all slightly different sizes is
- * a worse answer than one row with a little air in it.
+ * The row still is as tall as the row's three lines of text (62px) at M,
+ * 16:9 wide, scaled by the page's S/M/L/XL. Rows whose title wraps keep the
+ * still centred.
  */
 .scenes {
   --rowtext: 62px;

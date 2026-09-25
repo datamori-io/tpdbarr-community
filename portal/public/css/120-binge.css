@@ -1,17 +1,12 @@
 /* ------------------------------------------------------------------ binge */
 
 /*
- * The reel and the plugin frame both fill the screen rather than flowing down
- * it, so the page hands them everything it has: no column width, no padding,
- * and no scrollbar of its own — they scroll inside. Their height is set on the
- * element itself, by fitFills() in util.js.
+ * Full-screen views get the whole page with no padding or page scroll.
+ * Height set by fitFills() in util.js.
  */
 main:has(.fillview) { max-width: none; margin: 0; padding: 0; }
 
-/*
- * The section strip keeps its breathing room even on a full-bleed page — the
- * frame below it is what wants the whole width, not the tabs above it.
- */
+/* The section strip keeps its padding. */
 main:has(.fillview) .sections { padding: 12px 18px 0; }
 .bingeframe { display: block; width: 100%; border: 0; background: var(--bg); }
 
@@ -19,10 +14,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 .reelwrap { position: relative; width: 100%; background: #000; }
 
-/*
- * One clip per screen, and the scroll settles on one rather than between two.
- * scroll-snap-stop keeps a hard flick from skipping past three of them.
- */
+/* One clip per screen; scroll-snap-stop stops a flick skipping several. */
 .reel {
   height: 100%;
   overflow-y: auto;
@@ -33,13 +25,8 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 .reel::-webkit-scrollbar { display: none; }
 
 /*
- * The slide holds the room the chrome needs; the picture centres in the rest.
- *
- * This used to be per-mode, and the caption ended up in two different places
- * depending on the framing — sat under the picture in Fit, laid over it in the
- * crops. Reserving the space on the slide instead means the picture never
- * reaches under the bar or the captions in any mode, and the captions sit in
- * the same place whichever framing you are on.
+ * The slide reserves room for the bar and captions; the picture centres in
+ * the rest, in every mode.
  */
 .reelslide {
   position: relative;
@@ -60,16 +47,8 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 .reel.noinfo .reelover { display: none; }
 
 /*
- * Two shapes, because there are two kinds of thing in the reel.
- *
- * Reddit is phone-shaped already, so it gets the phone: cropped into 9:16 with
- * the overlay laid over it, which is what a reel looks like.
- *
- * The library is not. These are 16:9 scenes, and cropping one to 9:16 throws
- * away nearly two thirds of the width. So a library slide keeps its whole
- * frame and is given the band between the bar at the top and its own captions
- * at the bottom — the picture stops where the furniture starts instead of
- * sitting underneath it.
+ * Two shapes: Reddit is cropped to 9:16 with the overlay on it; library
+ * slides (16:9) keep the whole frame between the bar and captions.
  */
 .reelframe {
   position: relative;
@@ -91,27 +70,17 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 .reel.crop-auto .reelslide.tall .reelframe { aspect-ratio: 9 / 16; }
 
-/*
- * contain, not cover. A clip whose edges you cannot see is a clip you are not
- * being shown — and these arrive in whatever shape the person who posted them
- * chose, so cropping to a house style cuts the subject out of a good half.
- */
+/* contain: posted clips come in any shape. */
 .reel.crop-auto .reelslide.tall .reelvid { object-fit: contain; }
 
-/*
- * On a screen already narrower than the crop — a phone held upright — the
- * frame is the screen, and pillarboxing it inside itself would be absurd.
- */
+/* On a screen narrower than 9:14, the frame is the screen. */
 @media (max-aspect-ratio: 9 / 14) {
   .reel.crop-auto .reelslide.tall .reelframe { aspect-ratio: auto; width: 100%; }
 }
 
 /* --- the band, for the library ------------------------------------------- */
 
-/*
- * A column: the bar's height held clear at the top, the captions taking what
- * they need at the bottom, and the picture given everything left over.
- */
+/* A column: bar space, picture, captions. */
 .reel.crop-auto .reelslide.wide .reelframe {
   width: 100%;
   display: flex;
@@ -120,28 +89,15 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 .reel.crop-auto .reelslide.wide .reelvid { flex: 1; min-height: 0; height: auto; }
 
+/* Captions below the picture, not over it. */
 /*
- * Below the picture rather than over it, so nothing covers the scene. It keeps
- * the gradient's weight without the gradient, which has nothing to fade into
- * once it is on the black.
- */
-/*
- * Nothing special for the band any more: the caption is a child of the slide
- * in every mode, so it is already at the bottom of the screen and already
- * centred. The frame's padding-bottom above is what keeps the picture clear
- * of it.
+ * The caption is the slide's child in every mode; the frame's padding keeps
+ * the picture clear of it.
  */
 
 /* --- one shape for everything, when auto is not what you want ------------ */
 
-/*
- * Sized by whichever side runs out first, not by height.
- *
- * `height: 100%` from the base rule was overriding the ratio: on a phone a 4:3
- * frame came out 390x700 — the shape of the screen — and cover-cropped to it,
- * so 4:3 looked exactly like 9:16 and the button appeared not to work. Letting
- * both sides be bounded and the ratio decide is what makes 4:3 landscape.
- */
+/* Bounded both ways with the ratio deciding; `height: 100%` made 4:3 look like 9:16. */
 .reel.crop-four .reelslide:not(.feed) .reelframe {
   width: auto;
   height: auto;
@@ -153,39 +109,17 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 }
 
 /*
- * Filled to the 4:3 box, not letterboxed inside it.
- *
- * This was `contain`, and `contain` makes the control do nothing you can see:
- * the library is 16:9, a 16:9 clip contained in a 4:3 box renders at exactly
- * the size it renders at in Fit, and the only difference between the two modes
- * was the height of the black around it. A mode called 4:3 that shows you 16:9
- * is a button that appears broken.
- *
- * So it crops, which is what the name says and what the other mode is for
- * avoiding. **The rule about seeing a clip's edges still stands where it was
- * made** — it was made about the feeds, and RedGIFs and Reddit slides ignore
- * this control entirely, below.
+ * cover, not contain: a 16:9 clip contained in 4:3 looks the same as Fit.
+ * Feeds ignore this mode (below).
  */
 .reel.crop-four .reelslide:not(.feed) .reelvid { object-fit: cover; flex: none; height: 100%; }
 
-/* ------------------------------------------------------------- sideways
+/*
+ * ------------------------------------------------------------- sideways
  *
- * A phone held on its side, where every reserve on this page is wrong.
- *
- * The slide holds room at the top for the bar and at the bottom for the
- * caption, and both are measured rather than guessed — which is right, and
- * which in landscape produced this: on an iPhone at 844x390 the bar asked for
- * 54px and the caption for 185, so 239 of 390 went to furniture and the
- * picture got 151px of height and 201 of width on a screen 844 wide.
- *
- * The caption is tall because it is laid out for a portrait column — title,
- * cast, tags, buttons, stacked and centred. There is no room for that
- * sideways and there does not need to be: it is already absolutely positioned,
- * so it can go back over the picture the way a reel's caption normally does,
- * and the reserves come off.
- *
- * Keyed on height rather than orientation alone, because a short window on a
- * desktop has exactly the same problem and no orientation to report it with.
+ * Short screens (landscape phone, short window): the reserves took most of
+ * the height, so the caption goes back over the picture and the reserves
+ * come off. Keyed on height, not orientation.
  */
 @media (max-height: 560px) {
   .reelslide,
@@ -195,15 +129,8 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
   }
 
   /*
-   * Over the picture now, so it needs something to be legible against. The
-   * gradient is only here — in portrait the caption sits on the black below
-   * the picture and has nothing to fade into.
-   *
-   * The 76px at its foot stays. That is not spacing, it is clearance for the
-   * corner buttons, which are absolutely positioned at bottom:18px inside this
-   * overlay and would otherwise have the title running through them. It costs
-   * nothing now: the overlay floats, so its height no longer comes out of the
-   * picture's.
+   * Over the picture here, so it gets a gradient. The 76px foot clears the
+   * corner buttons.
    */
   .reelover {
     padding-top: 40px;
@@ -224,14 +151,10 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
   }
 }
 
-/* ---------------------------------------------------- the feeds always fit
+/*
+ * ---------------------------------------------------- the feeds always fit
  *
- * RedGIFs and Reddit ignore the framing button entirely. Their shape is
- * whatever was posted — portrait phone video, the odd landscape clip, a square
- * screenshot — and there is no house shape that flatters all of it. So the
- * frame takes the screen, the clip takes its own ratio inside it, and nothing
- * is cut off. The control above is for the library, which is the only place a
- * consistent shape is worth having.
+ * RedGIFs and Reddit ignore the framing button: the clip keeps its own ratio.
  */
 .reel .reelslide.feed .reelframe {
   width: 100%;
@@ -257,16 +180,8 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 /* The bar sits over the reel rather than above it: the clip gets the screen. */
 /*
- * One row, always, at every width.
- *
- * A grid of three columns rather than a flex row: the feed window has to be
- * centred against the *screen*, not against whatever the sides happen to
- * weigh — and the left side changes weight every time a tag chip appears, so a
- * flex row with spacers would slide the centre about as you filter.
- *
- * The outer columns are 1fr and minimum zero, which is what lets the sides give
- * up room rather than pushing anything onto a second line. What has to survive
- * a narrow screen survives by truncating, not by wrapping.
+ * One row at every width. A three-column grid keeps the feed window
+ * centred on the screen; the 1fr/0-min sides truncate instead of wrapping.
  */
 .reelbar {
   position: absolute;
@@ -290,14 +205,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 }
 .reelright { justify-content: flex-end; }
 
-/*
- * The tag picker, wearing an icon instead of a word.
- *
- * The select keeps doing the work — it is native, so it behaves properly on a
- * phone — and its closed state is deliberately blank, with the icon drawn over
- * where the text would be. Its options still read as words the moment it opens,
- * which is the only place words were doing anything.
- */
+/* Tag picker as an icon over a native select whose closed state is blank. */
 .reeltags { position: relative; display: inline-flex; flex: none; }
 .reeltags svg {
   position: absolute;
@@ -329,14 +237,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 .reelplugin { margin-left: 10px; }
 
-/*
- * The caption belongs to the slide, not to the picture.
- *
- * It used to live inside the frame, which meant that in a crop it sat on top
- * of the clip and, at 4:3 on a phone, was taller than the frame it was in. Out
- * here it is pinned to the bottom of the screen whatever shape the picture is,
- * and centred — a reel is read down the middle, not off the left edge.
- */
+/* The caption belongs to the slide: pinned to the bottom and centred. */
 .reelover {
   position: absolute;
   inset: auto 0 0 0;
@@ -468,11 +369,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 .redditwhen a { color: var(--muted); }
 .redditwhen a:hover { color: var(--accent-hi); }
 
-/*
- * A slide from Reddit. It borrows the reel's own furniture — same frame, same
- * overlay, same crop — so that scrolling past one is not a jolt. The chip is a
- * different colour because where a clip came from is worth knowing at a glance.
- */
+/* A Reddit slide: same furniture, different-coloured chip. */
 .reelfrom {
   background: rgba(47, 129, 247, 0.16);
   border-color: var(--blue);
@@ -514,18 +411,10 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 /* ------------------------------------------------- reel: hand controls */
 
+/* Framing and rolling on the picture, in thumb reach. */
 /*
- * The two that have to be reachable with a thumb. The bar scrolls off the top
- * of a phone the moment the reel moves, so framing and rolling live down here
- * on the picture instead, where a hand already is.
- */
-/*
- * One row across the foot of the screen, built from two halves.
- *
- * The reel owns four of these — rolling, shuffle, sound, framing — and each
- * slide owns two more, its O and its way in. They cannot be one element,
- * because four of them outlive every slide and two do not. So both halves sit
- * at the same height in the same numbered slots, and the row reads as one.
+ * One row of corner buttons from two halves: four the reel owns, two each
+ * slide owns, in the same numbered slots.
  *
  *   roll  shuffle  O  ·····tag·····  open  sound  fit
  *     1      2     3                  3     2      1
@@ -572,10 +461,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 .slot4.left { left: calc(var(--corner-in) + (3 * var(--corner-step))); }
 .slot4.right { right: calc(var(--corner-in) + (3 * var(--corner-step))); }
 
-/*
- * The gap the two clusters leave. Padded to their width so a long tag name
- * stops short of them rather than running underneath.
- */
+/* The gap between the clusters, padded so a long tag stops short of them. */
 .reeltagline {
   position: absolute;
   inset: auto 0 18px 0;
@@ -604,10 +490,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 }
 .reelicon:hover { color: var(--text); border-color: var(--line-hi); }
 
-/*
- * Where you are in the clip, and the handle for changing it. Thin, because it
- * is the whole width of the picture and the picture is the point.
- */
+/* The scrub bar, thin. */
 .reelscrub {
   position: absolute;
   inset: auto 0 0 0;
@@ -622,19 +505,10 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 .reelslide.scrubbing .reelscrub { height: 7px; }
 .reelslide.scrubbing { cursor: ew-resize; }
 
-/*
- * A sideways drag is a scrub, not a scroll. Without this the browser takes the
- * gesture for the snap scroller and the clip never moves.
- */
+/* A sideways drag scrubs rather than scrolls. */
 .reelslide { touch-action: pan-y; }
 
-/*
- * A 4:3 frame on an upright phone is only a couple of hundred pixels tall, and
- * the overlay was written for a frame the height of the screen — the tag chip
- * ended up clipped against the top edge. So on a narrow screen the captions
- * give up their spare room: less padding, one line of title, and the cast goes
- * rather than pushing everything else out of the picture.
- */
+/* Narrow screens: less padding, one line of title, no cast. */
 @media (max-width: 620px) {
   .reelover { padding: 12px 12px 16px; gap: 9px; }
   .reelmeta { gap: 3px; }
@@ -649,14 +523,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 }
 
-/*
- * One row, whatever the width.
- *
- * Wrapping put the bar on two lines on a phone and pushed the reel down; the
- * pickers give way instead. They share what room there is and ellipsis their
- * own text, and the gear — the only thing here that is not a menu — keeps its
- * size, because a control that shrinks to nothing is worse than a short label.
- */
+/* One row: pickers truncate; the gear keeps its size. */
 .reelbar { flex-wrap: nowrap; }
 
 .reelbar .reelpick {
@@ -672,13 +539,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
   .reelbar { gap: 6px; padding: 8px 10px; }
   .reelbar .reelpick { font-size: 12px; padding: 5px 6px; }
   .reelex { display: none; }
-  /*
-   * The tag goes back into the captions on a phone.
-   *
-   * Seven buttons at forty pixels leave about forty in the middle, and
-   * "Orgasm" rendered into twenty of them. Above the title is where it lived
-   * before the button row existed, and there is room for it there.
-   */
+  /* On a phone the tag goes back into the captions, above the title. */
   .reeltagline {
     position: static;
     order: -1;
@@ -721,11 +582,7 @@ main:has(.fillview) .sections { padding: 12px 18px 0; }
 
 /* ------------------------------------------------- reel: settings */
 
-/*
- * Line art rather than emoji. On currentColor, so an icon follows whatever its
- * button is doing — hover, the accent when a control is on — instead of being
- * a coloured picture sitting in a white row.
- */
+/* Line-art icons on currentColor, so they follow the button's state. */
 .reelglyph {
   width: 18px;
   height: 18px;

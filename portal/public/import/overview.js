@@ -4,16 +4,11 @@ import { api, el } from '../util.js';
 import { stashdbCard } from '../catalogue.js';
 import { SECTION_OF, paint, painterFor, renderSetup, show, state } from './core.js';
 
-/* ================================================================ overview
+/*
+ * ================================================================ overview
  *
- * The first page of Import, answering two questions rather than one: what am I
- * already collecting, and what is worth a look that I am not.
- *
- * The summary comes first because seven tracked rows do not tell you whether
- * you are behind — one number, "N decisions waiting", does. The suggestions
- * below it are drawn from marks you have already made on StashDB itself, except
- * the trending row, which is the only thing here that is not about him and is
- * last for that reason.
+ * Import's first page: the tracked summary ("N decisions waiting"), then
+ * suggestions from your StashDB favourites, then trending.
  */
 
 export let overviewTimer = null;
@@ -61,11 +56,7 @@ function renderOverview(paint, overview, building) {
   );
 }
 
-/*
- * The tracked catalogues, summed. Decisions is the headline because it is the
- * only number on the page that is a job rather than a fact: it grows on its own
- * as catalogues release things, and going stale is what it actually costs you.
- */
+/* The tracked catalogues summed. Decisions is the headline. */
 function summaryBand(summary, refresh) {
   const figure = (value, label, href, loud) =>
     el(href ? 'a' : 'div', { className: 'figure' + (loud ? ' loud' : ''), ...(href ? { href } : {}) },
@@ -102,11 +93,7 @@ function summaryBand(summary, refresh) {
   );
 }
 
-/*
- * A row of StashDB scenes. Not `band()` — that draws a ThePornDB card, whose
- * Add needs a ThePornDB site id these do not have, so every suggestion would
- * come out reading "Do not have" with no way to act on it.
- */
+/* StashDB scenes. Not `band()`, which draws TPDB cards needing a TPDB site id. */
 function stashdbBand(title, note, scenes) {
   return el('section', { className: 'feed' },
     el('div', { className: 'feedhead' },

@@ -2,22 +2,11 @@
 
 import { api } from '../util.js';
 
-/* ---------------------------------------------------- what was left set
+/*
+ * ---------------------------------------------------- what was left set
  *
- * The reel's settings are a sitting rather than a place: the framing, whether
- * it rolls, the mix, which feed. Setting them again on every visit is the kind
- * of small friction that makes a page feel like it is not listening.
- *
- * Kept on the server rather than in the browser, for the same reason the tile
- * sizes are — this portal gets used from more than one machine, and "how I like
- * the reel" does not change between them.
- *
- * **The address still wins.** A link with settings in it is somebody being
- * specific, and what was left last time must not overwrite it. So this is only
- * ever consulted where the address said nothing.
- *
- * Read once into a plain object before the session is built, because building a
- * session cannot wait on a request — the reel has to appear.
+ * The reel's settings, saved on the server (used from several machines).
+ * The address wins. Read once before the session is built.
  */
 let kept = {};
 
@@ -33,11 +22,7 @@ export async function loadKept() {
 
 export const remembered = (key, fallback) => (key in kept ? kept[key] : fallback);
 
-/*
- * Saved on a delay, because these change in flurries — cycling the framing
- * button is three writes in two seconds, and each one is a config write that
- * the backup then considers itself invited to think about.
- */
+/* Saved after a short delay; settings change in bursts. */
 let keepTimer = null;
 
 export function keep(session) {

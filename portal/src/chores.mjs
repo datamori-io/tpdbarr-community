@@ -1,19 +1,9 @@
 /*
- * Chores over /organized_scenes — the long presses on Manage › Stash.
+ * Chores over /organized_scenes (Manage › Stash): re-shelve files whose
+ * names drifted, write .nfo files, write thumbnails.
  *
- * Three of them, all the same shape: walk every filed scene, do one small
- * thing to each, and say how it went. Re-shelving a file whose name has
- * drifted from what Stash says it is, writing the .nfo beside it, writing the
- * thumbnail beside it.
- *
- * **One at a time, in the portal, not in Stash.** Stash has no job for any of
- * these, so the portal runs them itself and the page polls. Two at once would
- * be two loops renaming and writing into the same folders, and there is no
- * version of that which is worth the saved minutes.
- *
- * **Nothing is overwritten by a move, ever** — same rule as filer.mjs. The
- * "overwrite all" presses are for the sidecars only, and only because asking
- * for that is the whole point of them.
+ * Run by the portal one at a time; the page polls. A move never overwrites
+ * (same rule as filer.mjs); only the sidecar "overwrite all" presses overwrite.
  */
 
 import { mkdir, readdir, rename as renameFile, rmdir, stat, writeFile } from 'node:fs/promises';
@@ -75,10 +65,7 @@ export function stop() {
   return state();
 }
 
-/*
- * Start `work` over every scene in `scenes`, in the background. The page gets
- * the first snapshot back and polls for the rest.
- */
+/* Run `work` over `scenes` in the background; return the first snapshot. */
 function start(kind, label, scenes, work, after = null) {
   if (run && !run.over) throw Object.assign(new Error(`Already running: ${run.label}.`), { status: 409 });
 
@@ -107,35 +94,20 @@ function start(kind, label, scenes, work, after = null) {
 
 // ------------------------------------------------------------ re-shelving
 
-/*
- * -> { from, to, dir } or { why } for one filed scene.
- *
- * `null` when it is already where it belongs, which is the common case and
- * not worth a line in the plan.
- */
+/* -> { from, to, dir } or { why }, or null when already in place. */
 function place(scene) {
   if ((scene.files || []).length > 1) return { why: 'Two files on one scene — look at it rather than move half of it.' };
   const from = scene.files[0].path;
   const shelf = shelfFor(scene, from);
   if (shelf.why) return { why: shelf.why };
-  // The share is case-insensitive, so "pt. 2" and "Pt. 2" are the same file
-  // there — a rename between them is churn, and the exists-check would refuse
-  // it anyway.
+  // The share ignores case, so a case-only rename is churn.
   if (shelf.to.toLowerCase() === from.toLowerCase()) return null;
   return { from, to: shelf.to, dir: shelf.dir };
 }
 
 /*
- * Never writes. What "rename all" would do, so the page can say it before the
- * press: how many move, how many are already right, how many cannot, and a
- * sample of each.
- *
- * **Copies are their own pile.** A move whose destination is already taken is
- * almost always a second file of a scene that is filed already — a loose copy
- * at the top of the folder, left behind by an earlier import. The first run
- * counted those as failures, which buried them among real ones. They are
- * listed in full here, with both sizes and both scenes, because which one to
- * keep is a decision and nothing on this page makes it.
+ * The rename plan, never writes: moves, already right, can't, and copies.
+ * Copies (destination taken) are listed in full for you to decide.
  */
 async function sort(scenes) {
   const holder = new Map();
@@ -156,10 +128,7 @@ async function sort(scenes) {
     const [here, there] = await Promise.all([stat(p.from).catch(() => null), stat(p.to).catch(() => null)]);
 
     if (!here) {
-      // Nothing at the old path. If the file is at the new one it was moved
-      // and Stash has not rescanned yet; if it is at neither, the record is
-      // all that is left — FileFlows re-encoded it to another name, or it was
-      // deleted by hand. Neither is a move, and trying it is an ENOENT.
+      // Not at the old path: either moved (Stash not rescanned) or gone. Not a move.
       if (there) waiting++;
       else gone.push({ id: scene.id, path: p.from });
       continue;
@@ -260,10 +229,7 @@ export async function reshelve(config) {
 
   return start('reshelve', 'Renaming in organized', scenes, (scene) => moveOne(config, scene), async (mine) => {
     if (!mine.changed) return '';
-    /*
-     * Stash finds a moved file by its fingerprint and updates the scene it
-     * already has, so one scan of the folder puts every record right.
-     */
+    /* One scan fixes every moved record (Stash follows fingerprints). */
     await gql(config, 'mutation($p: [String!]) { metadataScan(input: {paths: $p}) }', { p: [HOME] });
     return 'Asked Stash to rescan /organized_scenes so it follows the moves.';
   });
@@ -274,31 +240,16 @@ export async function reshelve(config) {
 /*
  * Keep the better of each copy pair, delete the other.
  *
- * Asked for on 2026-09-21 after the first re-shelve stopped on 57 of them: a
- * loose file at the top of /organized_scenes whose scene is already filed at
- * the place the loose one wanted to go.
- *
- * **Better is quality, not size.** A 720p HEVC file is smaller than the same
- * 720p in H.264 and looks as good or better — which is the whole reason
- * FileFlows re-encodes the library. So, in order:
- *
+ * Better is quality, not size:
  *   1. more pixels
- *   2. at the same resolution, the newer codec (AV1/HEVC over H.264 over older)
- *   3. same codec too, the higher bitrate
+ *   2. same resolution: newer codec (AV1/HEVC over H.264 over older)
+ *   3. same codec: higher bitrate
  *
- * and a pair that ties on all three is left alone rather than decided by a
- * coin.
- *
- * **The filed scene is the one kept, whichever file wins.** It is the record
- * that has been matched, marked and watched. The loose scene is merged into it
- * first — Stash's own sceneMerge, play and o history included, the filed
- * scene's fields untouched — so for a moment one scene holds both files. Then
- * the losing file is deleted through Stash (deleteFiles, off the disk and out
- * of the database together), and if the winner is the loose one, Stash moves
- * it into the filed slot.
- *
- * A failure after the delete and before the move leaves the winner loose but
- * attached to the right scene — the next re-shelve puts it where it goes.
+ * The filed scene's record is kept. The loose scene is merged into it
+ * (sceneMerge, history included), the losing file deleted through Stash
+ * (deleteFiles), and a loose winner moved into the filed slot. A failure
+ * between delete and move leaves the winner attached; the next re-shelve
+ * files it.
  */
 const FILES = 'files { id path size width height video_codec bit_rate duration }';
 
@@ -401,11 +352,7 @@ const sourceOf = (endpoint) => {
   try { return new URL(endpoint).hostname.replace(/^www\./, '').split('.')[0]; } catch { return 'stash'; }
 };
 
-/*
- * Kodi/Emby movie.nfo, the same shape gapfill.mjs writes into /movies so both
- * halves of the share read the same to whatever scans it. No <lockdata> and no
- * <art> for the same reasons as there.
- */
+/* Kodi/Emby movie.nfo, same shape as gapfill.mjs writes. */
 function buildNfo(scene) {
   const year = scene.date ? String(scene.date).slice(0, 4) : null;
   const minutes = scene.files?.[0]?.duration ? Math.round(scene.files[0].duration / 60) : null;
@@ -457,13 +404,8 @@ export async function nfos(config, overwrite) {
 // ------------------------------------------------------------ thumbnails
 
 /*
- * `<stem>-thumb.jpg` beside the video — the name Kodi, Emby and Jellyfin all
- * look for. The picture is Stash's own cover for the scene, fetched the way
- * the media proxy fetches it.
- *
- * Stash answers a scene with no cover with a 200 and an SVG placeholder (see
- * scenethumb.mjs), so the type is checked: a placeholder is skipped as a
- * failure rather than written to disk as a thumbnail of nothing.
+ * `<stem>-thumb.jpg` beside the video, from Stash's cover. A placeholder
+ * (SVG, see scenethumb.mjs) is skipped as a failure.
  */
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 
@@ -506,11 +448,8 @@ export async function thumbs(config, overwrite) {
 // ------------------------------------------------------------ duplicates
 
 /*
- * Stash's own phash duplicate finder, over the whole library. A list and
- * nothing else — two files that look like the same scene are a thing to look
- * at, and deleting is done from the scene page where you can see both.
- *
- * `distance` is Stash's: 0 is exact, and its UI calls 4 "high", 8 "medium".
+ * Stash's phash duplicate finder. A list only; delete from the scene page.
+ * `distance`: 0 exact, 4 high, 8 medium.
  */
 export async function duplicates(config, distance = 0) {
   const d = Math.max(0, Math.min(10, Number(distance) || 0));

@@ -5,14 +5,11 @@ import { kindSwitch, sceneCard } from './cards.js';
 import { SECTION_OF, countChip, externalLink, link, paint, painterFor, sections, show, state, text } from './core.js';
 import { addMissing } from './send.js';
 
-/* ----------------------------------------------------------------- movies
+/*
+ * ----------------------------------------------------------------- movies
  *
- * TPDB's newest releases, poster side out.
- *
- * There is no Add on this page, and that is not an oversight: Whisparr v2 is
- * Sonarr with sites as series, and it has no movie to add one to. The scenes
- * inside a movie are ordinary scenes and do add, which is what opening one is
- * for.
+ * TPDB's newest releases as posters. No Add: Whisparr v2 has no movies.
+ * Open one to add its scenes.
  */
 
 // Like the scene search, the movie search lives in the address — a shelf you
@@ -42,11 +39,7 @@ export async function showMovies(qs) {
   }
 }
 
-/*
- * The movie feed on its own is a river of unrelated labels. A term and an order
- * turn it into a shelf: "adam and eve" sorted by studio is 566 releases with
- * Adam & Eve's own ninety-nine together at the top of their own block.
- */
+/* A search term and an order turn the feed into a shelf. */
 const MOVIE_ORDERS = [
   ['date', 'Release date'],
   ['studio', 'Studio'],
@@ -114,11 +107,7 @@ function renderMovies(paint, params, data) {
     }
   };
 
-  /*
-   * Said out loud rather than left to be discovered: a Stash group carries no
-   * TPDB id and no fingerprints, so the only thing left to match a movie on is
-   * its name. The number worth trusting is inside.
-   */
+  /* A Stash group can only be matched by name; the real count is inside. */
   const note = [
     stash.enabled
       ? `${counts.had} of ${counts.total} matched a group in Stash — on name alone, so open one for the scene-by-scene answer`
@@ -165,11 +154,7 @@ function movieCard(movie) {
         el('span', {}, movie.date || ''),
         movie.duration ? el('span', {}, movie.duration + ' min') : null
       ),
-      /*
-       * Only when there is something to say. An unmatched movie is not "Not
-       * had" — it is unchecked, and a badge claiming otherwise would be the
-       * one lie on the page.
-       */
+      /* Only when there's a match; unmatched isn't "Not had". */
       movie.stash
         ? el('div', { className: 'cardstate' },
             el('span', {
@@ -250,11 +235,7 @@ function renderMovie(paint, data) {
     )
   );
 
-  /*
-   * The one action a movie has. It adds the scenes, not the movie, and only
-   * the ones neither system already holds — which is the whole reason the page
-   * bothers listing them.
-   */
+  /* Add the movie's scenes that neither system holds. */
   const toolbar = el('div', { className: 'toolbar' }, el('span', { className: 'spacer' }));
   if (notHad) {
     const add = el('button', { className: 'primary', type: 'button' }, `Add the ${notHad} you do not have`);

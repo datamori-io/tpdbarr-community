@@ -1,6 +1,6 @@
 /*
- * The four filtered shelves — scenes, performers, studios, galleries — and the
- * one read of the whole library they all filter in the browser.
+ * Scenes, performers, studios, galleries: filtered in the browser from one
+ * read of the library.
  */
 
 import { api, el } from '../util.js';
@@ -24,26 +24,17 @@ export async function showList(key) {
   }
 }
 
-/* ----------------------------------------------------------------- scenes
+/*
+ * ----------------------------------------------------------------- scenes
  *
- * The shelf, with the questions you actually ask of one: what is it, whose is
- * it, who is in it, what is it about, and when. Resolution and watched-state
- * are deliberately not here — at this size they are noise, and the tile
- * already carries both.
- *
- * One read of the whole library backs this page and the two below it. That is
- * affordable exactly once — a couple of megabytes, cached on the server for
- * five minutes and here for the same — and a bar built from the first sixty
- * scenes would offer the wrong studios and lie about the counts.
+ * One read of the whole library (cached five minutes both ends), so the bar
+ * is built from everything.
  */
 
 const SHELF_TTL = 5 * 60 * 1000;
 let shelfMemo = null;
 
-/*
- * Kind is not a field Stash has — it is read off the tags, first match wins.
- * More than half the shelf says nothing at all, so it lands in "Not said".
- */
+/* Kind is read off tags, first match wins; most scenes are "Not said". */
 const KINDS = [
   ['Solo', ['solo']],
   ['Lesbian', ['lesbian', 'girl/girl']],
@@ -60,22 +51,14 @@ function kindOf(scene) {
   return UNSAID;
 }
 
-// Search reads the things you would name out loud. Tags have their own
-// dropdown, and matching them here as well would make it hard to tell which of
-// the two you were looking at.
+// Search matches title, studio and cast; tags have their own dropdown.
 const sceneHaystack = (scene) => [
   scene.title,
   scene.studio?.name,
   ...scene.performers.map((p) => p.name),
 ].filter(Boolean).join(' ').toLowerCase();
 
-/*
- * The two fields the shelf bar needs and Stash does not have: what kind of
- * scene it is, and the words you would search for it by. A category page reads
- * its own scenes rather than the whole library, so this is shared rather than
- * inlined — a tile filtered on one page must be filtered the same way on the
- * other.
- */
+/* Adds kind and search words. Shared with category pages. */
 export function shapeScene(scene) {
   const shaped = { ...scene, kind: kindOf(scene) };
   shaped.haystack = sceneHaystack(shaped);
@@ -100,11 +83,7 @@ export const SCENE_FACETS = [
   { key: 'year', any: 'Any year', of: (s) => (s.date ? [s.date.slice(0, 4)] : []) },
 ];
 
-/*
- * Recently Added leads, and so is the shelf's own order: what you want off this
- * page nine times in ten is what landed since you last looked, not what a
- * studio happened to release first.
- */
+/* Recently Added first. */
 export const SCENE_SORTS = [
   ['added', 'Recently Added'],
   ['newest', 'Newest'],
@@ -113,12 +92,7 @@ export const SCENE_SORTS = [
   ['studio', 'Most in that studio'],
 ];
 
-/*
- * "Most in that studio" is not a field either: it orders by how much of that
- * studio is on the shelf, so the sites you have collected most of come first
- * and their scenes arrive together. Counted over what is showing rather than
- * the whole library — a filtered shelf should sort by what is in front of you.
- */
+/* "Most in that studio" counts over what's showing. */
 export function orderScenes(scenes, sort) {
   const by = [...scenes];
 
@@ -147,15 +121,7 @@ export function orderScenes(scenes, sort) {
   return by.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 }
 
-/*
- * The two shelves this page can be.
- *
- * What you hold is the page. What you monitored and have not got is the same
- * question turned round, and it used to lead the page as a rail — which put a
- * handful of cards above the whole library every time you opened it. As a
- * second view it is out of the way until you ask for it, and it gets the whole
- * page rather than a row you scroll sideways.
- */
+/* Two shelves: what you hold, and what you wanted that hasn't arrived. */
 const MONITORED_WALL = 120;
 
 function monitoredWall(wanted, reload) {
@@ -212,11 +178,8 @@ export async function showScenes(query = '') {
     const missing = (wanted?.scenes || []).filter((s) => !s.stash);
 
     /*
-     * The switch sits under the heading rather than in the shelf bar: it says
-     * which shelf you are reading, and the bar below it filters whichever one
-     * that is. The held shelf keeps its bar, its wall and its Show more between
-     * switches — they are hidden, not rebuilt, so a filter you set survives a
-     * look at the want list.
+     * The switch under the heading. The held shelf is hidden, not rebuilt, so
+     * its filters survive.
      */
     const toggle = el('div', { className: 'viewswitch shelfviews' });
     const monitored = el('div', {});
@@ -425,12 +388,10 @@ export async function showStudios(query = '') {
   }
 }
 
-/* -------------------------------------------------------------- the gaps
+/*
+ * -------------------------------------------------------------- the gaps
  *
- * The TPDB half: not "what exists" — TPDB's directory is meaningless at this
- * size — but what is missing from the people and sites you already collect.
- * Ranked by the size of the gap, because that is the only ordering that makes
- * the row worth scrolling.
+ * What's missing from people and sites you collect, from TPDB, biggest gap first.
  */
 
 function gapRails(gaps, kind) {

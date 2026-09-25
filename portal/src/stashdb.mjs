@@ -1,22 +1,11 @@
 /*
- * StashDB — what the library *should* contain.
+ * StashDB: what the library should contain. Its ids are what v3 indexes
+ * and Stash stores. The token is borrowed from Stash.
  *
- * The other two sources answer different questions. Stash is what you have;
- * ThePornDB is a catalogue that happens to be reachable. StashDB is the one
- * Whisparr v3 indexes on, which makes it the only source whose ids survive the
- * whole trip: search here, add there, and the scene arrives in Stash carrying
- * the same UUID it was found under. So this is the front door, and TPDB is
- * where you go when StashDB has never heard of it.
- *
- * Credentials are borrowed from Stash, which already stores a token for the
- * StashDB stash-box — the same trick tpdb.mjs plays. Nothing to paste, and the
- * token never leaves this machine except back to StashDB.
- *
- * The schema here was read off StashDB's own introspection rather than guessed:
+ * Schema, from introspection:
  *   queryScenes(input: SceneQueryInput) -> { count, scenes }
  *   findScene(id: ID!) -> Scene
  *   findScenesBySceneFingerprints(fingerprints: [[FingerprintQueryInput!]!]!)
- * Worth re-reading if any of it ever stops matching.
  */
 
 import { stashdbEndpoint, stashdbToken } from './stash.mjs';
@@ -30,10 +19,7 @@ export function forgetCredentials() {
   credentials = null;
 }
 
-/*
- * Same shape and same reasoning as the TPDB token: a null is never cached, so
- * one slow moment from Stash does not take StashDB out until a restart.
- */
+/* Don't cache a null (see tpdb.mjs). */
 async function auth(config) {
   if (!stashConfigured(config)) return null;
 
@@ -60,17 +46,11 @@ export async function available(config) {
   return Boolean(await auth(config));
 }
 
-// The endpoint on its own, for matching stash_ids in Stash against StashDB.
-// Matching needs no token, so a stash-box saved without one still matches —
-// it used to answer null, and every "do I have this" silently lost its exact
-// pass and fell back to title + date or to nothing.
+// The endpoint alone, for matching stash_ids. Needs no token.
 export const endpointFor = async (config) =>
   (await auth(config))?.endpoint || (stashConfigured(config) ? await stashdbEndpoint(config).catch(() => null) : null);
 
-/*
- * Which of a Stash record's stash_ids is StashDB's. Stash keeps the endpoint as
- * it was typed and a trailing slash is not a different stash-box.
- */
+/* Compare endpoints ignoring a trailing slash. */
 const sameBox = (a, b) =>
   String(a || '').replace(/\/+$/, '').toLowerCase() === String(b || '').replace(/\/+$/, '').toLowerCase();
 
@@ -125,11 +105,7 @@ const SCENE = `
   images { url width height }
 `;
 
-/*
- * StashDB serves several images per scene at different sizes and the widest is
- * the landscape still — the same one the acquisition cards already show for a
- * TPDB scene, so the two sets of tiles look like one page.
- */
+/* The widest image is the landscape still. */
 function art(images = []) {
   const usable = images.filter((i) => i.url);
   if (!usable.length) return null;
@@ -137,11 +113,7 @@ function art(images = []) {
   return widest.url;
 }
 
-/*
- * A StashDB scene as this app carries it. `id` is the UUID Whisparr v3 knows as
- * stashId and Stash stores as a stash_id, which is the whole reason this source
- * is worth having: one id, three systems.
- */
+/* A StashDB scene as this app carries it. `id` is v3's stashId and Stash's stash_id. */
 export function toCard(raw) {
   const performers = (raw.performers || [])
     .map((p) => ({
@@ -190,16 +162,8 @@ export async function getScene(config, id) {
 }
 
 /*
- * The same read, asked for a list of ids at once.
- *
- * StashDB has no findScenes(ids:) — queryScenes filters by studio, performer
- * and text and not by id — so the batch is made with GraphQL aliases: thirty
- * `findScene` fields in one document rather than thirty round trips. Thirty
- * because a want list of a couple of thousand is seventy-odd requests at that
- * size, and a document large enough to be refused would fail the whole batch.
- *
- * An id StashDB no longer has comes back null and is simply absent from the
- * Map, which is the honest answer for a scene that has been merged away.
+ * Batch lookups by id via GraphQL aliases (thirty `findScene`s per
+ * document); StashDB has no find-by-ids. Merged-away ids come back null.
  */
 const BATCH = 30;
 
@@ -222,17 +186,11 @@ export async function scenesByIds(config, ids) {
   return found;
 }
 
-/* ------------------------------------------------------------- the bridge
+/*
+ * ------------------------------------------------------------- the bridge
  *
- * TPDB scene -> the same scene on StashDB, so something found on the TPDB side
- * can still go the v3 route. Whisparr v3 cannot do this itself: its scene
- * records come back with tpdbId null (checked against a live instance), so the
- * two catalogues only meet on content.
- *
- * Fingerprints first, because they are the one answer that cannot be a
- * coincidence — TPDB publishes PHASH and OSHASH per scene and StashDB indexes
- * the same kinds. Title and date only ever come back as `probable`, and what
- * happens to a probable is decided upstairs, not here.
+ * TPDB scene -> StashDB scene, for the v3 route (v3's records carry no
+ * tpdbId). Fingerprints first; title and date only as `probable`.
  */
 export async function findByFingerprints(config, { phashes = [], oshashes = [] }) {
   const prints = [
@@ -262,11 +220,8 @@ export async function findByTitle(config, { title, date = null, studio = null })
   if (!title) return [];
 
   /*
-   * The title and nothing else. StashDB's `text` search ANDs its terms against
-   * the scene text, and the studio name is not part of that text — adding it
-   * takes a search that finds the scene and turns it into one that finds
-   * nothing (checked: "PlushiesVR <title>" -> 0, "<title>" -> 1). So the studio
-   * is used to rank what comes back, never to fetch it.
+   * Title only: StashDB ANDs terms and the studio name isn't in the scene
+   * text. The studio ranks results instead.
    */
   const { scenes } = await searchScenes(config, title, { perPage: 20 });
 
@@ -284,8 +239,7 @@ export async function findByTitle(config, { title, date = null, studio = null })
 
 /*
  * -> {match: 'exact'|'probable', scene, via, others} or null.
- *
- * A `probable` is deliberately not acted on here. The caller shows it and asks.
+ * A probable isn't acted on here.
  */
 export async function bridge(config, tpdbScene) {
   const exact = await findByFingerprints(config, {
@@ -316,19 +270,11 @@ export async function bridge(config, tpdbScene) {
   };
 }
 
-/* --------------------------------------------------------------- searching
+/*
+ * --------------------------------------------------------------- searching
  *
- * The acquisition search runs on this rather than on searchScenes above.
- * StashDB's own query input takes every filter the page offers — text, title,
- * studio, performer, tag, a date bound, and the sort — so a filter is never
- * faked by discarding rows out of a page that has already come back. A count
- * shown next to a filtered search is StashDB's count of the whole match, not
- * of the twenty-four things on screen.
- *
- * One thing it will not do: DateCriterionInput carries a single `value` and no
- * `value2`, and its modifiers are EQUALS / GREATER_THAN / LESS_THAN — there is
- * no BETWEEN. So the page offers one date bound, on purpose. Two bounds would
- * have to be half a filter and half a lie about the count.
+ * The acquisition search. Every filter goes to StashDB, so counts are real.
+ * Dates take one bound only: DateCriterionInput has no BETWEEN.
  */
 
 export const SORTS = ['DATE', 'TITLE', 'DURATION', 'TRENDING', 'POPULARITY', 'CREATED_AT', 'UPDATED_AT'];
@@ -336,13 +282,7 @@ const DATE_MODIFIERS = ['GREATER_THAN', 'LESS_THAN', 'EQUALS'];
 
 const ids = (value) => (Array.isArray(value) ? value : [value]).filter(Boolean);
 
-/*
- * The browser's query string -> StashDB's SceneQueryInput.
- *
- * Everything is checked here rather than trusted: an unknown sort or date
- * modifier becomes the default instead of a GraphQL error the page cannot do
- * anything with.
- */
+/* Query string -> SceneQueryInput. Unknown values fall back to defaults. */
 export function sceneQuery({
   text = '',
   title = '',
@@ -397,31 +337,17 @@ export async function queryScenes(config, input) {
 }
 
 /*
- * Every scene a filter matches, stripped to what coverage needs — the id, and
- * the title and date that let a scene identified against the *other* stash-box
- * still be recognised. A tracked studio's whole catalogue at full scene shape
- * is megabytes of artwork URLs nobody is going to look at.
- *
- * The cap is a real limit and is reported, not hidden: a network with tens of
- * thousands of scenes is measured on the newest `cap` of them and the card says
- * so, rather than the page hanging on forty round trips.
+ * Every scene a filter matches, trimmed to id, title and date, for coverage.
+ * Capped at the newest `cap`, and the cap is reported.
  */
 const ID_PAGE = 500;
 
-/*
- * `rich` adds the duration and the tags, and is asked for only when something
- * needs them — today that is a decide rule about a length or a tag. This walks
- * every scene of a tracked catalogue up to the cap, forty-nine catalogues of
- * them, so the difference between three fields and five is paid a hundred
- * thousand times over and is not worth paying unasked.
- */
+/* `rich` adds duration and tags, only when a rule needs them. */
 export async function sceneBriefs(config, input, { cap = 3000, rich = false, cast = false } = {}) {
   const out = [];
   let total = 0;
 
-  // The cast is asked for on its own and only when something needs it: it is
-  // a list per scene rather than a field, over every scene of every catalogue
-  // you follow. See rules.needsCast.
+  // Cast only when needed. See rules.needsCast.
   const fields = [
     'id title release_date',
     rich || cast ? 'duration studio { name parent { name } } tags { name }' : '',
@@ -460,36 +386,16 @@ export async function sceneBriefs(config, input, { cap = 3000, rich = false, cas
   return { scenes: out.slice(0, cap), total, capped: total > cap };
 }
 
-/* ------------------------------------------------------------ by director
+/*
+ * ------------------------------------------------------------ by director
  *
- * A director's filmography — for a portal-owned category that wants to show
- * what somebody directed whether or not you hold it. See categories.mjs's
- * `kind: 'filmography'`.
- *
- * StashDB has no query for this. `director` lives on Scene as a free string
- * with nothing that indexes it — SceneQueryInput's own fields were read off
- * introspection and there is no `director` among them, and there is no Group
- * or Movie type on StashDB at all, only Scene. So this is a net rather than a
- * lookup: search the name as text, which is the nearest thing StashDB offers,
- * and keep only what comes back whose own `director` field actually matches.
- * The search finds candidates; the field decides.
- *
- * This is best-effort, not a guarantee. A scene StashDB's text search does not
- * surface for this name — because the search does not weigh the director
- * credit the way it weighs a title — is a scene this can never find, and the
- * category page has its own way to add one by hand for exactly that reason.
- *
- * Bounded at twenty pages so a common name typed by mistake cannot turn a
- * refresh into a crawl of the whole site; a director's own name is a narrow
- * search term in the ordinary case.
+ * A director's filmography (see categories.mjs). StashDB can't query by
+ * director, so: text-search the name, keep scenes whose `director` matches.
+ * Best effort; missed scenes can be added by hand. Capped at twenty pages.
  */
 const foldName = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
-// Substring rather than exact: a studio's own byline sometimes carries more
-// than the bare name ("Ricky Greenwood for Pure Taboo"), and this is already
-// only ever asked of candidates a text search or a network crawl produced —
-// both narrow enough that a substring match is not going to pull in a
-// different person of a similar name.
+// Substring, since bylines carry extras ("… for Pure Taboo").
 const directorMatches = (raw, wantedFolded) => foldName(raw.director).includes(wantedFolded);
 
 export async function findByDirector(config, name, { maxPages = 20, perPage = 25 } = {}) {
@@ -517,11 +423,7 @@ export async function findByDirector(config, name, { maxPages = 20, perPage = 25
   return [...found.values()].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 }
 
-/*
- * The network a scene's studio belongs to — its parent, or itself when it has
- * none. A director works for a network's studios as a set, not for one studio
- * in isolation, so this is the unit crawlNetworkForDirector walks.
- */
+/* A scene's network: its studio's parent, or itself. */
 export async function sceneStudioNetwork(config, id) {
   const data = await gql(
     config,
@@ -534,21 +436,8 @@ export async function sceneStudioNetwork(config, id) {
 }
 
 /*
- * Every scene of one network — its own studios, then every child studio's —
- * kept where the director credit matches. This is the actual answer to "what
- * did this person direct", as far as it can be answered at all: StashDB will
- * not search by director, but it will hand over a whole network's catalogue a
- * page at a time, and a network is the unit a director's byline sticks to.
- *
- * Two passes because `studios` and `parentStudio` are different filters — the
- * network's own scenes are filed directly under it, and everything else is
- * filed under one of its children, and StashDB has no single filter that
- * means "this studio or any of its children".
- *
- * Bounded at a page count that is generous for a real network (Adult Time's
- * whole slate is a few thousand scenes across four filters here) rather than
- * unbounded, so a mis-seeded id cannot turn a refresh into an unattended crawl
- * of the site.
+ * Every scene in a network, kept where the director matches. Two passes
+ * (`studios`, then `parentStudio`) since no filter covers both. Page-capped.
  */
 export async function crawlNetworkForDirector(config, networkId, director, { maxPages = 80, perPage = 100 } = {}) {
   const wanted = foldName(director);
@@ -581,11 +470,10 @@ export async function crawlNetworkForDirector(config, networkId, director, { max
   return [...found.values()];
 }
 
-/* ----------------------------------------------------------- the entities
+/*
+ * ----------------------------------------------------------- the entities
  *
- * What the filter chips are picked from. StashDB's search* queries are the
- * type-ahead ones — they match aliases as well as names, which is the whole
- * reason to ask the catalogue instead of filtering a list in the browser.
+ * Filter-chip type-ahead. StashDB's search* queries match aliases.
  */
 
 // Studio artwork comes back with width -1 when StashDB has not measured it, so
@@ -639,10 +527,7 @@ export async function searchTags(config, term, { limit = 10 } = {}) {
   return (data.searchTag || []).map((t) => ({ kind: 'tag', id: t.id, name: t.name, detail: '' }));
 }
 
-/*
- * One of a thing, by id. Used when a filter arrives from a bookmarked URL and
- * the browser has an id but no name to put on the chip.
- */
+/* One entity by id, for chips from a bookmarked URL. */
 export async function getStudio(config, id) {
   const data = await gql(
     config,

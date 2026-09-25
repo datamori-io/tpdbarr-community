@@ -8,10 +8,8 @@ export const api = async (path, options) => {
   const payload = await res.json();
 
   /*
-   * The server refuses to hand Whisparr a scene Stash already has (see
-   * heldguard.mjs) and says which one and where. Every Add and Send button
-   * comes through here, so the question is asked once, here: yes sends the
-   * same request again with `force`, no leaves it as the error it was.
+   * A 409 means Stash already holds it (heldguard.mjs). Ask; yes resends
+   * with `force`.
    */
   if (res.status === 409 && payload.held && options?.method === 'POST') {
     if (confirm(`${payload.error}\n\nSend it to Whisparr anyway?`)) {
@@ -34,11 +32,7 @@ export const el = (tag, props = {}, ...children) => {
   return node;
 };
 
-/*
- * Which folder a file is in: the mount in bold, then the folders under it.
- * Takes the file's path and drops the filename; the full path is the hover.
- * Used on the library tiles and the Not organised cards.
- */
+/* A file's folder: the mount in bold, then the folders. Full path on hover. */
 export function folderLine(path, className = 'folderline') {
   if (!path) return null;
   const parts = String(path).split('/').filter(Boolean);
@@ -64,11 +58,8 @@ export const clock = (seconds) => {
 export const gigabytes = (bytes) => (bytes ? (bytes / 1e9).toFixed(1) + ' GB' : '');
 
 /*
- * Pages that fill the screen rather than flow down it — the reel, the plugin
- * frame — cannot say so in CSS alone, because nothing above them has a fixed
- * height: the top bar grows with the brand image, the status bar with whatever
- * it has to say. So they carry .fillview and are measured instead, and the one
- * observer below re-measures them whenever the chrome moves.
+ * Full-screen pages (.fillview) are measured, since nothing above them has
+ * a fixed height; re-measured when the chrome changes.
  */
 export function fitFills() {
   for (const node of document.querySelectorAll('.fillview')) {

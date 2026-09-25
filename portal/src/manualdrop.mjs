@@ -1,20 +1,8 @@
 /*
- * The Manual category, carried to the Import Folder.
- *
- * A release grabbed by hand from the Indexers band lands in NZBGet's Manual
- * category on this PC, and nothing else in the pipeline watches that folder —
- * Whisparr only imports what it asked for, and that is the point of Manual. So
- * this does the one step Whisparr would have: once NZBGet says a Manual
- * download finished, the video goes to the Import Folder on the Mac, one
- * folder per release like everything else there, and Stash is asked to scan
- * it. From there it is an unmatched scene like any other — Match or the wild
- * card builds it.
- *
- * Only what NZBGet's history marks SUCCESS, so nothing is taken while it is
- * still unpacking. Copy, check the size, then delete — this crosses from the
- * PC to the Mac, a real transfer, and a dropped network halfway must not lose
- * the file. See share.mjs for why /media4 rather than /Import Folder, which is
- * mounted read-only.
+ * Carry finished NZBGet "Manual" downloads (hand grabs) to the Import
+ * Folder, one folder per release, and ask Stash to scan. Only SUCCESS
+ * entries. Copy, check size, then delete (a real network transfer). Written
+ * via /media4 because /Import Folder is mounted read-only (see share.mjs).
  */
 
 import { copyFile, mkdir, readdir, rm, stat } from 'node:fs/promises';
@@ -55,9 +43,7 @@ export const lastSweep = () => ({ ...last, running });
 
 /*
  * -> {moved: [{name, files}], failed: [{name, why}]}
- *
- * Idempotent without keeping a list: a release whose folder is gone has been
- * carried already, so the history can be read whole every time.
+ * Idempotent: a release whose folder is gone was already carried.
  */
 export async function sweep(config) {
   if (running) return last;

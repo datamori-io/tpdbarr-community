@@ -2,40 +2,18 @@
 
 import { api, el } from '../util.js';
 
-/* ============================================================== comparing
+/*
+ * ============================================================== comparing
  *
- * Both pages under this tab end at the same question — *is this the same
- * scene* — and both were answering it with two thumbnails a row apart. The
- * scene's frame at 176 and a candidate's cover at 176, and if the answer is
- * not obvious at that size you were opening the file to check.
- *
- * So this lays everything out at once and at a size that settles it: the
- * scene's own frames along the top, every candidate underneath, all the same
- * width. Cut more frames if the ones you have show nothing useful.
- *
- * **Inline, never a dialog.** You are working down a list, and a list you keep
- * being thrown out of is slower than the thing it replaced — the same reason
- * the match rows grow their candidates in place. This opens under the row and
- * closes again.
- *
- * **And it puts a number on it.** The picture pass on the match page already
- * measures a candidate's artwork against the scene's cover; here it measures
- * against every frame and reports the closest, which is strictly better
- * information — a cover cut at 25% is one sample of a scene, and the promo
- * still that a box holds was not necessarily taken anywhere near it.
+ * The compare sheet: the scene's frames along the top, every candidate
+ * below, all one size, inline under the row. Each candidate is scored
+ * against every frame and the closest reported. Cut more frames if needed.
  */
 
 const HASH_W = 9;
 const HASH_H = 8;
 
-/*
- * 64 bits, or null if the picture cannot be read.
- *
- * Null covers every way this fails and they are all the same answer: no image,
- * a load that never finished, a canvas the browser will not let us read back.
- * A source whose artwork taints the canvas lands here rather than throwing,
- * and simply gets no number.
- */
+/* 64 bits, or null if the picture can't be read (including a tainted canvas). */
 function pictureHash(src) {
   return new Promise((done) => {
     if (!src) return done(null);
@@ -76,15 +54,7 @@ function pictureHash(src) {
 
 const bitsApart = (a, b) => a.reduce((n, bit, i) => n + (bit === b[i] ? 0 : 1), 0);
 
-/*
- * What a distance means, in words rather than in bits.
- *
- * The thresholds are the ones measured on this library when the picture pass
- * was built: correct candidates scored 0 to 18 against the scene's own cover,
- * every wrong one scored 25 or more, and a 64-bit hash of two unrelated
- * pictures averages 32. The gap between 18 and 25 is the whole signal and it
- * is worth saying out loud rather than leaving as a number to interpret.
- */
+/* Distance in words. Measured here: correct 0–18, wrong 25+, unrelated ~32. */
 const verdict = (apart) => {
   if (apart == null) return { word: '', why: '' };
   if (apart <= 8) return { word: 'the same picture', why: `${apart} of 64 apart` };
@@ -93,14 +63,7 @@ const verdict = (apart) => {
   return { word: 'different picture', why: `${apart} of 64 apart — two unrelated pictures average 32` };
 };
 
-/*
- * The index sheet.
- *
- * `images` is what there is to compare against: `{ key, label, src, onPick }`.
- * `onPick` is optional and is what makes this useful on the match page rather
- * than merely interesting — having decided by looking, the tick is right here
- * instead of back up the row.
- */
+/* The sheet. `images`: `{ key, label, src, onPick }`; `onPick` puts the tick here. */
 export function compareSheet(sceneId, images, { onClose = null } = {}) {
   const mine = el('div', { className: 'cmpstrip' });
   const theirs = el('div', { className: 'cmpstrip' });
@@ -148,19 +111,13 @@ export function compareSheet(sceneId, images, { onClose = null } = {}) {
 
   const drawFrames = (frames) => {
     mine.replaceChildren(
-      // The row's own thumbnail first: it is what the picture pass has always
-      // measured against, and seeing it beside the frames says whether it was
-      // a fair sample of the scene.
+      // The row thumbnail first, the one the picture pass measures against.
       tile(`/media/scene/${sceneId}/thumb`, 'the row thumbnail'),
       ...frames.map((f) => tile(f.url, `${f.pct}% in`))
     );
   };
 
-  /*
-   * Measured after the sheet is on screen, not before. Decoding a dozen
-   * pictures is tens of milliseconds of nothing to look at, and the sheet is
-   * useful the instant it is drawn — the numbers arrive a moment later.
-   */
+  /* Scored after the sheet draws. */
   const measure = async () => {
     const sources = [`/media/scene/${sceneId}/thumb`, ...(await frames()).map((f) => f.url)];
     frameHashes = (await Promise.all(sources.map(pictureHash))).filter(Boolean);

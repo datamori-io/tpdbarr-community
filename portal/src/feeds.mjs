@@ -1,11 +1,4 @@
-/*
- * News, for the landing page.
- *
- * Five ordinary RSS/Atom feeds, none of it about the library. No favourites to
- * read off Stash, no rate limit like Reddit's — these are five publishers who
- * expect to be polled — so this stays a plain cache-and-refresh, the shape
- * reddit.mjs would be without the backoff it needs and this does not.
- */
+/* News for the landing page: five RSS/Atom feeds, cache-and-refresh. */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -76,16 +69,9 @@ const pick = (block, tag) => decode((block.match(new RegExp(`<${tag}[^>]*>([\\s\
 const stripTags = (html) => decode(String(html || '')).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 /*
- * Whatever picture a block offers, in the order an RSS item is likely to carry
- * one: an enclosure, a media:content, a media:thumbnail, XBIZ's bare `<image>`
- * element, or failing all of those, the first `<img>` inside the description
- * itself.
- *
- * The bare `<image>` is not in any spec — at the channel level RSS 2.0 uses it
- * for the feed's own logo, and it takes a `<url>` child there rather than a URL
- * of its own. XBIZ puts one on every item with the article's art in it, which
- * is the only place the art appears, so it is read when it holds a URL and
- * ignored when it does not.
+ * An item's picture: enclosure, media:content, media:thumbnail, XBIZ's
+ * bare `<image>` (non-standard, only place its art appears), else the
+ * first `<img>` in the description.
  */
 function firstImage(block) {
   const found =
@@ -104,11 +90,7 @@ function firstImage(block) {
   return img ? decode(img[1]) : null;
 }
 
-/*
- * RSS 2.0 items or Atom entries, whichever the feed turns out to be — the five
- * sources here are not all the same shape, and neither guess is worth asking
- * anyone to configure by hand.
- */
+/* RSS 2.0 items or Atom entries, detected. */
 function entries(xml, source) {
   const atom = !/<item[\s>]/i.test(xml) && /<entry[\s>]/i.test(xml);
   const tag = atom ? 'entry' : 'item';
@@ -156,11 +138,7 @@ async function pullOne(source) {
 
 let pulling = null;
 
-/*
- * One pass over the five. A source that fails keeps whatever it last had — a
- * publisher having a bad day is not a reason to blank a shelf that was fine
- * an hour ago.
- */
+/* One pass. A failing source keeps what it had. */
 async function pullAll() {
   const store = await load();
 
@@ -189,11 +167,7 @@ export function refresh() {
 
 // ------------------------------------------------------------------- read
 
-/*
- * Read the cache, and kick off a refresh in the background when it is stale.
- * Nothing here waits on a network request — the page draws what is on disk and
- * the next visit finds it caught up.
- */
+/* Serve the cache; refresh in the background when stale. */
 export async function view() {
   const store = await load();
   const stale = !store.at || Date.now() - store.at > STALE_MS;

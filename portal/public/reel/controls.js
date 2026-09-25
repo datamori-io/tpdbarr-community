@@ -61,11 +61,8 @@ function openSettings(session) {
   shut.onclick = () => { box.close(); box.remove(); };
 
   /*
-   * What a marker plays. The rendered clips are what Stash generated for each
-   * marker — 640x360 whatever the scene is, because that is the size Stash
-   * makes them — and they start instantly. The source is the scene file at its
-   * own resolution, seeked to the moment, which looks better and costs a range
-   * request into a file that may be gigabytes.
+   * What a marker plays: the rendered clip (instant, lower resolution) or the
+   * source file seeked to the moment (better, heavier).
    */
   const fromSource = el('input', { type: 'checkbox', checked: session.play === 'source' });
 
@@ -111,23 +108,11 @@ export function bar(session, tags) {
   gear.onclick = () => openSettings(session);
 
   /*
-   * Both halves of the tag question in one control.
-   *
-   * They were two dropdowns sitting side by side, both listing every tag, and
-   * telling them apart meant reading their first option. They are the same
-   * question asked twice — which tags is this reel about — so they are one
-   * list with two groups, and which group you pick from says which you meant.
-   *
-   * Narrowing to one tag is a mood, so it replaces whatever was narrowed
-   * before. Keeping tags out is a standing preference, so those accumulate and
-   * show as chips you can take off individually.
+   * One tag control, two groups: "only this tag" replaces; "keep out"
+   * accumulates as removable chips.
    */
   const picker = el('select', { className: 'reelpick tags', title: 'Only one tag, or keep tags out' },
-    /*
-     * Blank, so that what shows in the closed control is the tag icon sitting
-     * over it rather than a word. The options still read normally once it is
-     * open, which is the only place words are needed.
-     */
+    /* Blank, so the closed control shows the icon. */
     el('option', { value: '' }, ''),
     el('optgroup', { label: 'Only' },
       tags.map((t) => el('option', { value: 'only:' + t.id }, t.name))),
@@ -163,11 +148,7 @@ export function bar(session, tags) {
     return chip;
   });
 
-  /*
-   * What the reel is narrowed to, when it is. The picker cannot show it — it
-   * has gone back to offering — so the chip does, and taking it off is how you
-   * widen again.
-   */
+  /* A chip for the tag the reel is narrowed to; removing it widens again. */
   const only = session.tag
     ? [(() => {
       const chip = el('span', { className: 'reelex only', title: 'The reel is only this tag' },
@@ -180,40 +161,25 @@ export function bar(session, tags) {
     : [];
 
   /*
-   * Three zones on one row, at every width: the tags left, the feed window dead
-   * centre, whatever is not a moment-to-moment control on the right.
-   *
-   * A grid rather than a flex row with spacers, because the centre has to be
-   * centred against the *screen* and not against whatever the sides happen to
-   * weigh — and the left side changes weight every time a tag chip appears.
+   * Three zones on one row: tags left, feed window centred on the screen,
+   * the rest right. A grid, so tag chips don't shift the centre.
    */
   return el('div', { className: 'reelbar' },
     el('div', { className: 'reelleft' }, tagged, only, excluded),
     feedStrip(session),
     el('div', { className: 'reelright' },
-      /*
-       * One way in to everything that is not a moment-to-moment control: where
-       * the two off-library sources are managed, and how much of the reel they
-       * are allowed to be.
-       */
+      /* The gear: off-library sources and the mix. */
       gear,
       closer()
     )
   );
 }
 
-/* ------------------------------------------------------------ the feeds
+/*
+ * ------------------------------------------------------------ the feeds
  *
- * Four of them, and moving between them is sideways — but only on the dial.
- * The whole screen used to take the gesture, which put it in competition with
- * the two things a sideways drag on a clip already means: scrubbing through
- * it, and nothing at all. A swipe meant for the middle of a video changed the
- * feed under it, which is the page fighting the hand.
- *
- * Changing feed is a navigation rather than a filter: a different feed is a
- * different set of slides, so the reel is rebuilt rather than re-sorted. The
- * seed is deliberately left behind — arriving on RedGIFs should not deal you
- * the RedGIFs that happened to be woven into the mix you just left.
+ * Switched on the dial only (a whole-screen swipe fought with scrubbing).
+ * Changing feed rebuilds the reel, with a fresh seed.
  */
 export function feedTo(session, step) {
   const at = FEEDS.indexOf(session.feed);
@@ -223,13 +189,7 @@ export function feedTo(session, step) {
   switchTo(session, next);
 }
 
-/*
- * Moving to a feed. Its source comes with it — Scenes and Markers are feeds
- * now, so choosing one is choosing what a slide is made of.
- *
- * The seed is deliberately left behind: arriving on RedGIFs should not deal you
- * the RedGIFs that happened to be woven into the mix you just left.
- */
+/* Move to a feed; its source comes with it. The seed resets. */
 function switchTo(session, next) {
   const moved = {
     ...session,
@@ -245,26 +205,11 @@ function switchTo(session, next) {
   go(moved);
 }
 
-/*
- * The strip that says which feed you are on, and lets a mouse do what a thumb
- * does. It sits with the other things drawn over the clip rather than in the
- * bar, because on a phone the bar is off the top of the screen the moment you
- * scroll and this is the control you most want while scrolling.
- */
+/* The feed strip, over the clip so it's reachable while scrolling on a phone. */
 function feedStrip(session) {
   /*
-   * The mark stays put and the labels move behind it.
-   *
-   * The obvious build is a row of pills with the accent moving between them,
-   * and it has a flaw you only see once it is on screen: "All three" and
-   * "Reddit" are different widths, so the highlight jumps about and the whole
-   * strip changes size as you move through the feeds. The fix, and it is the
-   * better one — pin the mark in the middle, give every label the same slot,
-   * and slide the labels underneath. The strip is then a fixed size whatever it
-   * is showing, which is what lets it sit in a bar next to other things.
-   *
-   * The neighbours either side stay visible, so it reads as a position in a
-   * list rather than a label that changed.
+   * The mark stays centred and the labels slide under it, all the same width,
+   * so the strip keeps its size. Neighbours stay visible.
    */
   const at = Math.max(0, FEEDS.indexOf(session.feed));
 
@@ -293,32 +238,14 @@ function feedStrip(session) {
   );
 }
 
-/*
- * The two controls that live over the reel rather than in the bar.
- *
- * On a phone the bar is off the top of the screen the moment you scroll, and
- * reaching the crop button meant scrolling back up to it. These sit on the
- * clip, thumb-high, and neither of them navigates: the reel you are watching
- * survives both.
- */
-/*
- * The way out.
- *
- * Hiding the header takes the navigation with it, so the reel has to offer its
- * own. Top right, where a full-screen thing has closed since the first window
- * manager — and it goes back rather than to a fixed page, so it returns you to
- * whatever you were doing before the reel.
- */
+/* Controls over the reel, in thumb reach. Neither navigates. */
+/* The close button, top right (the header is hidden). */
 function closer() {
   const x = el('button', { className: 'reelclose', type: 'button', title: 'Close the reel' }, '×');
 
   /*
-   * Straight to the library, not history.back().
-   *
-   * Back was the obvious build and it does not work here: every feed you move
-   * through pushes a history entry, so going back from a reel lands you on the
-   * reel you were on a moment ago, and closing takes as many presses as you
-   * made swipes. Closing means leaving, so it leaves.
+   * Straight to the library: every feed change adds a history entry, so back()
+   * would just step through feeds.
    */
   x.onclick = () => { location.hash = '#/library'; };
 
@@ -355,18 +282,11 @@ export function corners(session) {
     keep(session);
     history.replaceState(null, '', addressFor(session));
 
-    /*
-     * Turning it on mid-clip should not strand you: whatever is playing now
-     * gets the same treatment as everything after it.
-     */
+    /* Turning roll on applies to the clip playing now. */
     armRoll(session, session.slides[session.current]);
   };
 
-  /*
-   * Shuffle and sound came down from the bar to sit with these. The bar
-   * scrolls away on a phone and these do not, and a control you cannot reach
-   * while watching is a control you do not use.
-   */
+  /* Shuffle and sound live with these, reachable on a phone. */
   const shuffle = el('button', {
     className: 'reelcorner slot2 left',
     type: 'button',
@@ -389,10 +309,7 @@ export function corners(session) {
     }
   };
 
-  /*
-   * The captions on or off. Like the framing button it never navigates: the
-   * clip you are watching survives it, and the address is rewritten in place.
-   */
+  /* Captions on or off. Rewrites the address in place. */
   const info = el('button', {
     className: 'reelcorner slot4 right' + (session.info ? '' : ' on'),
     type: 'button',
@@ -412,14 +329,7 @@ export function corners(session) {
   return [roll, shuffle, sound, shape, info];
 }
 
-/*
- * Moving on by itself.
- *
- * A clip loops for as long as you leave it, which is the right behaviour when
- * you are choosing. Rolling turns that into one time round: a video that has
- * played its window once, or a still that has been up four seconds, hands over
- * to the next slide. Turning it off puts the loop back.
- */
+/* Roll: play once (or four seconds for a still), then move on. Off loops. */
 export function armRoll(session, slide) {
   clearTimeout(session.rollTimer);
   if (!slide) return;

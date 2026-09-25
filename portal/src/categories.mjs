@@ -1,27 +1,12 @@
 /*
- * Categories — the shelf as you would arrange it, rather than as it arrived.
+ * Categories: shelves you arrange yourself. Portal-owned
+ * (config/categories.json); nothing is written to Stash.
  *
- * Stash's tags are what a scraper said a scene contains. A category is what you
- * say a set of scenes *is*, and the two are not the same question: there are
- * hundreds of tags, nobody chose most of them, and no tag has a cover, a blurb
- * or an order. So this is portal-owned and lives in config/categories.json
- * beside the group builder's store — nothing here is ever written into Stash,
- * which is what keeps a category out of the tag facet on the Scenes shelf.
+ *   picks  scenes chosen by hand, in order
+ *   rule   lines that keep adding matching scenes
+ *   drops  matches you removed, so the rule can't add them back
  *
- * A category holds scenes two ways at once:
- *
- *   picks  ids you chose by hand, in the order you chose them
- *   rule   a list of lines that keeps filling it as scenes land
- *
- * Both, because either alone is wrong. Hand-picking means a scene that arrives
- * tonight never joins anything; a rule alone means the one scene that belongs
- * and does not match can never be put in. So members are picks then matches,
- * and `drops` is the third list — the matches you have thrown out, remembered
- * so the rule cannot drag them back in tomorrow.
- *
- * Membership is resolved against the shelf read (stashlib.shelf), which is the
- * whole library with tag names, already cached for five minutes. A category
- * page therefore costs no extra read of Stash.
+ * Members are picks then matches, resolved against the cached shelf read.
  */
 
 import { readFile, writeFile, mkdir, rename, rm } from 'node:fs/promises';
@@ -52,12 +37,7 @@ function load() {
     .catch(() => { cache = empty(); })
     .then(() => {
       if (!Array.isArray(cache.categories)) cache = empty();
-      /*
-       * Every rule is shaped on the way in rather than only on the way out, so
-       * nothing downstream has to know that a rule used to be three lists and
-       * a word. A file written before clauses existed is read as clauses from
-       * here on, and rewritten in the new shape the next time it is saved.
-       */
+      /* Old rules are converted to clauses on load. */
       for (const row of cache.categories) row.rule = shapeRule(row.rule);
       loading = null;
       return cache;
@@ -78,11 +58,7 @@ async function save() {
 
 // ------------------------------------------------------------------ shaping
 
-/*
- * The slug is the address, so it is made once at creation and then left alone
- * even if the name changes. Renaming a category must not break a link you sent
- * yourself, and there is nothing here that could fix one up afterwards.
- */
+/* The slug is made once and kept through renames, so links don't break. */
 export function slugify(name) {
   return String(name || '')
     .toLowerCase()
@@ -102,43 +78,20 @@ const listOf = (value) => (Array.isArray(value) ? value : [])
   .filter(Boolean)
   .slice(0, 40);
 
-/* ------------------------------------------------------------------ rules
+/*
+ * ------------------------------------------------------------------ rules
  *
- * A rule is a list of lines, read top to bottom.
- *
- * It was one line: three comma-separated fields — tags, studios, performers —
- * OR-ed against each other, with a single "any / all" word that applied to the
- * tags only. Two things were wrong with that. You could not say the same thing
- * twice ("these tags, but not those"), and the one place a joining word
- * appeared did not join the things it sat between, so nobody could tell what
- * it did without reading this file.
- *
- * So each line names one field, one operator and its words, and every line
- * after the first carries the word that joins it to what is above it:
+ * A rule is a list of lines, read top to bottom. Each line is one field,
+ * one operator and its words; lines after the first say how they join:
  *
  *   tags        any of   anal, dp
  *   and studios none of  BangBros
  *   or performers any of Riley Reid
  *   or title     any of  wedding
  *
- * **Left to right, no precedence.** Each line joins to the result of every
- * line above it, not to the line immediately above. `a or b and c` is
- * therefore `(a or b) and c`, which is what the page says it is and what the
- * stack of rows looks like. Borrowing arithmetic's precedence would make the
- * picture on screen a lie about the rule, and there is nowhere in a flat list
- * to draw a bracket.
- *
- * Tags, studios and titles match loosely (a rule word inside the name) because
- * Stash's names are not typed consistently; performers match exactly, because
- * two people's names overlapping is common and catching the wrong one is worse
- * than missing.
- *
- * **Title catches the file name too, for nothing.** `card()` already falls back
- * to the file's basename where Stash holds no title, so a line saying
- * `title any of wedding` finds both the scene called "The Wedding Night" and
- * the unidentified one sitting on disk as `wedding-night-1080p.mp4`. Which is
- * the whole point of having it: the scenes with no tags and no studio are
- * exactly the ones a rule could not reach before.
+ * Left to right, no precedence: `a or b and c` is `(a or b) and c`.
+ * Tags, studios and titles match loosely; performers exactly. Title also
+ * matches the filename when Stash has no title.
  */
 
 export const FIELDS = ['tags', 'studios', 'performers', 'title'];
@@ -159,11 +112,7 @@ function shapeClause(clause) {
   };
 }
 
-/*
- * Both shapes in, one shape out. The old rule's three fields were OR-ed and its
- * `match` word applied inside the tags, so that is exactly what it becomes —
- * an upgraded rule catches the same scenes the day after as the day before.
- */
+/* Old shape (three OR-ed fields plus `match`) -> clauses, catching the same scenes. */
 function shapeRule(rule) {
   if (Array.isArray(rule?.clauses)) {
     return { clauses: rule.clauses.slice(0, MAX_CLAUSES).map(shapeClause) };
@@ -211,11 +160,7 @@ function clauseHits(scene, clause) {
   return wanted.some(named);
 }
 
-/*
- * Does the rule name this scene? Left to right, as written — see above. A line
- * with no words in it is skipped rather than counted as false, so a half-typed
- * row cannot quietly empty the category while you are still filling it in.
- */
+/* Does the rule match this scene? An empty line is skipped, not false. */
 function matches(scene, rule) {
   const live = liveClauses(rule);
   if (!live.length) return false;
@@ -228,12 +173,7 @@ function matches(scene, rule) {
   return held;
 }
 
-/*
- * The scenes of one category, in the order the page shows them: what you put
- * there first, in the order you put it, then what the rule found, newest
- * arrival first. Picks lead because they are the argument the category is
- * making; the rule's haul is the long tail underneath it.
- */
+/* Picks first, in order, then rule matches, newest first. */
 function membersOf(row, scenes) {
   const byId = new Map(scenes.map((s) => [String(s.id), s]));
   const dropped = new Set(row.drops || []);
@@ -252,24 +192,13 @@ function membersOf(row, scenes) {
   return { picked, found, all: [...picked, ...found] };
 }
 
-/*
- * What the client is given for one category. The membership lists stay on the
- * server side of the wire except where the editor needs them — a page drawing
- * a wall of tiles has no use for the pick order, and sending it would make the
- * index response grow with the size of the biggest category.
- */
+/* What the client gets for one category. Membership lists stay server-side. */
 const publicRow = (row, count, cover) => ({
   slug: row.slug,
   name: row.name,
   blurb: row.blurb || '',
   cover: cover || null,
-  /*
-   * The uploaded picture, if there is one, as the address that serves it. A
-   * URL rather than a flag: every page that draws a category needs an <img>
-   * src and not one of them should have to know how this is stored. The stamp
-   * is what makes a replacement show up rather than the browser redrawing the
-   * cached one.
-   */
+  /* The uploaded picture's URL; the stamp busts the browser cache. */
   art: row.art ? `/api/library/categories/${row.slug}/art?v=${row.artAt || 0}` : null,
   rule: row.rule,
   ruled: !ruleIsEmpty(row.rule),
@@ -278,41 +207,26 @@ const publicRow = (row, count, cover) => ({
   createdAt: row.createdAt || null,
 });
 
-/*
- * The cover picture. A category can name a scene to lead with; otherwise the
- * first member stands in, so a category never shows an empty frame just
- * because nobody chose one. Falls back to null only when it is genuinely empty.
- */
+/* The chosen cover scene, else the first member. */
 function coverOf(row, members) {
   if (row.cover && members.some((s) => String(s.id) === String(row.cover))) return String(row.cover);
   return members.length ? String(members[0].id) : null;
 }
 
-/* ------------------------------------------------------------ filmography
+/*
+ * ------------------------------------------------------------ filmography
  *
- * A second kind of category, alongside the rule-based one above: not "which
- * of the scenes I hold match this", but "everything this person directed,
- * whether or not I hold it" — a want list built from StashDB rather than a
- * filter over the shelf. See stashdb.findByDirector for where the list comes
- * from and why it can only ever be a best effort.
+ * A category of everything a director made, owned or not, from StashDB.
+ * See stashdb.findByDirector.
  *
- * Same three-list shape as a rule (picks / matches / drops), because it is the
- * same problem: an automated search can miss something that belongs, and a
- * hand fix must survive the next refresh rather than being overwritten by it.
+ *   manifest  what the last search found — replaced on refresh
+ *   extra     added by hand — kept
+ *   drops     removed by hand — kept
  *
- *   manifest  what the last StashDB search found — replaced whole on refresh
- *   extra     scenes added by hand, because the search missed them — kept
- *   drops     scenes thrown out by hand — kept, so a refresh cannot bring
- *             back exactly the thing you removed
- *
- * A row of this kind carries no `rule` and no `picks` — those stay on the
- * other kind. `row.kind === 'filmography'` is the one flag everything below
- * branches on.
+ * `row.kind === 'filmography'` is what everything branches on.
  */
 
-// A category's own small copy of a StashDB scene — enough to draw a tile and
-// nothing that goes stale on its own, since a refresh replaces the manifest
-// wholesale anyway.
+// Enough of a StashDB scene to draw a tile.
 const filmStub = (card) => ({
   id: card.id,
   title: card.title,
@@ -328,9 +242,7 @@ const filmStub = (card) => ({
 const STASHDB_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const extractStashdbId = (raw) => (STASHDB_UUID.exec(String(raw || '')) || [])[0]?.toLowerCase() || null;
 
-// The manifest, the hand-added extras and the drops, folded into one ordered
-// list — extras patch over a manifest entry with the same id, so re-adding a
-// scene the search also found does not create a duplicate.
+// Manifest, extras and drops folded into one list; extras override by id.
 function filmMembers(row) {
   const drops = new Set(row.drops || []);
   const byId = new Map();
@@ -342,30 +254,14 @@ function filmMembers(row) {
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 }
 
-/*
- * The uuid join alone missed every scene identified against ThePornDB rather
- * than StashDB — about a third of the library — so those showed as missing,
- * faded, with a Send to v3 under them. Title + date is the second pass, the
- * same one the StashDB search results use (discover.annotate), and a hit on it
- * is marked `probable` so the page can say so.
- */
+/* Title + date second pass, for scenes identified against TPDB. Marked `probable`. */
 const titleKey = (title, date) =>
   String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '') + '|' + String(date || '').slice(0, 10);
 
 /*
- * Which of them you already hold. The join is a StashDB uuid against Stash's
- * own `stash_ids`, through whichever endpoint Stash has a StashDB stash-box
- * configured for — the same trick the tracked studios and performers use on
- * the Overview (see stashlib.trackedStashIds). Without a StashDB stash-box
- * configured at all, nothing can be marked owned and everything shows as
- * missing, which is the honest answer rather than a guess.
- *
- * `skipped` reads the acquisition ignore list — `config.tracked.ignored`, the
- * same list "Skip" writes to in the decide queue (see discover.mjs). A
- * director you do not formally track still has scenes turn up there, under
- * whichever tracked studio or performer surfaced them, and a scene you have
- * already looked at and said no to is a different thing from one you have
- * simply never seen — worth telling apart even though neither is owned.
+ * Which you already hold: StashDB uuid against Stash's `stash_ids`. With no
+ * StashDB stash-box in Stash, everything shows missing.
+ * `skipped` reads the acquisition ignore list (config.tracked.ignored).
  */
 function decorateFilm(entries, scenes, endpoint, ignored) {
   const owned = new Map();
@@ -396,11 +292,8 @@ function decorateFilm(entries, scenes, endpoint, ignored) {
 // once per entry, since a well-used library holds thousands of them.
 const ignoredIds = (config) => new Set((config?.tracked?.ignored || []).map((s) => s.id));
 
-// The picture a filmography category leads with: the newest one you actually
-// hold, since that is the one with a thumbnail this portal generated rather
-// than one borrowed from StashDB; failing that, whatever the first entry
-// carries. Unlike a rule-based category's `cover`, this is already a usable
-// image address rather than a Stash scene id — see categories.js's coverOf.
+// Lead with the newest one you hold, else the first entry's picture.
+// Already an image URL, unlike a rule category's cover.
 function filmCoverOf(entries) {
   const owned = entries.find((e) => e.owned);
   if (owned) return `/media/scene/${owned.sceneId}/thumb`;
@@ -454,32 +347,18 @@ export async function createFilmography(config, body) {
   try {
     await refreshFilmography(config, slug);
   } catch {
-    // The category exists either way — an empty filmography that has not
-    // reached StashDB yet is a valid, if unhelpful, thing to land on, and the
-    // page offers Refresh again rather than the create failing outright.
+    // Create the category even if StashDB isn't reached; Refresh can retry.
   }
 
   return read(config, slug);
 }
 
 /*
- * The crawl itself — ported from the standalone Stash plugin this replaces
- * (a refresh_catalog.py script), because it answers the
- * question properly where a plain text search only guesses at it.
+ * Crawl a director's work (ported from refresh_catalog.py).
  *
- * StashDB cannot be asked "everything this person directed". What it can
- * answer is "everything under this studio network", a page at a time, with
- * each scene's own director credit along for the ride — so the real trick is
- * finding which networks to ask. That comes from Stash's own `director`
- * field: whatever you already own and have credited to him (by hand, or by a
- * scraper that fills it in — GameLink does) names the studios he works for,
- * and a network is the unit his byline actually sticks to, not one studio in
- * isolation.
- *
- * The plain text search runs too, as a smaller net alongside the network
- * crawl, for a one-off scene sitting outside every network that was seeded —
- * a studio he has worked with exactly once, which owning nothing from means
- * no network was ever seeded from it either.
+ * StashDB can't search by director, but can list a studio network with each
+ * scene's director. Networks are seeded from scenes Stash already credits to
+ * him. A text search runs too, for one-off studios.
  */
 async function crawlDirector(config, director) {
   const found = new Map();
@@ -583,13 +462,7 @@ export async function index(config) {
 
 const PER_PAGE = 60;
 
-/*
- * `all` hands back every member in one answer rather than a page of sixty. The
- * category page asks for that because its filter bar is the shelf's — built in
- * the browser out of what is in front of it — and a bar built from the first
- * page would offer the wrong studios and lie about the counts. A category is
- * a slice of the library, so this is smaller than the shelf read either way.
- */
+/* `all` returns every member at once, so the filter bar is built from all of them. */
 export async function read(config, slug, { page = 1, all: whole = false } = {}) {
   const [store, { scenes }, endpoint] = await Promise.all([
     load(), shelf(config), stashdb.endpointFor(config).catch(() => null),
@@ -603,19 +476,11 @@ export async function read(config, slug, { page = 1, all: whole = false } = {}) 
   }
 
   if (row.kind === 'filmography') {
-    // No paging: a director's filmography runs to dozens or a couple of
-    // hundred, never the thousands a rule-based category can, and the page
-    // that draws it already shows-more in the browser the same way the
-    // Scenes shelf does.
+    // No paging: filmographies are small.
     const decorated = decorateFilm(filmMembers(row), scenes, endpoint, ignoredIds(config));
     const held = decorated.filter((e) => e.owned).length;
 
-    /*
-     * Where each missing one stands in Whisparr v3, so the page can offer to
-     * send it — and not offer twice. One call for everything v3 holds (cached
-     * thirty seconds), not one per tile. Only here, not on the index: the wall
-     * of categories has no buttons to draw.
-     */
+    /* Each missing scene's v3 state, one cached call. Only on the category page. */
     const inV3 = whisparr3Reachable(config)
       ? await whisparr3.allByStashId(config).catch(() => new Map())
       : new Map();
@@ -646,19 +511,12 @@ export async function read(config, slug, { page = 1, all: whole = false } = {}) 
   };
 }
 
-/*
- * Every category a given scene is in. The scene page shows this, and it is the
- * other half of assigning: the place you are most likely to notice a scene
- * belongs somewhere is while you are looking at it.
- */
+/* Every category a scene is in, for the scene page. */
 export async function forScene(config, sceneId) {
   const [store, { scenes }] = await Promise.all([load(), shelf(config)]);
   const id = String(sceneId);
 
-  // Filmography categories sit out of this picker entirely: "add" there means
-  // finding a StashDB credit for a director, not filing an arbitrary Stash
-  // scene into a want list, and the two are not the same action wearing the
-  // same chip. See categories.js's scenePicker.
+  // Filmography categories aren't offered in the scene picker.
   const pickable = store.categories.filter((row) => row.kind !== 'filmography');
 
   const holding = pickable
@@ -708,11 +566,7 @@ function find(store, slug) {
   return row;
 }
 
-/*
- * Editing the category itself. Only the fields actually sent are touched, so
- * the cover picker and the rule editor can each save on their own without
- * having to hold the rest of the record.
- */
+/* Edit a category. Only fields sent are changed. */
 export async function update(config, slug, body) {
   const store = await load();
   const row = find(store, slug);
@@ -747,22 +601,12 @@ export async function remove(_config, slug) {
   return { removed: slug };
 }
 
-/*
- * Putting scenes in and taking them out.
- *
- * Taking one out has to do two things, because a scene can be in a category for
- * two reasons: drop the pick, and remember the drop so the rule does not put it
- * straight back. A scene that was never a match only needs the first, but
- * writing the drop anyway costs one string and removes a whole class of "why is
- * this still here".
- */
+/* Add and remove scenes. Removing drops the pick and records a drop. */
 export async function assign(config, slug, body) {
   const store = await load();
   const row = find(store, slug);
 
-  // A filmography category has no picks and no rule to drop out of — `add`
-  // and `remove` mean something different there (a StashDB link, not a Stash
-  // scene id) and assignFilmography is where that is actually done.
+  // Filmography add/remove means a StashDB link. See assignFilmography.
   if (row.kind === 'filmography') return assignFilmography(config, row, body);
 
   row.picks = row.picks || [];
@@ -782,12 +626,7 @@ export async function assign(config, slug, body) {
   return read(config, slug);
 }
 
-/*
- * The hand order. Only picks can be reordered — the rule's haul has an order of
- * its own (newest first) and there is nowhere to put a manual position for a
- * scene that might stop matching tomorrow. Ids not currently picked are
- * ignored rather than promoted, so a stale editor cannot quietly add anything.
- */
+/* Reorder picks. Unknown ids are ignored. */
 export async function reorder(config, slug, body) {
   const store = await load();
   const row = find(store, slug);
@@ -808,11 +647,7 @@ export async function reorder(config, slug, body) {
   return read(config, slug);
 }
 
-/*
- * What a rule would catch, before you commit to it. The editor calls this on
- * every keystroke-settled change: a rule you cannot see the result of is a
- * rule you will get wrong, and this costs nothing beyond the cached shelf.
- */
+/* What a rule would catch, for the editor's live preview. */
 export async function preview(config, body) {
   const { scenes } = await shelf(config);
   const rule = shapeRule(body?.rule);
@@ -826,37 +661,16 @@ export async function preview(config, body) {
   return { count: found.length, scenes: found.slice(0, 24) };
 }
 
-/* --------------------------------------------------------- your own artwork
+/*
+ * --------------------------------------------------------- your own artwork
  *
- * A picture you uploaded, which beats the scene a category leads with.
- *
- * What counts as a picture is artwork.mjs's, shared with the performer and
- * studio uploads - three callers with one magic-byte table between them,
- * because two copies of that table are two copies that drift.
- *
- * It lives in config/covers/ rather than anywhere near the library. Nothing
- * here is a scene, Stash must never scan it, and it is the one thing about a
- * category that cannot be fetched again — so it belongs beside the store that
- * already holds the rest of what you typed.
- *
- * One file per category, named for the slug. The slug is made once at creation
- * and never follows a rename, so the file never has to be moved and there is
- * nothing to leave orphaned; uploading again replaces what is there, including
- * across formats.
- *
- * **Sniffed, not trusted.** The extension comes from the bytes rather than
- * from the name the browser sent: the name is the one part of an upload that
- * is entirely the client's, and it is what decides the filename this writes
- * and the content type it is later served as.
+ * An uploaded picture, in config/covers/, one per category, named by slug.
+ * Type is sniffed from the bytes (artwork.mjs), not the uploaded name.
  */
 
 const COVERS = join(CONFIG_DIR, 'covers');
 
-/*
- * Where a category's picture is, for the route that serves it. Returns null
- * rather than throwing for a category with no picture, because "there isn't
- * one" is a 404 and not a fault.
- */
+/* Null when there's no picture (a 404, not a fault). */
 export async function artFile(slug) {
   const store = await load();
   const row = store.categories.find((c) => c.slug === slug);
@@ -884,9 +698,7 @@ export async function setArt(config, slug, buffer) {
   if (row.art && row.art !== name) await rm(join(COVERS, row.art), { force: true });
 
   row.art = name;
-  // Stamped so the browser fetches the new one. Same URL every time otherwise,
-  // and a replaced cover that still showed the old picture would read as a
-  // failed upload.
+  // Stamp so the browser fetches the new one.
   row.artAt = Date.now();
 
   await save();
@@ -905,11 +717,7 @@ export async function clearArt(config, slug) {
   return read(config, slug);
 }
 
-/*
- * The words a rule can be built from, counted over the shelf you actually
- * hold. Same reasoning as the Scenes filter bar: a list of every tag Stash
- * knows would offer hundreds that match nothing here.
- */
+/* Words a rule can use, counted over what you hold. */
 export async function terms(config) {
   const { scenes } = await shelf(config);
 

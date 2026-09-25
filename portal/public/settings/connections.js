@@ -1,24 +1,11 @@
 /*
- * Connections — the boxes this portal talks to.
+ * Connections. The form lives in the document and is borrowed, so its
+ * handlers survive navigation.
  *
- * The form is not rebuilt here. It lives in the document and is borrowed:
- * detaching a node does not destroy it, so the save and test handlers bound at
- * the bottom of this file go on working however many times you come and go
- * from this page.
- *
- * The gallery folder pair sits in a holder of its own next door, because it is
- * the Galleries page's question rather than this one's. One Save still writes
- * the lot — there is a single config document and half a save would blank the
- * other half — but the two boxes are read by direct reference rather than
- * through the form.
- *
- * **They cannot be form-associated, however well `form="settings-form"` reads.**
- * That association only holds while both nodes are in the same document tree,
- * and these two are borrowed onto different pages independently: stand the
- * fieldset on Settings › Galleries, navigate, and the form is the detached one
- * — at which point a name lookup through it is undefined and this page throws
- * on the way in, leaving the address bar saying Connections over whatever was
- * on screen before. Which is exactly what it did.
+ * The gallery folder pair is borrowed onto the Galleries page separately
+ * and read by direct reference. It can't be form-associated
+ * (`form="settings-form"`): that only works in the same document tree, and
+ * the lookup broke this page when the two were on different pages.
  */
 
 import { api, el } from '../util.js';
@@ -120,11 +107,7 @@ function formValues() {
   };
 }
 
-/*
- * One write of the whole form, wherever it was pressed from. The gallery page
- * has a Save of its own for the two paths it shows, and it is this one — there
- * is a single config document and half a save would blank the other half.
- */
+/* One write of the whole config, from either page; half a save would blank the rest. */
 export async function saveConfig() {
   const { warnings } = await api('/api/config', { method: 'POST', body: JSON.stringify(formValues()) });
   await refreshState();

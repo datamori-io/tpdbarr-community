@@ -1,28 +1,14 @@
 /*
- * Backing up the portal's own state.
+ * Backing up /config: decisions nobody can regenerate (want list, ignores,
+ * tracked catalogues, crawl state).
  *
- * The code is in git. This is the other half, and the more urgent one: the
- * files in /config are decisions nobody can regenerate. Measured the day this
- * was written — 789 scenes on the want list, 640 ignored, 10 tracked
- * catalogues, plus the RedGIFs and Reddit crawl state. Lose config.json and
- * every percentage in the Import tab goes back to zero with no way to rebuild
- * it, because the thing it was built from was somebody's judgement.
+ * Run by the portal itself, so a portal that's down takes no backups. One is
+ * taken on startup, and thirty are kept.
  *
- * The choice was to have the portal do this itself rather than a scheduled task on
- * Windows. **The known cost of that, stated rather than buried:** a portal that
- * is down or broken cannot take a backup, so the newest copy is only ever as
- * fresh as the last time this was running. That is exactly the moment you would
- * want one. It is mitigated by taking a copy on startup — so a crash-and-
- * restart still produces one — and by keeping thirty of them.
+ *   /backups      on this machine
+ *   the NAS       best effort; the local copy is never held up by it
  *
- * Two destinations, for two different failures:
- *
- *   /backups      on this machine. A bad write is recoverable in seconds.
- *   the NAS       a dead drive is too. Copied best-effort: the local set is
- *                 written first and is never held up by a share being down.
- *
- * Gzipped, because these are JSON and compress about ten to one — thirty sets
- * of a 3.8 MB config is 114 MB raw and closer to 12 MB like this.
+ * Gzipped JSON.
  */
 
 import { readdir, readFile, writeFile, mkdir, rm, stat } from 'node:fs/promises';
@@ -51,21 +37,9 @@ const stamp = () =>
   new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
 /*
- * Everything in the config directory, minus the media.
- *
- * The rule: nothing that can be fetched again goes in a backup, and that
- * includes everything the reel page shows. Almost all the weight here is
- * exactly that — 3727 cached gifs and 1193 cached posts, which is 3.1 MB of
- * the 3.8.
- *
- * But those two files are not *only* cache. redgifs.json also holds the
- * creators, two of which were followed by hand, and reddit.json holds the
- * subreddits added the same way. Dropping the files whole would throw those
- * away with the clips. So the bulk lists come out and the rest stays, which
- * takes a 3.8 MB backup to about 700 KB and loses nothing that was a decision.
- *
- * A field listed here is one that can be fetched again. Anything not listed is
- * kept, which is the safe direction for a rule about what to throw away.
+ * Fields that can be fetched again, dropped from the backup (the cached
+ * gifs and posts). Hand-followed creators and subreddits in the same files
+ * are kept. Anything not listed is kept.
  */
 const DROP = {
   'redgifs.json': ['gifs'],
@@ -73,28 +47,10 @@ const DROP = {
 };
 
 /*
- * Every .json at the top of config/, plus the uploaded category artwork one
- * level down.
- *
- * The artwork is here because it is the clearest case there has ever been of
- * The rule: a picture somebody chose and uploaded cannot be fetched again
- * by anything, from anywhere. Everything else in a backup is a list you typed;
- * this is a file you made.
- *
- * It costs more than the rest put together, and that is known rather than
- * discovered later: a cover is capped at 8MB, these do not compress, and there
- * are thirty sets. Bounded by how many categories you have and how big the
- * pictures are, which is a knob you can see — and thirty copies of a picture
- * that changes twice a year is still cheaper than the picture being gone.
+ * Every top-level .json in config/, plus uploaded category artwork (it
+ * can't be fetched again). Artwork doesn't compress; covers are capped at 8MB.
  */
-/*
- * What is in config/ and is not worth keeping thirty copies of.
- *
- * coverage.json is a cache of what StashDB says about the catalogues you
- * track. Every other file here is something you typed and nothing can work out
- * again; this one rebuilds itself in about two minutes from the source of
- * truth, and it is big enough to be most of a backup set on its own.
- */
+/* coverage.json is a cache that rebuilds itself; not kept. */
 const DERIVED = new Set(['coverage.json']);
 
 async function sources() {
@@ -109,13 +65,7 @@ async function sources() {
   ];
 }
 
-/*
- * -> the bytes to store for one file.
- *
- * A file with nothing to drop is passed through untouched rather than
- * re-serialised: a backup that reformats what it copies is a backup you cannot
- * diff against the original.
- */
+/* -> the bytes to store. Files with nothing to drop are copied unchanged. */
 function trim(file, body) {
   const drop = DROP[file];
   if (!drop) return { body, dropped: [] };
@@ -155,10 +105,7 @@ async function writeSet(root, name, files) {
   return { dir, bytes };
 }
 
-/*
- * Oldest sets removed once there are more than KEEP. Done per destination, so
- * the NAS keeps its own thirty even if the local disk was cleared out.
- */
+/* Remove the oldest sets beyond KEEP, per destination. */
 async function prune(root) {
   const names = (await readdir(root).catch(() => []))
     .filter((n) => /^\d{4}-\d{2}-\d{2}T/.test(n))
@@ -173,10 +120,7 @@ async function prune(root) {
 
 /*
  * -> {name, files, bytes, local, nas}
- *
- * The local copy is the one that must succeed; the NAS is best-effort and its
- * failure is reported rather than thrown. A share that is down is a thing to
- * tell somebody about, not a reason to have no backup at all.
+ * The local copy must succeed; a NAS failure is reported, not thrown.
  */
 export async function run({ force = false, why = 'asked for' } = {}) {
   if (running) return running;
@@ -243,11 +187,7 @@ export async function run({ force = false, why = 'asked for' } = {}) {
   return running;
 }
 
-/*
- * What the rest of the app calls. Config saves come in bursts — a click per
- * ignored scene — so this only marks that something changed and lets the gap
- * above decide whether it is worth a copy.
- */
+/* Mark a change; the minimum gap decides whether a copy is taken. */
 export function changed(why = 'config changed') {
   run({ why }).catch((err) => console.warn('[tpdbarr] backup failed -', err.message));
 }
@@ -277,11 +217,7 @@ export async function existing() {
   return out;
 }
 
-/*
- * One on startup, so a portal that crashed and came back has a copy from after
- * the crash rather than from whenever it was last healthy. Delayed a little:
- * the first seconds of a start are the busiest and this is not urgent.
- */
+/* One on startup, after a short delay. */
 export function onStart() {
   setTimeout(() => run({ force: true, why: 'portal started' }).catch(() => {}), 20000).unref?.();
 }

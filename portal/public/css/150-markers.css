@@ -1,22 +1,15 @@
-/* ==================================================== the marker builder
+/*
+ * ==================================================== the marker builder
  *
- * A cutting bench, laid out the way the cutting apps are: picture on top, the
- * filmstrip that is the timeline under it, what has been cut below that. The
- * playhead is fixed at the middle of the strip and the strip moves under it —
- * see markerbuilder.js for why that is not a matter of taste.
+ * Picture on top, filmstrip timeline under it, cut markers below. The
+ * playhead is fixed mid-strip (see markerbuilder.js).
  *
- * One size is shared with that file: .mbtile and .mbband are 64px tall because
- * STRIP_H is 64. Change one and change the other.
+ * .mbtile and .mbband are 64px because STRIP_H is 64. Change both together.
  */
 
 .mbuild { display: grid; gap: 14px; }
 
-/*
- * `.link` is worn by anchors everywhere else in the app, so it never had to
- * undo a button's own chrome. Both of this page's are real buttons — they
- * change the address rather than being one — and without this they arrive as
- * grey system pills with the link colour inside them.
- */
+/* Undo button chrome for `.link` buttons. */
 .mbuild button.link {
   padding: 0;
   border: 0;
@@ -25,11 +18,11 @@
   cursor: pointer;
 }
 
-/* the queue
+/*
+ * the queue
  *
- * A shelf, drawn by the library's own shelfPage — see picker() in
- * markerbuilder.js. The filter bar, the wall and Show more are all styled in
- * the library's sheets, so all that is left here is the line above them.
+ * A shelf from the library's shelfPage (see picker() in markerbuilder.js);
+ * only the line above it is styled here.
  */
 
 .mbtoolbar {
@@ -55,11 +48,7 @@
   justify-content: center;
 }
 
-/*
- * Capped rather than sized. The strip has to be on screen at the same time as
- * the picture — a bench where placing a mark means scrolling away from the
- * thing you are marking is not one.
- */
+/* Capped so the strip stays on screen with the picture. */
 .mbvideo { width: 100%; max-height: 46vh; object-fit: contain; background: #000; display: block; }
 
 .mbbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -177,11 +166,7 @@
 
 /* the prompt */
 
-/*
- * Fixed rather than placed in the flow. It appears in answer to a keystroke,
- * and a panel that pushes the timeline down at the moment you have just marked
- * something on it moves the thing you were looking at.
- */
+/* Fixed, so the prompt doesn't push the timeline down. */
 .mbprompt {
   position: fixed;
   left: 50%;
@@ -210,9 +195,7 @@
 }
 .mbtaginput:focus { outline: none; border-color: var(--accent-hi); }
 
-/* Capped against the window as well as absolutely: the panel is fixed to the
-   bottom of the screen, and a list long enough to run off the top of a short
-   one takes the input box with it. */
+/* Capped against the window so the input box stays on screen. */
 .mboptions { display: grid; gap: 3px; max-height: min(240px, 38vh); overflow-y: auto; }
 .mboption {
   display: flex;
@@ -272,9 +255,7 @@
 .mbmarker .chip { padding: 3px 10px; color: var(--text); }
 .mbmarker .chip:hover { border-color: var(--accent-hi); }
 
-/* Padded out to something you can actually hit. This is the only control on
-   the page that destroys anything, so it is deliberately not a 16px glyph in
-   the corner — it is a comfortable target that happens to look like one. */
+/* A large target for the only destructive control. */
 .mbdrop {
   padding: 6px 10px;
   /* Pulled back out again so a bigger target does not make the row taller. */
@@ -294,12 +275,10 @@
   .mbvideo { max-height: 34vh; }
 }
 
-/* ---------------------------------------------- the marker builder, by hand
+/*
+ * ---------------------------------------------- the marker builder, by hand
  *
- * The transport row. Every key has a button, because a phone has none of the
- * keys — see markerbuilder.js. Targets are sized for a fingertip rather than a
- * cursor, which costs a desktop nothing and is the difference between usable
- * and decorative on a phone.
+ * The transport row, sized for fingertips.
  */
 
 .mbtransport {
@@ -312,11 +291,7 @@
 
 .mbnudges, .mbacts { display: flex; align-items: center; gap: 6px; }
 
-/*
- * Nothing here is text you would want to select. Tapping a transport button
- * otherwise leaves the label highlighted, and on iOS a press-and-hold on it
- * raises the selection magnifier over the control you are trying to use.
- */
+/* No text selection on buttons (iOS magnifier on long press). */
 .mbtransport button, .mbpending { user-select: none; -webkit-user-select: none; }
 
 .mbnudge {
@@ -405,14 +380,7 @@
 }
 .mbcancel:hover { border-color: var(--accent-hi); color: var(--text); }
 
-/*
- * A finger, not a cursor.
- *
- * Keyed off the input device rather than the width, because the two are not
- * the same question: a tablet in landscape is wide and still has no keyboard,
- * and a narrow desktop window has one. The badges go because the keys they
- * name cannot be pressed; the targets grow because a fingertip is about 44px.
- */
+/* Touch devices: keyed on the pointer, not width. Badges hidden, targets 44px. */
 @media (hover: none) and (pointer: coarse) {
   .mbbadge { display: none; }
   .mbnudge, .mbact { min-height: 44px; }
@@ -433,12 +401,7 @@
   .mbnudges .mbnudge { flex: 1; min-width: 0; }
   .mbacts .mbact { flex: 1; padding: 0 8px; }
 
-  /*
-   * A sheet rather than a floating panel. It is already fixed to the bottom of
-   * the screen; on a phone it may as well own that edge, which also means the
-   * software keyboard pushes against something the width of the screen instead
-   * of shunting a centred box sideways.
-   */
+  /* On a phone the prompt is a bottom sheet. */
   .mbprompt {
     left: 0;
     right: 0;
@@ -476,23 +439,13 @@
 .mbsharpen:disabled { opacity: 1; }
 
 /*
- * The frame ladder — see markerbuilder.js.
- *
- * Rungs stack downwards, coarsest at the top, and each one is a scrolling row
- * rather than a wrapping grid: a rung is a stretch of time laid left to right,
- * and wrapping it would put the second half of a minute underneath the first.
- * The whole panel is capped and scrolls, because on a long film the top rung
- * alone is two hundred frames and it must not push the transport off screen.
+ * The frame ladder (see markerbuilder.js). Each rung scrolls sideways;
+ * the panel is capped and scrolls.
  */
 
 /*
- * The panel and the line down the middle of it.
- *
- * The line is a sibling of the scroller rather than a child: an absolutely
- * placed child travels with the content, which would leave it halfway up a
- * rung the moment the panel was scrolled. Being a sibling also makes it the
- * strip's line — both are the middle of a full-width block, so they sit on
- * the same pixel without either measuring the other.
+ * The centre line is a sibling of the scroller, so it doesn't scroll away
+ * and lines up with the strip's.
  */
 .mbladder { position: relative; }
 .mbladder[hidden] { display: none; }
@@ -558,14 +511,10 @@
   gap: 4px;
   overflow-x: auto;
   padding-bottom: 4px;
-  /* A horizontal drag here is a scroll, not a scrub — this is not the strip.
-     Said outright as well, so a tablet does not spend the first few pixels of
-     the gesture deciding whether it was meant to be a page swipe. */
+  /* A horizontal drag here scrolls, not scrubs. */
   overscroll-behavior-x: contain;
   touch-action: pan-x;
-  /* The rung is scrolled to put the playhead's frame under the line above, and
-     the padding that lets the first and last frames reach the middle is set in
-     markerbuilder.js — it is half a row wide and only known once laid out. */
+  /* Padding for the first and last frames is set in markerbuilder.js. */
   scrollbar-width: thin;
 }
 
@@ -605,50 +554,31 @@
 }
 
 @media (max-width: 620px) {
-  /* Half the screen is too much when the video is above it and the transport
-     below. Frames stay their own size — a smaller one is not worth looking at,
-     which is the entire point of the panel. */
+  /* Capped height. */
   .mbgrid { max-height: 38vh; padding: 8px; }
 }
 
-/* ------------------------------------------------------------- on a tablet
+/*
+ * ------------------------------------------------------------- on a tablet
  *
- * A tablet is wide, so none of the narrow rules above apply to it, and it has
- * no keyboard, so none of the desktop assumptions do either. It fell between
- * the two: full-size targets on a page driven entirely by fingers.
- *
- * Keyed on the pointer rather than the width for the same reason the block
- * further up is — a tablet in landscape is as wide as a laptop and still has
- * nothing to press `t` with.
+ * Wide but touch-only: keyed on the pointer.
  */
 @media (pointer: coarse) {
-  /*
-   * A double tap on a control is a page zoom on iOS unless this is said, and
-   * the two controls people tap fastest here are the nudges and the frames.
-   */
+  /* touch-action so a double tap isn't a zoom on iOS. */
   .mbtransport button,
   .mbframe,
   .mbspan,
   .mbtoolbar button,
   .mbbar button { touch-action: manipulation; }
 
-  /* Both halves have to be on screen together — the picture you are marking
-     and the ladder you are finding the moment in. Neither may take the room
-     the other needs. */
+  /* Picture and ladder both on screen. */
   .mbvideo { max-height: 38vh; }
   .mbgrid { max-height: 34vh; }
 
-  /* The scrub surface is a drag target rather than a cursor target, and the
-     selection magnifier appearing mid-drag is the one thing that reliably
-     ends the gesture on iOS. */
+  /* No selection magnifier mid-drag on iOS. */
   .mbstrip { -webkit-user-select: none; -webkit-touch-callout: none; }
 
-  /*
-   * The key legend goes with the badges, for the same reason and one more.
-   * It names ←, →, shift, alt, space and g, none of which a tablet has — and
-   * it is the widest thing in the bar, so on a 820px screen it is also what
-   * pushes the zoom controls onto a second line of their own.
-   */
+  /* Hide the key legend on touch. */
   .mbkeys { display: none; }
 
   /* The bar wraps onto two lines as soon as an in point appears, so it is
@@ -660,15 +590,10 @@
   .mbframe { border-width: 2px; }
 }
 
-/* ================================================== marker management
+/*
+ * ================================================== marker management
  *
- * A list of markers rather than of scenes — see markermanage.js for why that
- * is a different page rather than a filter on the queue.
- *
- * Rows are the bench's marker rows with a scene bolted on, and they are
- * deliberately the same rows: the same time button, the same tag chip, the
- * same delete in the same place. Two lists of markers that look different are
- * two things to learn.
+ * A list of markers (see markermanage.js), using the bench's row styles.
  */
 
 .mmbar {
@@ -734,9 +659,7 @@
 .mmrow .chip { padding: 3px 10px; color: var(--text); }
 .mmrow .chip:hover { border-color: var(--accent-hi); }
 
-/* Which scene it is in. Takes the slack in the row so the controls at either
-   end stay where the eye left them, and truncates rather than wrapping — a
-   long title must not make one row three lines tall. */
+/* The scene title takes the slack and truncates. */
 .mmwhere {
   flex: 1 1 200px;
   min-width: 0;
@@ -777,11 +700,7 @@
 /* Delete sits hard right, the way it does on the bench. */
 .mmrow .mbdrop { margin-left: 0; }
 
-/*
- * Retiming, opened inside the row it belongs to. On its own line — the row is
- * already full, and a set of fields that pushed the scene title off the end of
- * it would hide what is being retimed.
- */
+/* Retime fields on their own line in the row. */
 .mmretime {
   flex: 1 0 100%;
   display: flex;
@@ -825,11 +744,10 @@
   .mmtitle { display: none; }
 }
 
-/* =============================================== timestamps from elsewhere
+/*
+ * =============================================== timestamps from elsewhere
  *
- * The review panel — see markerfetch.js. It sits in the flow of the bench
- * rather than floating: it is read against the picture and the strip above it,
- * and a panel covering those would be a panel you have to close to use.
+ * The review panel (see markerfetch.js), in the flow of the bench.
  */
 
 .mfpanel {

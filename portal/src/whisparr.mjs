@@ -1,8 +1,7 @@
 /*
- * Whisparr v2 client.
- *
- * v2 is a Sonarr fork, so a TPDB site is a series (series.tvdbId = TPDB site id)
- * and a TPDB scene is an episode (episode.tvdbId = TPDB scene id).
+ * Whisparr v2 client. A Sonarr fork: a TPDB site is a series
+ * (series.tvdbId = TPDB site id), a TPDB scene an episode
+ * (episode.tvdbId = TPDB scene id).
  */
 
 export class WhisparrError extends Error {}
@@ -80,13 +79,8 @@ export async function ensureSeries(config, siteId) {
   const series = (await findSeries(config, siteId)) || (await addSeries(config, siteId));
 
   /*
-   * addOptions.monitor "none" leaves the series itself unmonitored, and Whisparr
-   * (like Sonarr) requires BOTH the series and the episode to be monitored
-   * before it will grab anything automatically. Without this, a scene with no
-   * release yet would sit monitored forever and never be picked up by RSS.
-   *
-   * Monitoring the series is safe: every episode is still unmonitored except
-   * the ones explicitly asked for.
+   * Whisparr only auto-grabs when both series and episode are monitored, so
+   * monitor the series. Its other episodes stay unmonitored.
    */
   if (series.monitored === false) {
     return call(config, '/series/' + series.id, {
@@ -141,10 +135,7 @@ export async function addScenes(config, siteId, tpdbSceneIds) {
   };
 }
 
-/*
- * Every monitored episode with no file — what v2 is still looking for. One
- * page large enough to be the whole list; v2 holds a site or two at a time.
- */
+/* Every monitored episode with no file, in one page. */
 export async function wantedMissing(config) {
   const out = await call(config, '/wanted/missing?page=1&pageSize=2000&monitored=true&includeSeries=true&sortKey=releaseDate&sortDirection=descending');
   return out?.records || [];

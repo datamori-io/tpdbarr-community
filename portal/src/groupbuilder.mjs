@@ -107,55 +107,22 @@ import { heldForV2, heldForV3, refusal } from './heldguard.mjs';
 const CONFIG_DIR = process.env.CONFIG_DIR || './config';
 const PATH = join(CONFIG_DIR, 'groupbuilder.json');
 
-/*
- * A studio's back catalogue does not change quickly and a scan of one is
- * hundreds of requests, so what a pass learned is kept on disk and only redone
- * when asked. This is the same reasoning groupurl.mjs writes down: holding an
- * expensive crawl in memory alone means every container rebuild spends somebody
- * else's budget again.
- */
+/* Scans are expensive and slow to change, so they're kept on disk. */
 const TTL = 7 * 24 * 60 * 60 * 1000;
 
 // The whole pass gets this long, then publishes what it has and says it did.
 const DEADLINE = 20 * 60 * 1000;
 
 /*
- * How many films are asked about at once.
- *
- * Three, not six, and the number is measured. A pass at six collected 313 rate
- * limits from ThePornDB in a single run — every one of them a film dropped from
- * the scan — and tpdb.mjs now backs the whole app off when that happens. Six
- * workers each waiting out the same limit is slower than three that never hit
- * it, so the smaller pool is the faster one as well as the politer one.
- *
- * IAFD is somebody's web server and is asked one page at a time by iafd.mjs
- * itself, which is why there is no second number here.
+ * Three at a time: six hit TPDB's rate limit hundreds of times per pass.
+ * IAFD is paced one page at a time by iafd.mjs.
  */
 const TPDB_AT_A_TIME = 3;
 
-/*
- * How many films one pass will ask IAFD about.
- *
- * Two pages each at 1.2 seconds is about three minutes for forty, which is a
- * length of time somebody will sit through once. New Sensations has 289 films
- * that get this far, so a studio like that takes several runs — and that is the
- * honest shape of it rather than one pass that grinds for a quarter of an hour
- * and gets closed halfway through.
- */
+/* IAFD films per pass: ~3 minutes at two pages each. Big studios take several runs. */
 const IAFD_PER_PASS = 40;
 
-/*
- * A film of one scene is not a group, whichever source said so.
- *
- * Both sources hold records nobody finished filling in, and a stub lists
- * exactly one scene. Believed, it proposes building a group around a scene that
- * already *is* the whole release — measured here first time out, on a Pure
- * Taboo record whose IAFD breakdown had a single row.
- *
- * A genuine one-scene release loses nothing by this. It is one file, it is
- * already in the library, and wrapping it in a group of one says nothing the
- * scene did not already say.
- */
+/* A one-scene film isn't a group. Stub records list a single scene. */
 const CREDIBLE = 2;
 
 let cache = null;
@@ -179,9 +146,7 @@ async function store() {
         if (!cache[key] || typeof cache[key] !== 'object') cache[key] = {};
       }
     } catch {
-      // Missing or corrupt: an empty store is the right recovery either way,
-      // and a scan rebuilds the proposals. The decisions are the loss that
-      // would matter, which is why the write below is atomic.
+      // Missing or corrupt: start empty. Decisions matter most, hence the atomic write.
       cache = { studios: {}, proposals: {}, decisions: {}, scenes: {}, iafd: {}, movies: {} };
     } finally {
       loading = null;
@@ -215,14 +180,7 @@ const STASHDB_ENDPOINT = /stashdb\.org/i;
 const idAt = (scene, pattern) =>
   (scene.stash_ids || []).find((s) => pattern.test(s.endpoint || ''))?.stash_id?.toLowerCase() || null;
 
-/*
- * Every scene in no group, with the three things a match needs: who is in it,
- * which studio filed it, and whichever catalogue ids it carries.
- *
- * One query for the lot. At 2,387 scenes that is a single response and every
- * comparison afterwards is in memory — the alternative is a round trip per
- * candidate film, which for one studio would be three hundred of them.
- */
+/* Every ungrouped scene with cast, studio and catalogue ids. One query. */
 async function ungrouped(config) {
   const data = await gql(config, `{
     findScenes(scene_filter: {groups: {modifier: IS_NULL, value: []}}, filter: {per_page: -1}) {
@@ -250,14 +208,7 @@ async function ungrouped(config) {
   }));
 }
 
-/*
- * The shelf the page opens on: which studios have loose scenes, how many, and
- * what a scan of each has found so far.
- *
- * Ordered by how many scenes are loose, because that is the same order as how
- * much a scan of one is worth — and a studio with two loose scenes is not where
- * anybody should spend three hundred requests.
- */
+/* Studios with loose scenes, most first, with what their scans found. */
 export async function studios(config) {
   if (!stashConfigured(config)) return { studios: [], scanning: scanSnapshot() };
 
@@ -311,13 +262,8 @@ export function scanSnapshot() {
 }
 
 /*
- * Kicks a studio's scan off and hands back progress. It does not wait: one
- * studio is a few hundred TPDB calls and, for the films TPDB cannot answer for,
- * an IAFD page every 1.2 seconds — Pure Taboo is a quarter of an hour. The page
- * polls this the same way the coverage and gaps builds are polled.
- *
- * One at a time on purpose. Two scans would be two crawlers on IAFD wearing one
- * politeness delay between them, which is not politeness.
+ * Start a studio's scan and return progress. The page polls.
+ * One scan at a time so IAFD sees one crawler.
  */
 export async function scan(config, studioId, { force = false } = {}) {
   if (!stashConfigured(config)) throw new Error('Stash is not configured — the loose scenes live there.');
@@ -350,14 +296,7 @@ export async function scan(config, studioId, { force = false } = {}) {
   return scanSnapshot();
 }
 
-/*
- * A studio's TPDB site id, which is the only way into its movie catalogue.
- *
- * There is no name lookup for a site, so this comes off a scene the studio
- * actually holds — one extra call, cached with the studio. A studio whose
- * scenes all came from StashDB alone has no TPDB id anywhere and therefore no
- * catalogue to scan, which the page reports rather than swallowing.
- */
+/* A studio's TPDB site id, taken from one of its scenes. No TPDB id, no catalogue. */
 async function siteIdFor(config, studioId, scenes) {
   const held = await store();
   if (held.studios[studioId]?.siteId) return held.studios[studioId].siteId;
@@ -393,33 +332,18 @@ async function runScan(config, studioId) {
     return;
   }
 
-  /*
-   * How far back the catalogue is worth reading.
-   *
-   * A film released before you held anything of this studio cannot contain a
-   * scene you hold, and the feed is newest first — so the oldest loose scene,
-   * less a year of slack for a re-release dated after the scenes on it, is a
-   * floor rather than a guess. Without it New Sensations is 3,629 movies over
-   * thirty-seven pages at eight seconds each, to find one film.
-   */
+  /* Skip films older than your oldest loose scene of this studio, less a year. */
   const dates = mine.map((s) => s.date).filter(Boolean).sort();
   const since = dates.length ? String(Number(dates[0].slice(0, 4)) - 1) + dates[0].slice(4) : null;
 
   progress.phase = 'reading the catalogue';
   const { movies, total, capped, read } = await tpdb.moviesForSite(config, siteId, {
     since,
-    // A studio with three thousand releases spends a minute here before there
-    // is anything to count, and a page that says nothing for a minute reads as
-    // stuck. Pages are the only honest unit until the roster is in.
+    // Report pages read, so a long roster read doesn't look stuck.
     onPage: (done, of) => { progress.looked = done; progress.total = of; },
   });
 
-  /*
-   * Indexes built once for the whole scan. `byTpdb` is the exact tier;
-   * `byCast` is the probable one, and it is a multimap because two scenes with
-   * the same three people in them are not the same scene — an ambiguous row is
-   * shown as ambiguous rather than resolved by picking the first.
-   */
+  /* `byTpdb` for the exact tier; `byCast` a multimap, so shared casts show as ambiguous. */
   const byTpdb = new Map();
   for (const scene of all) if (scene.tpdbId) byTpdb.set(scene.tpdbId, scene);
 
@@ -440,19 +364,7 @@ async function runScan(config, studioId) {
     byCast.get(key).push(scene);
   }
 
-  /*
-   * The title index, which is the Bang tier's whole basis.
-   *
-   * Same reasoning as the cast index above and for the same measured reason —
-   * built from every loose scene rather than this studio's, because a DVD
-   * gathers scenes from sibling labels and a studio-scoped index throws the
-   * real match away.
-   *
-   * A multimap for a duller reason than the cast one: two different scenes
-   * genuinely can carry the same title in a library this size, usually because
-   * a scraper gave both the film's name. An ambiguous title is shown as
-   * ambiguous rather than resolved by taking the first.
-   */
+  /* Title index for the Bang tier. Every loose scene, multimap, same as the cast index. */
   const byTitle = new Map();
   for (const scene of all) {
     const key = bang.flatten(scene.title);
@@ -462,23 +374,8 @@ async function runScan(config, studioId) {
   }
 
   /*
-   * The filter that makes the rest of this affordable, and it costs nothing:
-   * the roster row already carries the film's cast.
-   *
-   * For a film to contain a scene you hold, everyone in that scene has to be on
-   * that film. So a film no loose scene fits inside cannot produce a match at
-   * either tier, and asking TPDB for its scene list or IAFD for its breakdown
-   * is a request that was always going to come back no. On New Sensations that
-   * is 552 films worth asking about out of 1,300 read.
-   *
-   * A film TPDB lists no cast for is skipped rather than kept. It is the same
-   * judgement this file makes at the top about a one-scene record — an unfilled
-   * record is not evidence, and keeping them would put the thirteen hundred
-   * back.
-   *
-   * `fits` is carried through because it is the only ranking available later:
-   * a film two of your scenes fit inside is a better use of somebody else's
-   * crawl budget than one where a single cast happens to line up.
+   * Skip films no loose scene's cast fits inside, and films with no cast.
+   * `fits` ranks what's left.
    */
   const casts = [...byCast.keys()].map((key) => key.split('|'));
 
@@ -496,18 +393,8 @@ async function runScan(config, studioId) {
   let ranOut = false;
 
   /*
-   * What ThePornDB has already been asked about, so a pass that ran out of time
-   * carries on rather than starting again.
-   *
-   * This matters more than it looks. Girlsway's performer pool is small and
-   * densely shared, so 893 of its 1,000 films get this far — three passes' worth
-   * of asking. Without a record of what was asked, every pass would work through
-   * the same first six hundred in the same order and the rest would never be
-   * reached at all. The IAFD queue below has always had this; phase one did not,
-   * and that was the bug rather than the slowness.
-   *
-   * A film whose answer was "no scene list" still goes to IAFD, from the roster
-   * row rather than a second call — the row carries everything that tier needs.
+   * Films TPDB has already been asked about, so the next pass carries on.
+   * "No scene list" still goes on to IAFD.
    */
   const seen = held.movies || (held.movies = {});
   const fresh = (guid) => seen[guid] && Date.now() - Date.parse(seen[guid].at) < TTL;
@@ -523,16 +410,7 @@ async function runScan(config, studioId) {
   progress.looked = 0;
   progress.total = toAsk.length;
 
-  /*
-   * Phase one gets most of the clock but not all of it.
-   *
-   * The two phases are not equally valuable and the cheap one is the greedy
-   * one: five hundred ThePornDB calls will happily eat the whole budget and
-   * leave the IAFD leg — the only tier that answers for studios TPDB has no
-   * scene lists for — never run at all. So the exact tier stops with a share
-   * left, and what it did not reach is picked up by the next pass the same way
-   * the IAFD queue is.
-   */
+  /* Phase one gets 65% of the time so the IAFD phase always runs. */
   const phaseOneUntil = Date.now() + (until - Date.now()) * 0.65;
 
   await Promise.all(
@@ -549,9 +427,7 @@ async function runScan(config, studioId) {
 
           const exact = fromTpdb(movie, byTpdb, studioId, studioName);
           if (exact) found.push(exact);
-          // The roster row already carries the IAFD link and everything else
-          // the probable tier needs, so the one from the detail call is merged
-          // over it rather than replacing what the list knew.
+          // Merge the detail over the roster row; the row has the IAFD link.
           else if (!movie.scenes.length) unresolved.push({ ...toAsk[i], ...movie });
         } catch (err) {
           // Not recorded as seen: a call that failed is one to make again.
@@ -562,18 +438,8 @@ async function runScan(config, studioId) {
   );
 
   /*
-   * Phase two, only over the films TPDB could not answer for — and only a
-   * bounded number of those.
-   *
-   * This is the slow half: two IAFD pages per film at 1.2 seconds apiece, and
-   * on New Sensations there are 289 films to ask about. Asking all of them in
-   * one pass is a quarter of an hour of somebody else's server, and a pass that
-   * long is one that gets interrupted and learns nothing.
-   *
-   * So each pass takes the best few and remembers which films it has asked
-   * about. Best means most loose scenes fitting inside the film, because that
-   * is the only evidence available before the page is read. Run the scan again
-   * and it carries on with the ones it has not reached.
+   * Phase two: IAFD, for films TPDB couldn't answer, a batch per pass, best
+   * fits first. Remembers what it asked.
    */
   const asked = held.iafd || (held.iafd = {});
 
@@ -596,28 +462,13 @@ async function runScan(config, studioId) {
 
     try {
       /*
-       * Bang first, IAFD second, and only when Bang had nothing.
-       *
-       * Both cost two pages at 1.2 seconds, so asking Bang first is free on the
-       * films it answers for and costs one extra round trip on the films it
-       * does not. That trade is worth making in this direction: a title match
-       * needs no judgement from you and a cast match usually does, so the
-       * cheaper question is also the one that produces the better proposal.
-       *
-       * Bang carries current and catalogue DVD releases and has nothing at all
-       * for a studio like Pure Taboo, which is web-only — so on those studios
-       * this leg finds nothing every time and the IAFD leg is still the whole
-       * answer. Which is why it is a first ask rather than a replacement.
+       * Bang first; IAFD only when Bang had nothing. Same cost, and a title match
+       * needs no judgement.
        */
       let proposal = await fromBang(movie, byTitle, studioId, studioName);
       if (proposal) viaBang++;
 
-      /*
-       * Then the two cast tiers, cheapest first. GameLink is one page and a
-       * Stash-side search; IAFD is two pages. Neither is a better answer than
-       * the other — they are the same rule over different catalogues — so the
-       * order is decided by what they cost and by which has more films.
-       */
+      /* Then the cast tiers, cheapest first: GameLink, then IAFD. */
       if (!proposal) {
         proposal = await fromGameLink(config, movie, byCast, studioId, studioName);
         if (proposal) viaGameLink++;
@@ -643,10 +494,7 @@ async function runScan(config, studioId) {
     name: studioName,
     siteId,
     scannedAt: new Date().toISOString(),
-    // Both numbers, because they say different things: how much of the
-    // catalogue was read, and how much of it could possibly have held anything
-    // of yours. One film asked about out of a thousand read is the pass working
-    // rather than the pass giving up.
+    // Films read, and films that could hold anything of yours.
     movies: plausible.length,
     read,
     catalogue: total,
@@ -663,12 +511,7 @@ async function runScan(config, studioId) {
 
   await save();
 
-  /*
-   * One line per pass, because a pass that finds nothing and a pass that never
-   * finished look identical from outside — which is exactly the confusion that
-   * cost an afternoon here. Every other long pass in this app says what it did;
-   * this one was the exception and should not have been.
-   */
+  /* One log line per pass, so "found nothing" and "never finished" differ. */
   console.log(
     `[tpdbarr] group builder: ${studioName} — ${read} films read, ${plausible.length} asked about, ` +
     `${batch.length} checked against Bang, GameLink and IAFD ` +
@@ -703,15 +546,7 @@ function shell(movie, studioId, studioName) {
   };
 }
 
-/*
- * The exact tier. TPDB's scene list, matched on the id every other page in this
- * portal matches on — so a hit here is the same scene and not a scene with the
- * same name.
- *
- * A film you hold nothing of is not a proposal. This page is about what your
- * scenes add up to; a catalogue of everything a studio ever released is the
- * acquisition side's job and it already does it.
- */
+/* Exact tier: TPDB's scene list, matched on id. Films you hold nothing of aren't proposed. */
 function fromTpdb(movie, byTpdb, studioId, studioName) {
   if (movie.scenes.length < CREDIBLE) return null;
 
@@ -763,25 +598,8 @@ function fromTpdb(movie, byTpdb, studioId, studioName) {
 }
 
 /*
- * The likely tier. Bang's DVD page lists a film's scenes **with their titles**,
- * so this matches a scene to a row when the two titles are the same title.
- *
- * Why this sits above the cast tier. IAFD says who is in scene three and
- * nothing else, and two scenes on one DVD sharing a cast is ordinary — a
- * two-hander shot over two days is two rows with identical casts, and the
- * probable tier has to call both ambiguous. Titles do not collide that way.
- * They are also the thing your files already carry, so a match here needs
- * nothing IAFD needs and agrees with what you can see on the shelf.
- *
- * Why it sits below the exact tier all the same. A title is a string two people
- * typed, not an id — Bang's "Elsa Jean's pedicure with French tips gets covered
- * in cum" and your scraper's spelling of the same scene agree after `flatten`
- * and would not agree before it. That is a good guess and it is still a guess.
- *
- * Cast is used as a tie-break and never as the match. Where two of your scenes
- * flatten to one title, the row's cast picks between them when Bang printed one
- * — it prints a cast beside most scenes and not all — and where it cannot, both
- * are named and neither is filed.
+ * Likely tier: Bang lists scene titles. Matched when the titles agree after
+ * `flatten`. Cast only breaks ties; if it can't, both are named and neither filed.
  */
 async function fromBang(movie, byTitle, studioId, studioName) {
   const page = await bang.findFilm(movie.title, { year: (movie.date || '').slice(0, 4) || null });
@@ -795,10 +613,7 @@ async function fromBang(movie, byTitle, studioId, studioName) {
     const key = bang.flatten(row.title);
     let candidates = (byTitle.get(key) || []).filter((s) => !claimed.has(s.id));
 
-    /*
-     * The tie-break, and only ever a tie-break: it narrows two scenes that
-     * already agreed on the title, and can never introduce one that did not.
-     */
+    /* Tie-break only: narrows scenes that already matched on title. */
     if (candidates.length > 1 && row.performers.length) {
       const wanted = row.performers.map(normalise).filter(Boolean).sort().join('|');
       const narrowed = candidates.filter((s) => [...s.cast].sort().join('|') === wanted);
@@ -839,9 +654,7 @@ async function fromBang(movie, byTitle, studioId, studioName) {
     missing.push({
       key: `${movie.guid}:${row.no}`,
       index: row.no,
-      // Bang named this one, which IAFD's rows never do — so a missing scene
-      // here is something you can go and look for rather than a gap with a
-      // cast list attached.
+      // Bang named it, so the missing scene can be looked for.
       title: row.title,
       date: null,
       image: null,
@@ -849,11 +662,7 @@ async function fromBang(movie, byTitle, studioId, studioName) {
       tpdbId: null,
       siteId: movie.siteId ?? null,
       performers: row.performers,
-      /*
-       * A title is not an id. Whisparr fetches by id, so the button that would
-       * add this cannot work and the page says so rather than offering it —
-       * the same honesty the IAFD tier's rows get, for the same reason.
-       */
+      /* No id, so nothing Whisparr can fetch. */
       addressable: false,
     });
   }
@@ -877,24 +686,8 @@ async function fromBang(movie, byTitle, studioId, studioName) {
 }
 
 /*
- * The probable tier again, by a different route.
- *
- * GameLink's movie page lists a film's scenes with the cast of each — and does
- * not name them, which is the single fact that puts this here rather than up
- * beside Bang. Same evidence as IAFD, same set-equality rule, same ambiguity
- * when two rows share a cast.
- *
- * It is worth having anyway, for coverage. GameLink fronts the AdultEmpire
- * catalogue — 150,000-odd films — and answers for studios the other two legs
- * do not: measured while this was written, Pure Taboo's "The Family Tradition"
- * comes back with its scenes here and with nothing at all from Bang. It is also
- * the cheaper ask, one page against IAFD's two, which is why it goes first of
- * the two cast tiers.
- *
- * The attributes each row carries are kept but not matched on. They are a
- * genuine extra — IAFD gives nothing like them — and a scene's attributes are
- * not distinctive enough to identify it, so they ride along as evidence for a
- * person reading the proposal rather than as part of the guess.
+ * Probable tier via GameLink: cast per scene, no titles, same rule as IAFD.
+ * Attributes are kept for the reader, not matched on.
  */
 async function fromGameLink(config, movie, byCast, studioId, studioName) {
   const page = await gamelink.film(config, movie.title, {
@@ -951,9 +744,7 @@ async function fromGameLink(config, movie, byCast, studioId, studioName) {
       tpdbId: null,
       siteId: movie.siteId ?? null,
       performers: row.performers,
-      // A cast and a set of attributes, and no id — so there is nothing for
-      // Whisparr to fetch and the page says so rather than offering a button
-      // that cannot work. Same honesty the IAFD rows get.
+      // No id, so nothing Whisparr can fetch.
       addressable: false,
       attributes: row.attributes,
     });
@@ -973,17 +764,8 @@ async function fromGameLink(config, movie, byCast, studioId, studioName) {
 }
 
 /*
- * The probable tier. IAFD lists a film's scenes as casts and nothing else, so
- * this matches a scene to a row when the two casts are the same set and the
- * scene is filed under this studio.
- *
- * Set equality rather than overlap, deliberately. A row of three people that
- * merely *includes* your scene's two is a different scene, and treating it as a
- * match is how a film ends up with somebody else's work filed inside it.
- *
- * Two owned scenes with identical casts make the row ambiguous. Both are named
- * and neither is filed — you pick, or you do not, and the group is built either
- * way with whatever was unambiguous.
+ * Probable tier: a scene matches an IAFD row when the casts are the same set.
+ * Not overlap. Two held scenes with the same cast: ambiguous, neither filed.
  */
 async function fromIafd(movie, byCast, studioId, studioName) {
   const page = await findOnIafd(movie);
@@ -1040,11 +822,7 @@ async function fromIafd(movie, byCast, studioId, studioName) {
       tpdbId: null,
       siteId: movie.siteId ?? null,
       performers: row.performers,
-      /*
-       * IAFD named the cast and nothing else, so there is no id to track this
-       * by and nothing for Whisparr to fetch. The page offers to go and find it
-       * rather than pretending the button would work.
-       */
+      /* No id, so nothing Whisparr can fetch. The page offers Find it instead. */
       addressable: false,
     });
   }
@@ -1068,13 +846,8 @@ async function fromIafd(movie, byCast, studioId, studioName) {
 }
 
 /*
- * Which IAFD record is this film.
- *
- * The link TPDB already holds is taken without asking anything, because it is
- * somebody's answer rather than ours. Failing that the title is searched, and
- * the result is only believed when the title matches outright and the year is
- * within one of TPDB's — "Under the Bed" returns seventeen films and sixteen of
- * them are not this one, which is the whole reason this check exists.
+ * Which IAFD record is this film. TPDB's link if it has one; otherwise a
+ * title search, believed only on an exact title and year ±1.
  */
 async function findOnIafd(movie) {
   if (movie.links?.IAFD) return iafd.titleScenes(movie.links.IAFD);
@@ -1095,39 +868,14 @@ async function findOnIafd(movie) {
   return best ? iafd.titleScenes(best.url) : null;
 }
 
-/* -------------------------------------------------- what the titles say
+/*
+ * -------------------------------------------------- what the titles say
  *
- * The third tier, and the only one that asks nobody anything.
- *
- * Some scenes carry their film's name already:
- *
- *   Michelle Wild in Barely Legal #29
- *   Britney in Barely Legal #14
- *   Plants vs Cunts Vol. 6
- *
- * That is not a guess about what a film contains — it is what the file says it
- * is. Across this library it finds 33 films covering 120 loose scenes, with no
- * ThePornDB call and no IAFD page, and it lands hardest exactly where the other
- * two tiers are weakest: the 955 loose scenes carrying no ThePornDB id at all,
- * which the exact tier cannot see.
- *
- * **A number is required.** "Barely Legal" is a series and "Barely Legal #14"
- * is a film; without the number this would gather a decade of unrelated scenes
- * under one name. So a title only implies a film if it names a numbered one.
- *
- * **How big the film is comes from IAFD**, asked once per film and kept. The
- * titles say which scenes belong; the breakdown says how many there were, and
- * the rows nothing of yours sits in are the ones you are missing.
- *
- * Scenes are placed against those rows **by the name in the title, not by the
- * cast Stash holds** — because four of the five Barely Legal 126 scenes here
- * have no performers tagged at all. "Abbie Anderson in Barely Legal #126"
- * against a row reading "Abbie Anderson, Eric John" is the match; the tagged
- * cast is the fallback for scenes that are billed to nobody.
- *
- * A film IAFD cannot be found for keeps no denominator at all rather than
- * borrowing the count of what you hold. An invented denominator is worse than
- * none: it reads as a fact about the film when it is only a fact about you.
+ * The offline tier: scenes whose titles name a numbered film
+ * ("Britney in Barely Legal #14", "Plants vs Cunts Vol. 6").
+ * A number is required, or a whole series becomes one film.
+ * IAFD gives the film's size. Scenes are placed on its rows by the name in
+ * the title first, tagged cast second. No IAFD record, no size.
  */
 
 // "#132", "no. 132", "vol. 132" and a bare "132" are one film. Lifted from
@@ -1143,12 +891,8 @@ const TAIL_INDEX = /[\s,:\-–—]*\b(?:scene|part|pt\.?)\s*(\d+)\s*$/i;
 const AFTER_IN = /^.*\bin\s+(.+)$/i;
 
 /*
- * -> {name, index} or null.
- *
- * Read right to left, because that is where the film's name sits: a trailing
- * "Scene 3" is the part number, and everything after the last " in " is the
- * release. A title with neither shape is taken whole, which is how
- * "Plants vs Cunts Vol. 6" works.
+ * -> {name, index} or null. Read right to left: "Scene 3" is the part,
+ * the text after the last " in " is the film.
  */
 export function impliedFilm(title) {
   let rest = String(title || '').trim();
@@ -1164,30 +908,15 @@ export function impliedFilm(title) {
   const name = (after ? after[1] : rest).replace(/\s+/g, ' ').trim();
   if (!NUMBERED.test(name)) return null;
 
-  /*
-   * Who the title says is in it, which turns out to matter more than the cast
-   * Stash holds. Four of the five scenes of Barely Legal 126 in this library
-   * have **no performers tagged at all** — the name only exists in the title,
-   * "Abbie Anderson in Barely Legal #126", and IAFD's row for that scene reads
-   * "Abbie Anderson, Eric John". So the billing is what places a scene against
-   * a breakdown; the tagged cast is the fallback, not the other way round.
-   */
+  /* The name billed in the title. Often the only cast a scene has. */
   const billed = after ? String(title).slice(0, String(title).lastIndexOf(after[1])).replace(/\bin\s*$/i, '').trim() : null;
 
   return { name, index, billed: billed || null };
 }
 
 /*
- * Best-effort dressing for a film the titles named.
- *
- * ThePornDB is asked once per film and only believed when the title matches
- * outright, because the search returns near-misses for anything it cannot
- * place, and a near-miss here puts another film's cover and date on this one.
- * What it adds is a poster, a real release date and an address; what it cannot
- * add is a scene count, because these records carry no scene list.
- *
- * A film it has never heard of is still a proposal. The evidence for it came
- * from the files, not from TPDB.
+ * Poster, date and URL from TPDB, only on an exact title match. Without one
+ * the proposal still stands.
  */
 async function dressFromTpdb(config, name) {
   const found = await tpdb.searchMovies(config, name, { limit: 6 }).catch(() => []);
@@ -1212,18 +941,8 @@ async function dressFromTpdb(config, name) {
 }
 
 /*
- * How big is a film the titles named, and what of it is missing?
- *
- * The titles say which scenes belong to a release; they cannot say how many the
- * release had. IAFD can — its Scene Breakdowns list one row per scene — so this
- * asks it for a denominator and for the rows nothing of yours sits in.
- *
- * Held scenes are placed against those rows by cast, the same way the probable
- * tier does it. And there is a guard on the result: if a scene you hold could
- * not be placed on any row, then the rows and the files disagree about who is
- * in this film, and the leftovers are not evidence of anything. In that case
- * the size is still taken — it is IAFD's own count — and no claim is made about
- * what is missing. Half an answer, said as half an answer.
+ * A named film's size and missing rows, from IAFD. If a held scene can't be
+ * placed, the size is kept but nothing is called missing.
  */
 async function sizeFromIafd(name) {
   const page = await findOnIafd({ title: name, date: null, links: {} }).catch(() => null);
@@ -1234,12 +953,7 @@ async function sizeFromIafd(name) {
   return { url: page.url, compilation: page.compilation, rows: page.scenes };
 }
 
-/*
- * Which of a film's scenes you have, and which rows nothing sits in.
- *
- * Offline — it works on rows already fetched, which is what lets this be redone
- * on every pass as scenes arrive without costing IAFD a page.
- */
+/* Which rows you hold and which are empty. Works on stored rows, no fetch. */
 function placeOnRows(rows, heldRows) {
   const key = (names) => (names || []).map(normalise).filter(Boolean).sort().join('|');
 
@@ -1249,12 +963,7 @@ function placeOnRows(rows, heldRows) {
   for (const row of rows) {
     const on = new Set((row.performers || []).map(normalise).filter(Boolean));
 
-    /*
-     * Billing first, tagged cast second. A scene billed to somebody the row
-     * lists is that row — one name inside a two-name row is enough, because the
-     * film is already established and only the position is in question. Cast
-     * equality is the fallback for scenes properly tagged and not billed.
-     */
+    /* Billing first (one name in the row is enough), then exact cast. */
     const mine =
       heldRows.find((r) => !placed.has(r.sceneId) && r.billed && on.has(normalise(r.billed))) ||
       heldRows.find((r) => !placed.has(r.sceneId) && r.cast?.length && key(r.cast) === key(row.performers));
@@ -1267,13 +976,7 @@ function placeOnRows(rows, heldRows) {
 
   return {
     total: rows.length,
-    /*
-     * Named only when every scene you hold found a row. A scene that could not
-     * be placed might *be* one of the empty rows under a name neither source
-     * agrees on, and saying "you are missing scene 3" while holding something
-     * that could be scene 3 is worse than saying nothing. The count still
-     * stands; only the naming is withheld.
-     */
+    /* Missing rows are named only when every held scene was placed. */
     missing: unplaced === 0 ? empty : [],
     placed: placed.size,
     unplaced,
@@ -1293,15 +996,7 @@ export function titlesSnapshot() {
   };
 }
 
-/*
- * One pass over the whole library rather than one studio at a time — this tier
- * needs no catalogue, so there is nothing to scope it to.
- *
- * Grouped by film name **and Stash studio**. Studio is a weak key when matching
- * across two catalogues, which is why the other tiers do not gate on it; here
- * both scenes are records in the same library, so it agrees with itself and it
- * stops two studios' "Volume 3" becoming one film.
- */
+/* One pass over the whole library. Grouped by film name and Stash studio. */
 export async function scanTitles(config) {
   if (!stashConfigured(config)) throw new Error('Stash is not configured — the loose scenes live there.');
   if (running) return titlesSnapshot();
@@ -1340,12 +1035,7 @@ async function readTitles(config) {
 
   const worth = [...films.values()].filter((film) => film.members.length >= CREDIBLE);
 
-  /*
-   * The ones nothing has looked up yet go first, so a pass that runs out of
-   * time moves the shelf on rather than re-asking about the same films. Same
-   * contract as the roster walk and the IAFD queue, and the same reason: with
-   * thirty-odd films and two lookups apiece, one pass does not reach them all.
-   */
+  /* Unlooked-up films first, so a pass that runs out of time still moves on. */
   const knownRows = (film) => held.proposals[`titles:${film.key}`]?.iafd?.rows;
   worth.sort((a, b) => (knownRows(a) ? 1 : 0) - (knownRows(b) ? 1 : 0));
 
@@ -1358,12 +1048,7 @@ async function readTitles(config) {
   for (const film of worth) {
     progress.looked++;
 
-    /*
-     * Ordered by the part number where a title gave one, and by date where it
-     * did not. Both beat the order Stash happened to return them in, and a
-     * wrong order inside a group is a thing you can see and fix — a wrong
-     * membership is not.
-     */
+    /* By part number, else by date. */
     film.members.sort((a, b) =>
       (a.index ?? 99) - (b.index ?? 99) ||
       String(a.scene.date || '').localeCompare(String(b.scene.date || '')));
@@ -1382,12 +1067,7 @@ async function readTitles(config) {
       ambiguous: null,
     }));
 
-    /*
-     * What was already looked up is kept. Both lookups cost somebody else a
-     * page, neither answer changes week to week, and the placement below is
-     * redone from the stored rows every pass anyway — so an arriving scene
-     * still moves the count without a single request.
-     */
+    /* Keep earlier lookups; placement is redone from stored rows each pass. */
     const was = held.proposals[id];
     const inTime = () => Date.now() < until;
 
@@ -1413,20 +1093,13 @@ async function readTitles(config) {
       foundAt: was?.foundAt || new Date().toISOString(),
       match: 'named',
       via: sized ? 'the scene titles, sized by IAFD' : 'the scene titles',
-      /*
-       * IAFD's row count where it has one; otherwise unknown, and left unknown
-       * rather than quietly set to what you happen to hold.
-       */
+      /* IAFD's count, or unknown. Never what you happen to hold. */
       total: sized?.total ?? null,
       iafd: iafd
         ? { url: iafd.url, compilation: iafd.compilation, rows: iafd.rows, unplaced: sized?.unplaced ?? null }
         : null,
       held: heldRows,
-      /*
-       * The rows nothing of yours sits in. Cast and a number, because that is
-       * all IAFD gives — so these are not addressable and the page offers to go
-       * and find them rather than a Track button that could not work.
-       */
+      /* Empty rows: cast and number only, so not addressable. */
       missing: (sized?.missing || []).map((row) => ({
         key: `${id}:${row.index}`,
         index: row.index,
@@ -1454,17 +1127,8 @@ async function readTitles(config) {
 }
 
 /*
- * The groups you already built, measured again.
- *
- * A scene stops being loose the moment it is filed, so the pass above cannot
- * see a film once its group exists — which left forty-three groups here frozen
- * at whatever was known when they were made, most of them from before there was
- * any way to say how big the film was. "What is this group missing" is the
- * question that outlives the building of it, and this is where it gets asked.
- *
- * Read from the group rather than from the shelf: the group is the statement of
- * what belongs, and its scenes are exactly the ones to place against the
- * breakdown.
+ * Re-measure groups already built, from the group's own scenes. Built films
+ * never show up as loose.
  */
 async function resizeBuilt(config, held, until) {
   const wanted = Object.values(held.proposals).filter((proposal) => {
@@ -1481,14 +1145,7 @@ async function resizeBuilt(config, held, until) {
   progress.looked = 0;
   progress.total = wanted.length;
 
-  /*
-   * Every group in one read, then indexed by id.
-   *
-   * Not filtered to the ones wanted, because GroupFilterType has no `id` field
-   * to filter on — checked against the schema after a version of this quietly
-   * asked for one and had its error swallowed, which is why the catch below
-   * says something now instead of returning nothing.
-   */
+  /* Every group in one read: GroupFilterType has no `id` field. The catch says so. */
   const data = await gql(config, `{
     findGroups(filter: {per_page: -1}) {
       groups { id scenes { id title date performers { name } paths { screenshot } } }
@@ -1556,12 +1213,7 @@ async function resizeBuilt(config, held, until) {
 
 /* ------------------------------------------------------------ the review */
 
-/*
- * A declined proposal comes back only when you hold a scene of that film you
- * did not hold when you declined it. Everything else about it may have changed
- * — the cover, the synopsis, the scan that found it again — and none of that is
- * the thing you said no to.
- */
+/* A declined proposal returns only when you hold a new scene of that film. */
 function reopened(proposal, decision) {
   if (decision.verdict !== 'declined') return false;
   const then = new Set(decision.owned || []);
@@ -1571,13 +1223,8 @@ function reopened(proposal, decision) {
 function openProposals(held) {
   return Object.values(held.proposals).filter((proposal) => {
     /*
-     * Enforced on the way out as well as on the way in, so a rule tightened
-     * later applies to what earlier passes already wrote down rather than only
-     * to what the next scan finds.
-     *
-     * Measured against what you hold when the film's size is unknown — the
-     * titles tier has no denominator, and "two scenes say they are this film"
-     * is the same evidence as "two of this film's four scenes are here".
+     * Applied on the way out too, so older proposals obey a tightened rule.
+     * With no known size, measured against what you hold.
      */
     const size = proposal.total || (proposal.held || []).filter((row) => row.sceneId).length;
     if (size < CREDIBLE) return false;
@@ -1589,23 +1236,14 @@ function openProposals(held) {
   });
 }
 
-/*
- * What is waiting on you. The exact tier above the probable one and newest
- * first inside each — the ones that need no judgement should not be buried
- * under the ones that do.
- */
+/* Waiting proposals: exact before probable, newest first. */
 export async function proposals(config, { studio = null } = {}) {
   const held = await store();
   const mine = (p) => !studio || p.studioId === studio;
 
   const open = openProposals(held).filter(mine);
 
-  /*
-   * Strongest evidence first: an id, then a scene list that named the scene and
-   * agreed with your title, then what the file says about itself, then a cast
-   * that lines up. The ones needing no judgement should not be buried under the
-   * ones that do.
-   */
+  /* Strongest evidence first: id, named title, the file's own title, cast. */
   const STRENGTH = { exact: 0, likely: 1, named: 2, probable: 3 };
 
   open.sort((a, b) =>
@@ -1620,15 +1258,7 @@ export async function proposals(config, { studio = null } = {}) {
         .filter(([, verdict]) => verdict)
     );
 
-  /*
-   * Groups you have built that still have a question open.
-   *
-   * Building one and answering what it is missing are two steps, and the second
-   * one is where a page reload used to lose you: the proposal left the list the
-   * moment the group existed, taking the unanswered scenes with it. So an
-   * approved film stays visible until every scene it is missing has been
-   * tracked, added or ignored, and then it goes quiet on its own.
-   */
+  /* Built groups with unanswered missing scenes stay listed until each is answered. */
   const finishing = Object.values(held.proposals)
     .filter(mine)
     .filter((proposal) => {
@@ -1685,19 +1315,9 @@ export async function decline(config, id) {
 }
 
 /*
- * Building the group.
- *
- * The order matters. The group is created first and the scenes are filed into
- * it afterwards, so a failure halfway leaves an empty group you can see and
- * delete rather than scenes pointing at something that does not exist.
- *
- * The addresses go on it because that is what makes the group scrapeable later:
- * Stash's own AdultEmpire scraper walks through the age gate this portal will
- * not, so a group carrying that URL can be filled in from the Movies page
- * without anybody typing anything.
- *
- * Studio is taken from the scenes rather than from TPDB's idea of the site.
- * Stash wants an id and the scenes already carry the right one.
+ * Build the group. Create it first, then file the scenes, so a failure
+ * leaves an empty group rather than dangling scenes. URLs go on it so
+ * Stash's scrapers can fill it later. Studio comes from the scenes.
  */
 export async function approve(config, id, { sceneIds = null } = {}) {
   if (!stashConfigured(config)) throw new Error('Stash is not configured.');
@@ -1706,22 +1326,12 @@ export async function approve(config, id, { sceneIds = null } = {}) {
   const proposal = held.proposals[id];
   if (!proposal) throw new Error('That proposal is no longer on the list.');
 
-  /*
-   * Every scene this film could be built out of, which is not the same list as
-   * the rows on screen: an ambiguous row has no scene of its own and two
-   * candidates underneath it. Flattening them in here is what lets a pick made
-   * on the page actually be filed — without it the choice is sent, matched
-   * against nothing, and quietly dropped.
-   */
+  /* Include ambiguous rows' candidates so a pick on the page can be filed. */
   const certain = (proposal.held || []).filter((row) => row.sceneId);
   const options = (proposal.held || []).flatMap((row) =>
     (row.ambiguous || []).map((option) => ({ ...option, index: row.index })));
 
-  /*
-   * With no list, only the certain rows go in — an ambiguous row that nobody
-   * chose between stays out, because filing both candidates is the one mistake
-   * the ambiguity was flagged to avoid.
-   */
+  /* With no list, only certain rows. Ambiguous ones stay out. */
   const picked = sceneIds
     ? [...certain, ...options].filter((row) => sceneIds.includes(row.sceneId))
     : certain;
@@ -1745,13 +1355,8 @@ export async function approve(config, id, { sceneIds = null } = {}) {
   };
 
   /*
-   * The cover is the one field that can fail for a reason that has nothing to
-   * do with the group. Stash fetches an image URL at mutation time, and some
-   * studios sign theirs — New Sensations' posters carry a validfrom/validto and
-   * a hash — so a stale roster row can turn "build this group" into an error
-   * about a picture. A group without its cover is worth having; the cover
-   * without the group is not, and the Movies page can scrape one later from the
-   * AdultEmpire address this puts on it.
+   * Stash fetches the cover at mutation time and some signed URLs expire.
+   * Retry without the cover rather than lose the group.
    */
   const create = (body) => gql(
     config,
@@ -1812,18 +1417,14 @@ export async function approve(config, id, { sceneIds = null } = {}) {
 }
 
 /*
- * One missing scene, answered.
+ * One missing scene answered:
  *
- *   track  — put it on the want list, which is keyed on StashDB ids, so a scene
- *            TPDB named has to be found there first.
- *   add    — hand it to the downloader now.
- *   ignore — not part of this film's gap, as far as you are concerned.
+ *   track  — want list (StashDB ids, so TPDB scenes are bridged first)
+ *   add    — send to the downloader now
+ *   ignore — not needed for this film
  *
- * **Ignoring here is local to this page and does not touch the want list's own
- * ignore list.** The two look like the same word and are not: that one means
- * "not for me" and quietly removes the scene from the tracked percentage on
- * every other page. Saying "I do not need this to call the film complete"
- * should not silently move a number somebody else is reading.
+ * This ignore is local to the page. It doesn't touch the want list's ignore,
+ * which changes percentages elsewhere.
  */
 const VERDICTS = ['tracked', 'added', 'ignored'];
 
@@ -1857,17 +1458,9 @@ export async function decideScene(config, id, key, verdict, { force = false } = 
   return result;
 }
 
-/*
- * TPDB named the scene; StashDB is where the want list lives. bridge() is the
- * same crossing the acquisition side already makes — fingerprints first, then
- * title and date, and it says which one answered.
- */
+/* TPDB scene -> StashDB via bridge(): fingerprint, then title and date. */
 async function toStashdb(config, scene, proposal) {
-  /*
-   * A row somebody has already pointed at a StashDB scene needs no bridge —
-   * there is no guess left in it, which is why the match reads as named rather
-   * than as probable.
-   */
+  /* Already pointed at a StashDB scene: no bridge needed. */
   if (scene.stashdbId) {
     const card = await stashdb.getScene(config, scene.stashdbId).catch(() => null);
     if (card) return { match: 'named', scene: card, via: 'you picked it', others: [] };
@@ -1879,12 +1472,7 @@ async function toStashdb(config, scene, proposal) {
   return stashdb.bridge(config, { ...full, siteName: full.siteName || proposal.studioName });
 }
 
-/*
- * v2 takes ThePornDB scenes and v3 takes StashDB ones, and which of the two
- * this scene can go to is decided by the id it has rather than by a preference.
- * A scene IAFD named and nothing else has neither, and this says so instead of
- * reporting a success nothing happened for.
- */
+/* v2 for TPDB ids, v3 for StashDB ids. Neither: say so. */
 async function handToDownloader(config, scene, proposal, { force = false } = {}) {
   if (scene.tpdbId && scene.siteId && whisparr2Configured(config)) {
     if (!force) {
@@ -1912,14 +1500,7 @@ async function handToDownloader(config, scene, proposal, { force = false } = {})
   );
 }
 
-/*
- * The cast IAFD gave, looked for on StashDB.
- *
- * This is the "Find it" the missing rows offer when IAFD named people and
- * nothing else. It searches rather than asserts: what comes back is candidates
- * for you to look at, exactly as the Match page does with an unmatched scene,
- * and pressing track or add afterwards is a separate sentence.
- */
+/* Find it: look up an IAFD cast on StashDB. Returns candidates only. */
 const PLACEHOLDER = new Set([
   'guy', 'guys', 'girl', 'girls', 'man', 'men', 'woman', 'women',
   'male', 'males', 'female', 'females', 'boy', 'boys',
@@ -1937,23 +1518,8 @@ export async function findMissing(config, id, key) {
   const cast = (scene.performers || []).filter(Boolean);
 
   /*
-   * Searched by cast as *people*, not as words.
-   *
-   * The first version of this joined the studio name and the performer names
-   * into one string and handed it to StashDB's text search. That search reads
-   * titles, so a row of four names matched on whichever of them happened to
-   * appear in somebody's title and the results were a list of scenes with one
-   * actress in common and nothing else. The row asserts a cast, so the query
-   * should be a cast: each name resolved to its StashDB performer, then every
-   * scene that has all of them.
-   *
-   * INCLUDES_ALL rather than INCLUDES, for the same reason fromIafd insists on
-   * set equality — a scene with one of the four is a different scene, and
-   * offering it as a candidate invites the wrong pick.
-   *
-   * The studio is deliberately not part of this. A DVD gathers scenes from
-   * sibling labels, which is the whole reason the cast match upstream is not
-   * studio-scoped either.
+   * Search by cast as performers, not text: resolve each name, then scenes
+   * with all of them (INCLUDES_ALL). No studio filter.
    */
   const ids = [];
   const unknown = [];
@@ -1961,17 +1527,8 @@ export async function findMissing(config, id, key) {
 
   for (const name of cast) {
     /*
-     * IAFD writes a stand-in where a film did not credit somebody, and this
-     * house's breakdowns carry "guy" three times. StashDB has three performers
-     * literally named Guy, so the exact-name rule below happily resolves it,
-     * ANDs a stranger into the query and returns nothing — while reporting
-     * `by: 'cast'` with an empty `unknown`, which reads as "asked properly,
-     * genuinely not there". A confident wrong answer, and worse than the text
-     * search this replaced.
-     *
-     * The list is explicit rather than a shape rule on purpose: "Jowy" and
-     * "Eze" are one short word each and are real people, so anything that
-     * rejected placeholders by length would throw them away too.
+     * Skip IAFD placeholders like "guy" — StashDB has real performers called Guy.
+     * An explicit list, because short real names like "Jowy" exist.
      */
     if (PLACEHOLDER.has(normalise(name))) { unnamed.push(name); continue; }
 
@@ -1985,12 +1542,7 @@ export async function findMissing(config, id, key) {
 
   const term = cast.filter((n) => !PLACEHOLDER.has(normalise(n))).join(', ') || cast.join(', ');
 
-  /*
-   * Nobody resolved — a cast of names StashDB does not hold under those
-   * spellings. Text search is the only thing left and it is worth one try, but
-   * the answer says which way it was asked so a thin result is readable rather
-   * than mysterious.
-   */
+  /* No one resolved: try text search once, and say so. */
   if (!ids.length) {
     const real = cast.filter((n) => !PLACEHOLDER.has(normalise(n)));
     const found = await stashdb.searchScenes(config, (real.length ? real : cast).join(' '), { perPage: 12 });
@@ -2009,16 +1561,8 @@ export async function findMissing(config, id, key) {
 }
 
 /*
- * "That one." — naming which StashDB scene a cast-only row actually is.
- *
- * This is what makes Track and Add possible on the probable tier at all. IAFD
- * hands over four people and no title, so until somebody says which scene that
- * is there is nothing to want and nothing to fetch; the row offers Find it, you
- * pick, and the two answers that needed an id turn on.
- *
- * The pick is written onto the proposal rather than acted on. Saying what a
- * scene is and saying what to do about it are two sentences, and this is only
- * the first.
+ * Record which StashDB scene a cast-only row is, so Track and Add work.
+ * Only records it; doesn't act.
  */
 export async function resolveMissing(config, id, key, stashdbId) {
   const wanted = String(stashdbId || '').toLowerCase();
@@ -2048,11 +1592,7 @@ export async function resolveMissing(config, id, key, stashdbId) {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/*
- * Undo, for the row you pressed by accident. Only the record goes — a tracked
- * scene stays tracked and a downloaded one stays downloaded, because this page
- * did not put the file there and should not be the thing that takes it away.
- */
+/* Undo one row. Only the record goes; tracked or downloaded stays. */
 export async function undecideScene(config, id, key) {
   const held = await store();
   if (held.scenes[key]) {
@@ -2062,11 +1602,7 @@ export async function undecideScene(config, id, key) {
   return { key, verdict: null };
 }
 
-/*
- * Undo, for a whole proposal. A declined film comes back on the list; an
- * approved one does too, and the group it made is left exactly where it is —
- * deleting a group is the film shelf's job and it asks properly.
- */
+/* Undo a whole proposal. An approved one's group is left alone. */
 export async function reconsider(config, id) {
   const held = await store();
   const decision = held.decisions[id];

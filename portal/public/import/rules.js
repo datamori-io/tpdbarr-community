@@ -1,18 +1,6 @@
 /*
- * Standing answers — the editor for them.
- *
- * On the Tracked page because that is where the size of the job is: the wall
- * above says 9,381 scenes are waiting on you, and this is the control that
- * makes that number mean something. A rule is a no you only give once.
- *
- * **They hide, they do not skip.** Nothing is written against a scene, so
- * deleting a rule puts everything it was holding back into the queue again. It
- * is worth saying on screen, because "skip" on a card is irreversible-ish and
- * the two words would otherwise look like the same act.
- *
- * Saved whole on every change, which is the right shape for a list of five:
- * the alternative is three routes and an id per rule, for something you edit
- * about twice a year.
+ * The standing-rules editor, on the Tracked page. Rules hide rather than
+ * skip: deleting one brings its scenes back. The list is saved whole.
  */
 
 import { api, el } from '../util.js';
@@ -26,11 +14,7 @@ const KINDS = [
   ['studio', 'From studio', 'a word in the name — “VR” catches “CockVR”', 'text'],
 ];
 
-/*
- * Where a rule bites. Everywhere is the blanket one and the default; the other
- * three narrow it to one catalogue, which is the only way to say the things a
- * blanket cannot — nothing before 2015 *of hers*, not this studio *for him*.
- */
+/* Where a rule applies: everywhere (default), or one catalogue. */
 const SCOPES = [
   ['', 'Everywhere'],
   ['performer', 'For performer'],
@@ -38,11 +22,7 @@ const SCOPES = [
   ['tag', 'For tag'],
 ];
 
-/*
- * Picking the catalogue a rule is about. StashDB's own type-ahead, the same
- * one the search filters use, because it matches aliases — and the name is
- * kept beside the id so a saved rule still reads as a sentence.
- */
+/* Pick the catalogue via StashDB's type-ahead; the name is kept with the id. */
 function scopePicker(rule, onPick) {
   const kind = el('select', { className: 'control' },
     SCOPES.map(([value, label]) => el('option', { value, selected: value === (rule.on?.kind || '') }, label)));
@@ -113,12 +93,7 @@ export function rulesPanel(onSaved) {
   let held = [];
 
   const save = async () => {
-    /*
-     * Half-written rules are not sent. The server drops them anyway; not
-     * sending them is what keeps the row on screen while you finish typing —
-     * and a rule that has been pointed at a catalogue but not yet told which
-     * one is exactly as half-written as one with no value.
-     */
+    /* Half-written rules aren't sent, so the row stays while you type. */
     const ready = held.filter((rule) => String(rule.value ?? '').trim() !== '' && !rule.pointing);
 
     said.textContent = 'Saving…';
@@ -166,9 +141,7 @@ export function rulesPanel(onSaved) {
     });
 
     kind.onchange = () => {
-      // A length and a phrase are not the same kind of answer, so changing the
-      // kind empties the box rather than carrying "20" into "Tagged". Where
-      // it applies is not part of that and is kept.
+      // Changing the kind clears the value; scope is kept.
       held[at] = { ...held[at], kind: kind.value, value: '' };
       draw();
     };

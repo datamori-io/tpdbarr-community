@@ -1,12 +1,6 @@
 /*
- * Galleries — where a built one lands, and the builder itself.
- *
- * The untied builder used to sit at the top of the Galleries shelf, above the
- * wall of what you already hold. It is a setup question wearing a shelf's
- * clothes: you open that page to look at galleries, not to make one, and the
- * panel pushed the wall down every time. The tied ones stay where they are —
- * a scene's builder knows which scene it is for, and that is the whole reason
- * to press it there.
+ * Galleries settings: where built galleries land, and the untied builder.
+ * Tied builders stay on scene and performer pages.
  */
 
 import { el } from '../util.js';
@@ -23,9 +17,8 @@ export function showGallerySettings(paint) {
 }
 
 /*
- * The two paths, which are one folder named twice. They are part of the
- * connections form wherever they are standing, so Save here writes the whole
- * config — see connections.js.
+ * The two paths (one folder, two names). Part of the connections form, so
+ * Save writes the whole config (see connections.js).
  */
 function folders() {
   const note = el('p', { className: 'note' });

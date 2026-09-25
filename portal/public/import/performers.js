@@ -56,12 +56,10 @@ function renderPerformer(paint, { performer, scenes, counts }) {
   );
 }
 
-/* ------------------------------------------------------------- performers
+/*
+ * ------------------------------------------------------------- performers
  *
- * The cast of your own library, not ThePornDB's directory. A name is here
- * because you have files of them, and the number under it is what you hold.
- * Clicking one lands on the performer page, which is already where what they
- * have been in — and what you are missing of it — lives.
+ * Your library's cast. Clicking opens the performer page.
  */
 
 export async function showPerformers() {
@@ -89,12 +87,7 @@ function renderPerformers(paint, { creators, counts, stash }) {
 
   const grid = el('div', { className: 'creators' }, creators.map(creatorCard));
 
-  /*
-   * Three hundred faces is a wall, not a list, so it gets a filter rather than
-   * an alphabet or paging — you already know the name you came for. Filtering
-   * hides rather than rebuilds, so the portraits are not re-fetched on a
-   * keystroke.
-   */
+  /* A name filter that hides tiles rather than rebuilding them. */
   const find = el('input', {
     type: 'search',
     className: 'filter',
@@ -146,13 +139,7 @@ function creatorCard(creator) {
 
   card.dataset.name = creator.name.toLowerCase();
 
-  /*
-   * Where a click lands depends on which catalogue knows them. ThePornDB's uuid
-   * opens their page here; a performer Stash only ever identified against
-   * StashDB goes to the search filtered to them, which is the same question
-   * asked of the other catalogue. Before both were allowed through, a performer
-   * with no TPDB id was simply absent from this page.
-   */
+  /* TPDB uuid opens their page here; StashDB-only goes to the filtered search. */
   card.onclick = () => {
     if (creator.uuid) location.hash = `#/performer/${creator.uuid}`;
     else if (creator.stashdbId) location.hash = `#/import/video?performer=${creator.stashdbId}`;

@@ -3,11 +3,10 @@
 import { api, el } from '../util.js';
 import { SECTION_OF, paint, painterFor, show } from './core.js';
 
-/* =========================================================== integrations
+/*
+ * =========================================================== integrations
  *
- * Is everything up, and what is in flight. This is where the Queue tab went:
- * "what is Whisparr doing" was never a different question from "what is the
- * pipeline doing" — it was the first step of it, shown on its own.
+ * Is everything up, and what's in flight (formerly the Queue tab).
  */
 
 export let integrationsTimer = null;
@@ -56,12 +55,8 @@ function renderIntegrations(paint, { services, pipeline, moving, encoderQueue })
 }
 
 /*
- * The backups.
- *
- * Code is in git; this is the other half — the want list, the ignore list, the
- * tracked catalogues. Nothing here can be recomputed, which is the whole reason
- * it is worth copying, and nothing that *can* be fetched again goes in: no
- * clips, and none of what the reel page generates.
+ * Backups of what can't be recomputed: want list, ignore list, tracked
+ * catalogues. No clips or reel cache.
  */
 function backupBand() {
   const body = el('div', {}, el('div', { className: 'empty small' }, 'Reading…'));

@@ -1,27 +1,15 @@
 /*
- * What resolution a scene should end up at, and keeping FileFlows off it.
+ * Target resolution per scene, and keeping FileFlows off it.
  *
- * FileFlows' "Organized Scenes" library watches the filed library and runs
- * "H264 Encoding (Fast)" on everything in it, which scales anything wider than
- * 1280 down to 720p and replaces the original. So 720p is the default without
- * anybody pressing anything. Every other outcome — keeping a 4K file as it is,
- * taking it to 1080p, taking something to 480p — only survives if FileFlows is
- * told to leave the file alone afterwards.
+ * FileFlows' Organized Scenes flow scales anything wider than 1280 to 720p.
+ * Any other choice survives only with a blank `.fileflows-ignore` in the
+ * scene's folder. Whenever the portal decides a file, it writes the flag.
  *
- * That is a blank `.fileflows-ignore` in the scene's folder. The flow's first
- * step after "Video File" checks for it and ends there if it exists. A filed
- * scene is one folder per scene (see filer.mjs), so the flag covers exactly one
- * scene. **The rule: whenever the portal decides a file, it writes the flag.**
+ *   not filed yet  remembered here; filing writes the flag before the file
+ *                  arrives, then any encode starts
+ *   already filed  flag now, then encode if asked
  *
- * Two moments:
- *
- *   not filed yet  the choice is remembered here, and filing writes the flag
- *                  into the destination folder *before* the file arrives, so
- *                  FileFlows never sees the file unflagged. An encode choice
- *                  starts once the file is in place.
- *   already filed  the choice acts at once: flag, then encode if asked.
- *
- * Encoding only ever happens in /organized_scenes — see downscale.mjs for why.
+ * Encoding only in /organized_scenes (see downscale.mjs).
  */
 
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
@@ -41,10 +29,10 @@ const CHOICES = ['keep', 480, 720, 1080];
 
 const refuse = (message) => Object.assign(new Error(message), { status: 400 });
 
-/* ------------------------------------------------------------ the store
+/*
+ * ------------------------------------------------------------ the store
  *
- * Only choices for scenes not filed yet. Once a scene is filed its choice is
- * the flag on disk, and a second record of it here would be one that drifts.
+ * Choices for unfiled scenes only. Once filed, the flag is the record.
  */
 
 let cache = null;
@@ -69,22 +57,18 @@ export async function flag(dir) {
   flags.dirs.add(dir);
 }
 
-/* ------------------------------------------------------------- the target
+/*
+ * ------------------------------------------------------------- the target
  *
- * What a scene is meant to end up at, for the colour on its tile. Red is a
- * file still bigger than that, yellow is at or under it but not finished, and
- * green is filed, organised and at it.
+ * The target for a tile's colour:
  *
  *   not filed, a choice made   that choice ('keep' is the file as it is)
- *   filed and flagged          the file as it is — the flag means "leave it"
- *   a film, in /movies         the file as it is — FileFlows never goes there
- *   anything else              720, what FileFlows turns a filed scene into
+ *   filed and flagged          the file as it is
+ *   a film, in /movies         the file as it is
+ *   anything else              720
  *
- * The tile has to be drawn from one synchronous read, and a filed scene's
- * choice lives only on disk as the flag. So the flags are swept into memory
- * alongside the shelf read — one stat per filed folder, about a second and a
- * half for four thousand of them — and kept for ten minutes. A flag this
- * module writes or removes updates the set at once.
+ * Flags are swept into memory with the shelf read (one stat per folder)
+ * and kept ten minutes; writes here update the set.
  */
 export const DEFAULT_TARGET = 720;
 const FLAG_TTL = 10 * 60 * 1000;
@@ -132,11 +116,7 @@ async function fileOf(config, sceneId) {
   return file;
 }
 
-/*
- * What is on offer for a file this tall. Keep only means something above
- * 720p, since that is where FileFlows would otherwise step in; 1080p only
- * means something above 1080p.
- */
+/* Options for a file this tall: Keep only above 720p, 1080p only above 1080p. */
 function offered(height) {
   const out = [];
   if (height > 720) out.push('keep');
@@ -146,10 +126,7 @@ function offered(height) {
   return out;
 }
 
-/*
- * -> everything the File card needs to draw itself. Asked before it draws, so
- * a control that cannot do anything says why instead of failing when pressed.
- */
+/* -> what the File card needs, including why a control can't act. */
 export async function plan(config, sceneId) {
   const file = await fileOf(config, sceneId);
   const filed = String(file.path).includes(FILED);
@@ -211,10 +188,7 @@ export async function choose(config, sceneId, raw) {
   return plan(config, sceneId);
 }
 
-/*
- * Handing a filed file back to FileFlows. The one undo on this card: it
- * removes the flag, and FileFlows treats the file as it would any other.
- */
+/* Hand the file back to FileFlows: remove the flag. */
 export async function release(config, sceneId) {
   const now = await plan(config, sceneId);
   if (!now.filed) throw refuse('Only a filed scene has a flag to take off.');
@@ -223,11 +197,11 @@ export async function release(config, sceneId) {
   return plan(config, sceneId);
 }
 
-/* ------------------------------------------------------------- at filing
+/*
+ * ------------------------------------------------------------- at filing
  *
- * Called by filer.mjs with the destination folder, after it exists and before
- * the file is moved into it. Anything but the default puts the flag there
- * first.
+ * Called by filer.mjs after the destination exists, before the move.
+ * Non-default choices write the flag first.
  */
 export async function beforeFiling(sceneId, dir) {
   const choice = (await load()).scenes[sceneId]?.choice;
@@ -235,11 +209,8 @@ export async function beforeFiling(sceneId, dir) {
 }
 
 /*
- * And once the file has arrived: start the encode it was waiting for, and let
- * the remembered choice go — from here on the flag is the record. An encode
- * that will not start (another is running, or it is not an .mp4) is reported
- * rather than retried; the flag is already down, so FileFlows will not touch
- * it, and the card offers the encode again.
+ * After the move: start any waiting encode and drop the remembered choice.
+ * An encode that won't start is reported; the flag keeps FileFlows off.
  */
 export async function afterFiling(config, sceneId) {
   const store = await load();
@@ -259,10 +230,8 @@ export async function afterFiling(config, sceneId) {
 }
 
 /*
- * The encoder reads the path from Stash, and Stash only learns the new one
- * from the rescan filing asked for — which runs as a job and takes a few
- * seconds. Started before then, the encoder sees the old folder and refuses.
- * So: wait until Stash says the file is filed, for two minutes at most.
+ * Wait (up to two minutes) until Stash has the new path, or the encoder
+ * refuses the old one.
  */
 async function startWhenFiled(config, sceneId, height) {
   for (let waited = 0; waited < 120_000; waited += 3000) {

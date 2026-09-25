@@ -1,35 +1,12 @@
 /*
- * Filling in what is already answerable, without asking anybody.
+ * Catch-up: fill blanks on scenes that already have a stash id, by
+ * reading that id from its source. No scene without an id is touched and
+ * nothing is searched by title, so it can run unattended.
  *
- * Every other way this portal writes metadata involves a person: the Match
- * page asks the sources and you tick what is right, the marker bench and its
- * fetch panel show you what came back before anything lands. That is correct
- * for a scene nobody has identified — a title that matches is a guess, and a
- * guess written unattended is a wrong studio you find six months later.
- *
- * **This is the other case, and it involves no guessing at all.** A scene that
- * already carries a stash id has been identified: by Stash's own Identify, by
- * the Match page, by a scraper that got it right. The id names one scene on one
- * box. Asking that box for that id is not matching, it is reading — so it can
- * be done to two thousand scenes at once with nobody watching.
- *
- * Which is why the rule here is narrow and absolute: **no scene without an id
- * is touched**, and nothing is ever searched for by title.
- *
- * Two passes, and they share that rule:
- *
- *   facts       StashDB first, ThePornDB for whatever is still blank
+ *   facts       StashDB first, ThePornDB for what's still blank
  *   timestamps  timestamp.trade first, ThePornDB second
  *
- * The order is not arbitrary in either case. StashDB is the better-curated of
- * the two and is what the library is measured against; timestamp.trade is the
- * primary marker source in this library and TPDB the backup — the same order the
- * two Stash plugins are run in, for the reasons in stash-scene-markers.
- *
- * **Only blanks are filled.** A scene that already has a title keeps it, even
- * if StashDB disagrees. This is a catch-up, not a re-identification, and a job
- * that quietly rewrote fields somebody had corrected by hand would be the last
- * time anybody pressed it.
+ * Only blanks are filled.
  */
 
 import { gql } from './stash.mjs';
@@ -46,12 +23,7 @@ const STASHDB = /stashdb\.org/i;
 // holds ?type=Movie, ?type=JAV and a bare one sharing the same token.
 const TPDB_ENDPOINT = 'https://theporndb.net/graphql?type=Scene';
 
-/*
- * Between one outside request and the next. These are somebody else's servers
- * and this asks them thousands of times in a row — the marker plugins and the
- * Match page's Search All both take the same care, and for the same reason: a
- * burst is how an account stops working for the rest of the afternoon.
- */
+/* Pause between outside requests. */
 const BREATH = 600;
 const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -80,14 +52,7 @@ const idFor = (scene, which) => {
   return hit && hit.stash_id && String(hit.stash_id) !== '0' ? hit.stash_id : null;
 };
 
-/*
- * What is missing from a scene, as a list of field names.
- *
- * Deliberately short. A description or a tag list is not a gap — plenty of
- * scenes never had either and nobody is looking at this page because of it.
- * These four are what make a scene findable and recognisable everywhere else
- * in the portal.
- */
+/* Missing fields, as names. Only the four that make a scene findable. */
 function gapsIn(scene) {
   const gaps = [];
   if (!scene.title) gaps.push('title');
@@ -102,13 +67,7 @@ async function allScenes(config) {
   return (data.findScenes?.scenes || []).filter(filed);
 }
 
-/*
- * -> what a run would look at, without doing any of it.
- *
- * Read before the button is pressed, so it can say what it is about to do
- * rather than starting and reporting afterwards. It is one Stash query and no
- * outside requests at all.
- */
+/* -> what a run would look at. One Stash query, nothing outside. */
 export async function scope(config) {
   if (!stashConfigured(config)) return { ready: false, filed: 0, facts: 0, timestamps: 0, stranded: 0 };
 
@@ -134,15 +93,7 @@ export async function scope(config) {
 
 /* ------------------------------------------------------------- the writes */
 
-/*
- * A name back into a Stash id, and never by creating one.
- *
- * The same rule the Match page applies to a hand-picked match, applied here
- * for a stronger reason: this runs unattended over hundreds of scenes, and a
- * pass that created studios and performers from two sources' spellings would
- * leave a library with "Brazzers" and "Brazzers " in it by morning. What could
- * not be attached is counted and reported instead.
- */
+/* A name -> Stash id. Never creates; misses are counted and reported. */
 async function findByName(config, kind, name) {
   const clean = String(name || '').replace(/\s+/g, ' ').trim();
   if (!clean) return null;
@@ -157,13 +108,7 @@ async function findByName(config, kind, name) {
   return hit ? hit.id : null;
 }
 
-/*
- * One scene's facts, from whichever source can answer for the blanks.
- *
- * -> the fields that were filled, so the run can report in numbers rather than
- * in a claim. An empty list is the ordinary outcome and not a failure: the
- * commonest reason a scene has no studio is that neither box knows one either.
- */
+/* One scene's facts. -> the fields filled (often none). */
 async function fillFacts(config, scene, held) {
   const gaps = gapsIn(scene);
   if (!gaps.length) return [];
@@ -210,9 +155,7 @@ async function fillFacts(config, scene, held) {
     await wait(BREATH);
   }
 
-  // ThePornDB for whatever is still blank. On this library it does most of the
-  // work despite being second: of the scenes with a gap and an id, the great
-  // majority carry a TPDB id and no StashDB one.
+  // Then ThePornDB for what's still blank.
   const tp = idFor(scene, 'tpdb');
   if (tp && filled.length < gaps.length) {
     await take(await tpdb.getScene(config, tp).catch(() => null));
@@ -231,16 +174,7 @@ async function fillFacts(config, scene, held) {
   return { filled, missed };
 }
 
-/*
- * One scene's markers, and only onto a scene that has none.
- *
- * The same rule the TPDB plugin is configured with, and for the reason in
- * stash-scene-markers: an incoming marker within fifteen seconds of an
- * existing one gets *rewritten in place* by the plugins, and while nothing
- * here does that, a scene that already has markers is one where the question
- * is which of two sets to keep. That is a decision, and decisions belong on
- * the bench — the fetch panel there exists for exactly it.
- */
+/* Markers only onto a scene with none. Merging two sets is a decision for the bench. */
 async function fillTimestamps(config, scene) {
   const found = await markersources.fetched(config, scene.id).catch(() => null);
   if (!found) return 0;

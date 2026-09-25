@@ -1,8 +1,5 @@
 /*
- * The home page.
- *
- * Not a feed reader — an acquisition console. The bands answer, in order, the
- * questions a collector actually arrives with:
+ * The acquisition home page. Bands, in order:
  *
  *   1. what dropped since I last looked?   -> since
  *   2. is anything stuck?                  -> attention
@@ -10,15 +7,8 @@
  *   4. what have my performers been in?    -> performers
  *   5. what else is out there?             -> discovery
  *
- * The previous page answered only (1), three times over.
- *
- * Scene data is sourced from TPDB rather than the free mirror, because TPDB
- * carries posters, performer genders and fingerprints in the same response —
- * which is what makes the filtering and the "already have it" check possible.
- *
- * It is slow enough (dozens of paged requests) that it is built in the
- * background and served from cache. The queue is the exception: it changes by
- * the minute, so it is read live on every request instead.
+ * From TPDB (posters, genders, fingerprints). Built in the background and
+ * cached; the queue is read live.
  */
 
 import * as tpdb from './tpdb.mjs';
@@ -113,10 +103,8 @@ async function build(config) {
   await annotate(config, state, allScenes(home));
 
   /*
-   * Advance the watermark only once the page has actually been built, and
-   * always compare against the value from before it. A rebuild inside the same
-   * day therefore finds nothing new — which is why the band falls back to
-   * "Latest from your sites" rather than rendering an empty row.
+   * Advance the watermark after the build, comparing against the old value.
+   * A same-day rebuild falls back to "Latest from your sites".
    */
   await saveConfig({ lastSeenAt: new Date().toISOString() }).catch(() => {});
 
@@ -134,12 +122,7 @@ function allScenes(home) {
 
 // ------------------------------------------------------ Whisparr, read once
 
-/*
- * Every band that knows what you already have is driven from this one pass:
- * the new-releases feed, the stale list, the completion table and the badges
- * on every card. Reading it once is the difference between one walk over the
- * library and four.
- */
+/* One pass over Whisparr state drives every band. */
 async function whisparrState(config) {
   const out = { series: [], perSeries: new Map(), byTpdbId: new Map(), error: null };
   if (!whisparr2Configured(config)) return out;
@@ -173,20 +156,12 @@ async function fromYourSites(config, state) {
   return perSite.flat().sort(byDate);
 }
 
-/*
- * The global feed is mostly clip sites, so this has to read a long way to fill
- * a row — roughly 2000 scenes for 24 cards. It runs in the background and is
- * cached, so the depth costs nothing at page load.
- */
+/* The global feed is mostly clip sites, so this reads deep (~2000 scenes for 24 cards). */
 async function fromStudios(config) {
   return tpdb.recentGlobal(config, { pages: 20, limit: 24 });
 }
 
-/*
- * Grouped by performer rather than flattened into one row. Performer is the
- * primary entity everywhere else in this hobby — a scene listed under a name is
- * a different question from a scene listed under a date.
- */
+/* Grouped by performer. */
 async function fromPerformers(config) {
   if (!stashConfigured(config)) return [];
 
@@ -217,12 +192,7 @@ async function fromPerformers(config) {
 
 // ---------------------------------------------------------------- the bands
 
-/*
- * "New" is meaningless without a personal watermark — an absolute date sort is
- * the same three rows you already scrolled past this morning. Upcoming scenes
- * are held back for the attention band, or they would sit at the top of this
- * one forever.
- */
+/* New since the watermark. Upcoming scenes go to the attention band. */
 function sinceBand(siteScenes, performerGroups, watermark) {
   const now = today();
   const cutoff = watermark || daysAgo(FIRST_RUN_DAYS);
@@ -255,11 +225,8 @@ function sinceBand(siteScenes, performerGroups, watermark) {
 }
 
 /*
- * Monitored, no file, and the release date well past. Whisparr will not tell
- * you this on its own — it just keeps searching quietly forever.
- *
- * Minus what Stash already has: v2 never unmonitors a scene the pipeline filed
- * (see tidy.mjs), so without this the nudge counts the shelf as missing.
+ * Monitored, no file, release long past. Minus what Stash already has
+ * (v2 never unmonitors filed scenes).
  */
 async function staleWanted(config, state) {
   const cutoff = daysAgo(STALE_DAYS);
@@ -285,19 +252,9 @@ async function staleWanted(config, state) {
 }
 
 /*
- * How much of each site you actually have.
- *
- * Counted in Stash, not in Whisparr. Whisparr is a downloader: a scene passes
- * through it, gets encoded and moved, Stash imports it, and Whisparr is then
- * told to delete it and not fetch it again. So `hasFile` is true only for the
- * hours a scene is in flight — Stash is the thing that remembers.
- *
- * Whisparr is still consulted, for the scenes currently in flight and for the
- * ones already monitored, so neither shows up as a gap to re-add.
- *
- * Per site this costs one catalogue read from the metadata mirror (cached 6h)
- * and one batched match against Stash, so it is capped: the cost grows with the
- * number of sites you track, not with the size of your library.
+ * How much of each site you have, counted in Stash (Whisparr only holds
+ * files in flight). Whisparr is still asked so in-flight and monitored
+ * scenes aren't gaps. Capped by number of sites.
  */
 async function coverage(config, state) {
   const basis = stashConfigured(config) ? 'stash' : 'whisparr';
@@ -322,12 +279,7 @@ async function coverageFor(config, state, series) {
   const byTpdbId = new Map((state.perSeries.get(series.id) || []).map((e) => [e.tvdbId, e]));
   const held = stashConfigured(config) ? (await stash.matchScenes(config, scenes)).found : new Map();
 
-  /*
-   * Fingerprint matches need TPDB's per-scene hashes, which only arrive with the
-   * slow artwork pull. This reads whatever that job has already cached for the
-   * site and never starts one — so once you have opened a site, coverage agrees
-   * with what its page told you instead of quietly reporting a lower number.
-   */
+  /* Use cached fingerprint matches if the artwork pull has run; never start one. */
   const fingerprinted = tpdb.artSnapshot(series.tvdbId).matches;
 
   let had = 0;
@@ -368,10 +320,7 @@ function posterOf(series) {
 const isStalled = (r) =>
   /warning|error/i.test(r.trackedDownloadStatus || '') || /failed|warning/i.test(r.status || '');
 
-/*
- * Deliberately outside the 30-minute cache: a queue half an hour out of date is
- * worse than no queue at all.
- */
+/* Not cached: the queue changes by the minute. */
 export async function queueSummary(config) {
   const empty = { total: 0, stalled: [], error: null };
   if (!whisparr2Configured(config)) return empty;
@@ -400,9 +349,7 @@ export async function queueSummary(config) {
 async function annotate(config, state, scenes) {
   if (!scenes.length) return;
 
-  // TPDB stash id and title + date first, then fingerprints — the same order
-  // as the site pages (library.annotateScenes). Fingerprints alone missed any
-  // scene Stash has no phash for yet, and called it not held.
+  // TPDB stash id and title + date first, then fingerprints, as on site pages.
   const [held, index] = stashConfigured(config)
     ? await Promise.all([
       stash.matchScenes(config, scenes).then((r) => r.found).catch(() => new Map()),

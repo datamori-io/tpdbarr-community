@@ -32,10 +32,8 @@ import { showStash } from './settings/stash.js';
 
 async function routeTo(fullHash) {
   /*
-   * The reel goes first: the library owns everything under #/library and
-   * returns before the rest of this runs, and a performer chip on a slide
-   * links straight into it — which would leave the reel playing behind the
-   * page you just opened.
+   * Stand the reel down first: the library returns early below, and a reel
+   * link into it would leave the reel playing.
    */
   reel.leave();
   social.leave();
@@ -45,16 +43,8 @@ async function routeTo(fullHash) {
   markerbuilder.leave();
 
   /*
-   * Whatever the last page left running stops here: the address has changed, so
-   * anything still polling for the old one has nothing left to say. The paint
-   * guard would swallow their output anyway; this stops them asking.
-   *
-   * It happens **before** the library gets its turn at the address, and that
-   * ordering is the whole point. Four pages on this side redraw themselves on a
-   * timer, and the guard that stops a late render is a generation counter — so
-   * handing off to the library without bumping it left those timers both armed
-   * and unguarded. Twenty seconds after opening a film you were looking at
-   * Import › Integrations instead, at the film's own address.
+   * Bump the generation before the library handles the address, or pages
+   * redrawing on timers keep painting over the new page.
    */
   newGeneration();
   clearTimeout(homeTimer);
@@ -66,10 +56,7 @@ async function routeTo(fullHash) {
   if (shelf.route(fullHash)) return;
   shelf.leave();
 
-  /*
-   * The search carries its filters in a query string, so the address is split
-   * before anything is matched on it. Every other page ignores the second half.
-   */
+  /* Split off the query string before matching. */
   const [hash, query = ''] = fullHash.split('?');
 
   const site = hash.match(/^#\/site\/(\d+)$/);
@@ -90,10 +77,8 @@ async function routeTo(fullHash) {
   if (search) return showSearch(decodeURIComponent(search[1]));
 
   /*
-   * Binge is the reel, which is ours. The plugin it was named after is still
-   * reachable one level down: a single-file app that Stash serves and that
-   * talks to its GraphQL directly, so everything inside that frame — its own
-   * #/home, #/foryou — is its business and not this router's.
+   * Binge is the reel. The Stash plugin frame is its own app; its inner
+   * routes aren't ours.
    */
   if (hash.startsWith('#/parameters')) return showSettings(hash);
   if (hash === '#/binge/redgifs') return gifs.show();
@@ -102,7 +87,7 @@ async function routeTo(fullHash) {
   if (hash === '#/binge') return reel.show(query);
 
   /*
-   * Import: five pages, in the order the work actually goes.
+   * Import, five pages:
    *
    *   Overview      what am I collecting, and what is worth a look
    *   Video         the scene and movie search
@@ -110,10 +95,7 @@ async function routeTo(fullHash) {
    *   Tracked       the catalogues being measured
    *   Integrations  is everything up, and what is in flight
    *
-   * The tab was called Acquire and every address under it began #/acquire.
-   * Those still answer — a rename is not a reason to break a bookmark — but
-   * they are rewritten to the new address rather than served in place, so the
-   * URL bar and the back button agree about where you are.
+   * Old #/acquire addresses are rewritten to the new ones.
    */
   const moved = MOVED_FROM_ACQUIRE(hash);
   if (moved) {
@@ -129,9 +111,7 @@ async function routeTo(fullHash) {
   if (hash === '#/import/video') return showAcquire(query);
   if (hash === '#/import/images') return showImages(query);
   /*
-   * Catalogue: the work on scenes you already hold. Ahead of the Find pages
-   * below only because it reads better beside its own comment — the router is
-   * a list of exact matches and the order between them means nothing.
+   * Catalogue: work on scenes you already hold.
    *
    *   Overview      what is left to do, and where it is
    *   Match         which scene is this, and file the ids
@@ -150,14 +130,7 @@ async function routeTo(fullHash) {
   if (hash === '#/import') return showOverview();
   if (hash === '#/thanks') return showThanks();
 
-  /*
-   * The front door is the library — this is a thing you watch far more often
-   * than a thing you shop in. Acquisition keeps its whole console, one nav
-   * click away at #/acquire.
-   *
-   * Except on a fresh install, where there is no library to show and the way
-   * in is the only useful thing on the page.
-   */
+  /* The library is the front door, except on a fresh install (setup). */
   if (!state?.stash?.enabled) return renderSetup();
   return shelf.showLibrary();
 }
@@ -183,10 +156,7 @@ function showBingePlugin() {
 
 // ---------------------------------------------------------------- settings
 
-/*
- * Manage (was Settings) — seven pages behind one strip. Everything about them, including the
- * connections form the document holds, is under public/settings/.
- */
+/* Manage (was Settings): seven pages, in public/settings/. */
 function showSettings(hash) {
   const paint = painterFor();
   if (hash === '#/parameters/catchup') return showCatchUp(paint);
@@ -197,9 +167,7 @@ function showSettings(hash) {
   if (hash === '#/parameters/stash') return showStash(paint);
   if (hash === '#/parameters') return showConnections(paint);
 
-  // Anything else under here is a page that does not exist. Sent back to the
-  // landing rather than drawn in place, so the address bar and the strip agree
-  // about where you are.
+  // Unknown subpage: back to the landing.
   location.hash = '#/parameters';
   return undefined;
 }
@@ -219,26 +187,13 @@ document.getElementById('search-form').onsubmit = (e) => {
   else location.hash = hash;
 };
 
-/* ------------------------------------------------------- where you are
+/*
+ * ------------------------------------------------------- where you are
  *
- * Lighting the top-nav entry for the half of the app you are standing in.
- *
- * There was no active state at all before this: all four sat grey wherever you
- * were, so the only thing that ever lit one was the cursor being on it. A nav
- * that cannot say where you are is four links rather than a nav.
- *
- * It is worked out from the address rather than set by each page, because the
- * pages that draw are not the pages you can be on — the router hands
- * `#/library/...` straight to shelf.js and returns, and a dozen renderers on
- * this side paint from their own timers. One reading of `location.hash` is the
- * only version of this that cannot fall out of step.
- *
- * **The StashDB pages belong to Find even though their addresses do not say
- * so.** `#/scene/<uuid>`, `#/performer/`, `#/movie/`, `#/site/` and `#/search/`
- * are all somebody looking at what they have *not* got — the same half as
- * `#/import`, which is where every one of them is reached from. Note these are
- * anchored: `#/library/scene/12` is the library's own scene page and lands in
- * the default, where it should.
+ * Light the top-nav entry for the current section, worked out from the
+ * address. The StashDB detail pages (`#/scene/<uuid>`, `#/performer/`,
+ * `#/movie/`, `#/site/`, `#/search/`) belong to Find; anchored, so
+ * `#/library/scene/12` isn't caught.
  */
 function navFor(hash) {
   const at = String(hash || '').split('?')[0];
@@ -281,22 +236,15 @@ document.addEventListener('keydown', (e) => {
 });
 
 /*
- * The size control attaches itself rather than being threaded through every
- * render function: pages paint from a dozen places here and in shelf.js, some
- * of them asynchronously and long after the route resolved. Watching the view
- * catches all of them, and mounting is idempotent.
- *
- * The multiplier is applied on the address change instead, so the page paints
- * at the right size rather than being resized a frame later.
+ * The size control mounts itself by watching the view (idempotent); the
+ * multiplier is applied on the address change.
  */
 const applyForHash = () => applyStep(stepFor(pageKey(location.hash)));
 window.addEventListener('hashchange', applyForHash);
 
 /*
- * A timer rather than a frame. requestAnimationFrame does not fire while the
- * tab is hidden, so a render that happened in the background left `mountQueued`
- * stuck at true and the size control never mounted again for the rest of the
- * session — on any page, not just the one that was hidden.
+ * A timer, not rAF: rAF doesn't fire in a hidden tab, which left
+ * `mountQueued` stuck and the control never mounted again.
  */
 let mountQueued = false;
 new MutationObserver(() => {

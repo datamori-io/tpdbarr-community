@@ -1,25 +1,8 @@
 /*
- * What you already collect, and how much a scene looks like it.
- *
- * The decide queue is honest and exhausting in the same breath: it hands you
- * the catalogue in date order and every card costs the same attention, whether
- * it is the performer you own forty scenes of or a studio you have never once
- * said yes to. Rules took out the obvious noes. This is the other end — the
- * obvious yeses, first, so that a backlog you will never finish is at least
- * read in the order that pays.
- *
- * **The signal is your own library.** Not a model of taste and not StashDB's
- * popularity: the performers and studios already on your disk, counted. Forty
- * scenes of somebody is a statement you made forty times, and it is the only
- * statement here nobody had to invent.
- *
- * Matched on StashDB's uuid where Stash holds one and on the name where it
- * does not, which is the same two-pass join the rest of the portal uses — a
- * third of this library was identified against ThePornDB's box instead, and
- * dropping those would quietly mean "you do not collect her".
- *
- * Nothing here decides anything. A score reorders what you were going to be
- * shown anyway; no scene is hidden by it and none is skipped.
+ * How much a scene looks like what you already collect, to order the
+ * decide queue. The signal is your library: performers and studios on
+ * disk, counted, matched by StashDB uuid then name. Reorders only; hides
+ * and skips nothing.
  */
 
 import * as stash from './stash.mjs';
@@ -48,12 +31,7 @@ const STUDIOS = `{
 const stashdbIdOf = (row) =>
   (row.stash_ids || []).find((s) => /stashdb\.org/i.test(s.endpoint))?.stash_id || null;
 
-/*
- * Two lookups per kind, by uuid and by name, built once and held for half an
- * hour. A library does not change between one card and the next, and this is
- * two full-table reads out of Stash — paying that per batch would be paying it
- * every few seconds.
- */
+/* Lookups by uuid and by name, cached half an hour. */
 export async function taste(config) {
   if (held && Date.now() - held.at < TTL) return held;
 
@@ -89,19 +67,8 @@ export async function taste(config) {
 }
 
 /*
- * How the points are given, and why these numbers.
- *
- * **Each performer is capped.** Owning eighty scenes of somebody does not make
- * a scene twice as interesting as owning forty — past a point it only says
- * "yes, her", and without a cap one name would decide every ranking in the
- * queue.
- *
- * **A studio counts for less than a person.** You collect people and you end
- * up with studios; a studio you have two hundred scenes of is mostly a fact
- * about who shoots for them.
- *
- * **A favourite is worth about a dozen scenes** — it is a statement you made
- * on purpose, and it is the only one here that survives a thin library.
+ * Scoring: each performer capped (so one name doesn't dominate); a studio
+ * counts less than a person; a favourite is worth about a dozen scenes.
  */
 const PER_CAP = 30;
 const STUDIO_CAP = 40;

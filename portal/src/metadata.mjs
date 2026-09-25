@@ -1,10 +1,6 @@
 /*
- * ThePornDB catalogue, via the Whisparr v2 metadata service.
- *
- * api.whisparr.com/v3 mirrors TPDB and needs no credentials, so the portal can
- * browse the whole catalogue without a TPDB account or any scraping. Sites come
- * back with a poster; scenes come back with performers, genres and dates but no
- * artwork of their own.
+ * The TPDB catalogue via Whisparr's open metadata mirror (api.whisparr.com/v3).
+ * No credentials. Sites have posters; scenes have no artwork.
  */
 
 const META = 'https://api.whisparr.com/v3';

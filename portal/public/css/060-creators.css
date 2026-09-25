@@ -1,10 +1,8 @@
-/* ==========================================================================
-   The acquisition sections — scenes, movies, creators.
-
-   A strip under the toolbar rather than three more entries in the top nav:
-   Library and Queue are other places you go, these are three views of one
-   question. So they sit inside the page, not above it.
-   ========================================================================== */
+/*
+ * ==========================================================================
+ * The acquisition section strip, inside the page.
+ * ==========================================================================
+ */
 
 .sections {
   display: flex;
@@ -25,10 +23,10 @@
 .section:hover { color: var(--text-2); }
 .section.on { color: var(--text); border-bottom-color: var(--accent-hi); }
 
-/* ---------------------------------------------------------------- creators
+/*
+ * ---------------------------------------------------------------- creators
  *
- * Three hundred faces, so the tile is as small as a name can be read at and
- * the grid takes the wide column the library uses.
+ * Small tiles, wide column.
  */
 
 main:has(.creators) { max-width: 1560px; }

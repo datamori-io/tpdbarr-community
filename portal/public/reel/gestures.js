@@ -43,12 +43,8 @@ export function swipeable(session, dial) {
 }
 
 /*
- * Scrubbing with a thumb.
- *
- * A drag across the picture moves through it, which on a phone is the only
- * way to get at the middle of a clip — there is no scrub bar to hit and no
- * room for one. Horizontal only, and it claims the gesture from the scroller
- * so a sideways drag does not also flick you to the next slide.
+ * Drag across the picture to scrub. Horizontal only; claims the gesture
+ * from the scroller.
  */
 export function scrubbable(slide, video, start, end) {
   const bar = el('div', { className: 'reelscrub' }, el('i', {}));
@@ -73,14 +69,8 @@ export function scrubbable(slide, video, start, end) {
   video.addEventListener('timeupdate', () => { if (!dragging) paint(); });
 
   /*
-   * The picture itself is the preview. Most players show a little thumbnail
-   * strip while you drag; this seeks the video you are already looking at, so
-   * the frame under your thumb is the real frame at full size — no sprite
-   * sheet to fetch and nothing to line up with the file.
-   *
-   * fastSeek where it exists: it lands on the nearest keyframe instead of
-   * decoding exactly to the requested moment, which is what makes a drag feel
-   * live rather than a series of stutters.
+   * Seeks the video itself (no sprites). fastSeek where available, so a drag
+   * feels live.
    */
   const seekTo = (clientX) => {
     const box = slide.getBoundingClientRect();
@@ -100,11 +90,7 @@ export function scrubbable(slide, video, start, end) {
     if (e.target.closest('.reelover, .reelcorner')) return;
     dragging = true;
     width = slide.getBoundingClientRect().width;
-    /*
-     * Paused while a thumb is down. A playing video fights a drag — it keeps
-     * advancing between seeks, so the frame you stop on is not the one you
-     * chose. Whether it was playing is remembered and put back afterwards.
-     */
+    /* Paused while the thumb is down, restored after. */
     wasPlaying = !video.paused;
     video.pause();
     slide.classList.add('scrubbing');

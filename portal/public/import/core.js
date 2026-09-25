@@ -1,9 +1,6 @@
 /*
- * The import side's spine: what the app knows about itself, which render owns
- * the screen, and the chrome every page here wears.
- *
- * Nothing in here imports from a sibling. A page needing something from another
- * page means the something belongs in this file instead.
+ * The import side's core: app state, which render owns the screen, shared
+ * chrome. Nothing here imports from a sibling.
  */
 
 import { api, el } from '../util.js';
@@ -13,26 +10,13 @@ export const view = document.getElementById('view');
 const statusbar = document.getElementById('statusbar');
 export let state = null;
 /*
- * Painting the view, and the rule that stops a slow page winning.
- *
- * Open Movies, get bored of the ThePornDB pull, click Performers — and when the
- * movie feed finally lands it replaces the whole view with itself, dragging you
- * back to a page you had already left. Which page you got dragged to depended
- * only on which request happened to be slowest.
- *
- * So a render is bound to the navigation it began under, not to the address at
- * the moment it finishes: `painterFor()` is called before the first await and
- * closes over the generation it saw. Comparing addresses instead does not work
- * — by the time the stale render paints, the address has already been updated
- * to the page it is about to trample.
+ * A render is bound to the navigation it started under: `painterFor()` is
+ * called before the first await and keeps that generation, so a slow page
+ * can't paint over the one you moved to. (Comparing addresses doesn't work.)
  */
 let generation = 0;
 
-/*
- * The router bumps this on every navigation, and the router is not in this
- * file any more. An imported binding is read-only, so it cannot be assigned
- * from over there — it is moved on through here instead.
- */
+/* The router bumps this; imported bindings are read-only, hence a function. */
 export const newGeneration = () => { generation += 1; };
 
 // Unguarded, for the synchronous renders that cannot arrive late.
@@ -72,12 +56,7 @@ function statusLine() {
     // Pointed at one and it did not answer. That is a fault worth the red.
     bits.push(el('span', { className: 'bad' }, `Whisparr: ${w.error || 'not answering'}`));
   } else {
-    /*
-     * No Whisparr at all, which since the library became the thing that decides
-     * "configured" is a shape this portal runs in perfectly well. Said plainly,
-     * in the statusbar's own colour, the same way v3 stays quiet until pointed
-     * at something.
-     */
+    /* No Whisparr: browsing only. */
     bits.push(el('span', {}, 'No Whisparr — browsing only, nothing to add with'));
   }
 
@@ -105,11 +84,7 @@ function statusLine() {
       'Artwork via TPDB token from Stash'));
   }
 
-  /*
-   * The status bar is already the strip that says what this is standing on —
-   * which Whisparr, whose token — so the page that says it properly belongs at
-   * the end of it rather than taking a slot in the top nav.
-   */
+  /* Link to the thanks page at the end of the status bar. */
   bits.push(el('a', { className: 'thankslink', href: '#/thanks', title: 'The catalogues and software this is built on' }, 'Thanks'));
 
   return bits;
@@ -136,11 +111,10 @@ export function renderSetup() {
   ));
 }
 
-/* -------------------------------------------------------------- sections
+/*
+ * -------------------------------------------------------------- sections
  *
- * The acquisition side, in three. Not three more entries in the top nav:
- * Library and Queue are other places, whereas these are three views of the
- * same question — what is out there, and what of it do I not have.
+ * The acquisition side's section strip.
  */
 
 const SECTIONS = [
@@ -151,19 +125,7 @@ const SECTIONS = [
   ['#/import/integrations', 'Integrations'],
 ];
 
-/*
- * The other half of the work, and the reason it is a section of its own.
- *
- * Find is about scenes you have not got: searching catalogues, tracking
- * studios, watching things arrive. Catalogue is about the ones you have and
- * cannot yet use — a file with no id, no cover, no title, no markers is on the
- * disk and absent from every shelf in here.
- *
- * They were one tab for a long time and it stopped being true. Match, Wild
- * Card and Marker Builder never once got used in the same sitting as the
- * StashDB search above them; they are what you do on a Sunday with a folder
- * full of things that arrived during the week.
- */
+/* Catalogue sections: work on scenes you have but can't use yet. */
 const CATALOGUE_SECTIONS = [
   ['#/catalogue', 'Overview'],
   ['#/catalogue/match', 'Match'],
@@ -172,12 +134,7 @@ const CATALOGUE_SECTIONS = [
   ['#/catalogue/markers', 'Marker Builder'],
 ];
 
-/*
- * Where an old address goes now. The Queue was a top-nav entry of its own and
- * is now one band of Integrations, because "what is Whisparr doing" was never a
- * different question from "what is the pipeline doing" — it was the first step
- * of it, shown on its own.
- */
+/* Old addresses and where they go now (the Queue is part of Integrations). */
 const MOVED = {
   '#/acquire': '#/import/video',
   '#/acquire/scenes': '#/import/video',
@@ -187,12 +144,7 @@ const MOVED = {
   '#/acquire/console': '#/import/console',
   '#/queue': '#/import/integrations',
 
-  /*
-   * Cataloguing became its own section. These three were under Find because
-   * that is where they were written, not because that is what they are — a
-   * rename is not a reason to break a bookmark, so the old addresses still
-   * answer and are rewritten rather than served in place.
-   */
+  /* Match, Wild Card and Marker Builder moved to Catalogue; old addresses redirect. */
   '#/import/match': '#/catalogue/match',
   '#/import/wildcard': '#/catalogue/wildcard',
   '#/import/markers': '#/catalogue/markers',
@@ -201,12 +153,7 @@ const MOVED = {
 
 export const MOVED_FROM_ACQUIRE = (hash) => MOVED[hash] || null;
 
-/*
- * The strip a page wears is decided by which strip it is listed in, not by an
- * argument the page passes. A page that could name its own strip is a page
- * that can name the wrong one, and the two sections now have three tabs that
- * read almost the same.
- */
+/* A page's strip is decided by which list it's in, not by the page. */
 export function sections(active) {
   const strip = CATALOGUE_SECTIONS.some(([href]) => href === active) ? CATALOGUE_SECTIONS : SECTIONS;
 
@@ -216,12 +163,7 @@ export function sections(active) {
   );
 }
 
-/*
- * A detail page belongs to the section that lists it, and the strip says which
- * — not how you got here. So a performer lights Performers whether you arrived
- * from there, from a scene's cast, or from the band on the console. Where you
- * came from is the back button's job; this is the page's address.
- */
+/* Detail pages light the section that lists them. */
 export const SECTION_OF = {
   search: '#/import/video',
   site: '#/import/video',
@@ -258,20 +200,11 @@ export const acquireHash = (params) => {
   return '#/import/video' + (qs ? '?' + qs : '');
 };
 
-/* ------------------------------------------------------ list or grid
+/*
+ * ------------------------------------------------------ list or grid
  *
- * Two ways to look at the same results. A row is for reading — cast, studio and
- * date all legible at once. A grid is for looking.
- *
- * Neither is part of the search, so neither goes in the address: a search you
- * send to yourself should arrive looking the way you like to read, and should
- * not carry a setting the other end never chose.
- *
- * They are kept in two different places on purpose. **Size** goes to the
- * server, in `tileScale` under this page's key, because how big you want
- * thumbnails is a taste and this portal gets used from more than one machine.
- * **List or grid** stays in the browser, because that one really is about the
- * screen in front of you — a phone wants the rows, a desk wants the wall.
+ * Not in the address. Size is saved on the server (`tileScale`); list or
+ * grid is kept per browser.
  */
 
 // A browser with site data blocked is not a reason for the page to fall over.
@@ -293,14 +226,7 @@ export const recall = (key, fallback) => {
 
 export const isGrid = () => recall('acquire.view', 'list') === 'grid';
 
-/*
- * Whether the decide queue stacks itself into blocks.
- *
- * On by default, because the queue's own reason for existing is a backlog too
- * big to answer one card at a time, and a block is the grain most of those
- * answers actually come at — a studio's whole 2011, a guest appearance you
- * have no interest in. Off is the old flat queue, one long run of cards.
- */
+/* Whether the decide queue groups into blocks. On by default. */
 export const isGrouped = () => recall('acquire.group', 'on') === 'on';
 
 export function countChip(label, n) {

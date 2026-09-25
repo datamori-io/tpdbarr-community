@@ -7,11 +7,10 @@ import { initial } from '../library/core.js';
 import { acquireRun, goAcquire, nextAcquireRun } from './search.js';
 import { rulesPanel } from './rules.js';
 
-/* ================================================================= tracked
+/*
+ * ================================================================= tracked
  *
- * The catalogues being measured. This used to be the bottom of the search page,
- * which meant the thing you check on had to be reached through the thing you
- * do. It is the other way round now.
+ * The catalogues being measured, as their own page.
  */
 
 export async function showTracked() {
@@ -35,45 +34,18 @@ export async function showTracked() {
   renderTracked(body, mine);
 }
 
-/*
- * What you are measuring yourself against.
- *
- * **Three kinds, three tabs, in the order you acquire by.** It was one list
- * sorted by how complete each was, which put a performer between two studios
- * and made "how am I doing on studios" a question you answered by reading.
- * Performers, studios and tags are different kinds of catalogue and the eye
- * wants them apart.
- *
- * A grid rather than rows. A row is the right shape for something with four
- * controls on it and the wrong one for thirty-six of them — this is a wall you
- * scan for the big numbers, and the artwork is how you find the one you meant.
- * Three rows a tab, then Show more: past that it stops being a glance.
- */
+/* A grid per kind (performers, studios, tags), three rows per tab, then Show more. */
 
 const TRACK_ROWS = 3;
 
-/*
- * The three catalogue kinds, and the words on them. `kind` is what the record
- * carries and what the untrack route takes, so it is not a display choice.
- */
+/* The three kinds. `kind` is what the record carries and the untrack route takes. */
 const TRACK_KINDS = [
   ['performer', 'Performers', 'the people you follow'],
   ['studio', 'Studios', 'the catalogues you measure yourself against'],
   ['tag', 'Tags', 'subjects you dip into — a percentage of one means little'],
 ];
 
-/*
- * The five tabs, and the order they are in.
- *
- * This page was one column and it outgrew it: thirty-three performers, fifteen
- * studios, the tags, the standing answers and a want list of two and a half
- * thousand, all stacked, so every question below the first was reached by
- * scrolling past the answer to one you were not asking. Five tabs is the same
- * split the rest of the portal already uses — one question per view.
- *
- * `open` is what the tab counts in its own strip. Rules has none: a rule is
- * not a thing you have a backlog of.
- */
+/* The five tabs. `open` is each tab's own count; Rules has none. */
 const TABS = [
   ['performer', 'Performers'],
   ['studio', 'Studios'],
@@ -84,15 +56,7 @@ const TABS = [
 
 const TAB_KEY = 'tracked.tab';
 
-/*
- * Built once, kept, and swapped by hiding rather than redrawing.
- *
- * The alternative — build the tab you are on and throw it away when you leave
- * — would re-ask the server for the want list every time you glanced at the
- * rules and back. Nothing on this page is big enough to be worth that, and a
- * tab that comes back exactly as you left it, scroll position and open
- * sections and all, is the whole reason to have tabs.
- */
+/* Tabs are built once and hidden, not rebuilt, so they come back as you left them. */
 async function renderTracked(body, mine) {
   body.replaceChildren(el('div', { className: 'empty' }, 'Loading what you track…'));
 
@@ -111,19 +75,11 @@ async function renderTracked(body, mine) {
   const band = workBand();
   band.update(rows, measuring);
 
-  /*
-   * The catalogue tabs. Each keeps its own grid and is handed new numbers
-   * rather than rebuilt — see refresh() below for why that matters.
-   */
+  /* Catalogue tabs are handed new numbers, not rebuilt (see refresh()). */
   const kinds = new Map(TRACK_KINDS.map(([kind, title, note]) => [kind, trackedSection(kind, title, note)]));
   for (const [kind, section] of kinds) section.update(rows.filter((row) => row.kind === kind));
 
-  /*
-   * The rules panel is built once and never replaced. Saving a rule used to
-   * redraw this whole page, which meant the panel you were typing in was torn
-   * out from under you and put back as a fresh one — the redraw you could see
-   * happening. It stays; only the numbers it moves are re-read.
-   */
+  /* The rules panel is built once; saving a rule only re-reads the numbers. */
   const rules = rulesPanel(() => refresh());
 
   const panels = new Map([
@@ -151,11 +107,7 @@ async function renderTracked(body, mine) {
     for (const [k, link] of links) link.classList.toggle('on', k === key);
   };
 
-  /*
-   * What one tab says: its name, and how much of the page's job is behind it.
-   * Written in one place because the refresh below says it again, and a label
-   * built twice is a label that goes out of step once.
-   */
+  /* A tab's label: name and count. One place, used by the refresh too. */
   const labelFor = (key, label, count) => [
     label,
     count ? el('span', { className: 'muted small' }, ' ' + count.toLocaleString()) : null,
@@ -164,24 +116,15 @@ async function renderTracked(body, mine) {
   for (const [key, label] of TABS) {
     const link = el('a', { className: 'section', href: '#' + key },
       ...labelFor(key, label, openOf(key)));
-    /*
-     * A button in a link's clothing. A real address would go through the
-     * router, and the router's answer to #/import/tracked is to draw this page
-     * again from nothing — the exact redraw the tabs exist to avoid.
-     */
+    /* A link-looking button; a real link would make the router redraw the page. */
     link.onclick = (e) => { e.preventDefault(); pick(key); };
     links.set(key, link);
     strip.append(link);
   }
 
   /*
-   * Re-read the numbers without touching the page.
-   *
-   * Called when a rule is saved and while a measurement is in flight. It asks
-   * for the snapshot again and hands it to the band and the three grids; the
-   * rules panel, the want list, the tab you are on and everything you have
-   * expanded stay exactly as they are. This is the difference between "the
-   * numbers moved" and "the page reloaded".
+   * Re-read the numbers without touching the page: tabs, open sections and
+   * the rules panel stay put.
    */
   let polling = null;
   const refresh = async () => {
@@ -233,24 +176,11 @@ async function renderTracked(body, mine) {
 }
 
 /*
- * What there is to do, above what you are measuring.
- *
- * This page was a wall you read percentages off, and the way to actually do
- * something was small grey text on one card at a time. The job is the sum of
- * those numbers, and it belongs at the top in the size it actually is, with
- * the button that starts it.
- *
- * One queue over everything rather than a catalogue you first have to choose:
- * choosing which studio to work on is not part of the work, and it was the
- * part that stopped it happening.
+ * The work band: the total to do and one button to start, over every
+ * catalogue at once.
  */
 function workBand() {
-  /*
-   * The band is made once and refilled. A rule saved on the Rules tab moves
-   * every number on it, and swapping the node for a new one made the top of
-   * the page jump — which read as the whole page reloading even when only two
-   * numbers had changed.
-   */
+  /* Built once and refilled, so the top of the page doesn't jump. */
   const num = el('div', { className: 'worknum' });
   const numNote = el('div', { className: 'muted small' });
   const across = el('div', {});
@@ -277,9 +207,7 @@ function workBand() {
     across.textContent = `across ${rows.length.toLocaleString()} catalogue${rows.length === 1 ? '' : 's'} you follow`;
     under.textContent = [
       ruled ? `${ruled.toLocaleString()} held back by your rules` : null,
-      // A total missing a catalogue looks like a total, so it says which
-      // part of itself is still being worked out rather than quietly
-      // being short by it.
+      // Say how many are still being measured, so the total isn't silently short.
       waiting ? `${waiting} still being measured` : null,
     ].filter(Boolean).join(' · ') || 'one queue, every catalogue, one card at a time';
 
@@ -292,12 +220,8 @@ function workBand() {
 }
 
 /*
- * One kind's worth, capped at three rows until you ask for the rest.
- *
- * How many fit on a row is a CSS answer, not a JS one — the grid is
- * auto-filling and the column count changes with the window — so "three rows"
- * is read back off the laid-out grid rather than assumed. On a narrow screen
- * that is six cards; on a wide one, twenty-one.
+ * One kind, capped at three rows. The row size is read from the laid-out
+ * grid (auto-fill).
  */
 function trackedSection(kind, title, note) {
   const grid = el('div', { className: 'trackgrid' });
@@ -330,21 +254,9 @@ function trackedSection(kind, title, note) {
 
   more.onclick = () => { opened = true; draw(rows.length); };
 
-  /*
-   * New numbers, same section. Redrawing the cards is unavoidable — the
-   * percentages are on them — but how far the section is open, and which tab
-   * you are on, are not the server's business and survive.
-   */
+  /* New numbers, same section; how far it's open survives. */
   const update = (next) => {
-    /*
-     * Most open first. This was least-complete-percent, which sorts by the
-     * wrong thing: 2% of a catalogue with one scene left in it is finished
-     * work, and 34% of one with four hundred to answer for is the job. The
-     * page is a queue, so it is ordered by how much queue each one is.
-     *
-     * A catalogue still being measured has no count yet and goes last rather
-     * than being called zero.
-     */
+    /* Most still-to-decide first. Still-measuring catalogues go last. */
     rows = [...next].sort((a, b) =>
       (a.pending ? 1 : 0) - (b.pending ? 1 : 0)
       || (b.undecided || 0) - (a.undecided || 0));
@@ -364,30 +276,17 @@ function trackedSection(kind, title, note) {
   };
 
   /*
-   * Drawn with a guess, then corrected once the grid has a width — and by an
-   * observer rather than an animation frame, because a frame never fires while
-   * the tab is in the background and the section would stay at the guess for
-   * the rest of the session. The observer also answers the window changing,
-   * which is the same question asked again.
+   * Correct the row count once the grid has a width. A ResizeObserver, not
+   * rAF (rAF doesn't fire in a background tab).
    */
   const watch = new ResizeObserver(() => {
     if (opened) return;
-    /*
-     * A hidden tab has no layout: the grid reports no columns, perRow() falls
-     * back to one, and the section would fold itself to three cards while
-     * nobody was looking at it. Measuring something with no width answers a
-     * question about CSS, not about this page.
-     */
+    /* A hidden tab has no width; skip rather than fold to three cards. */
     if (!grid.clientWidth) return;
     const want = TRACK_ROWS * perRow();
     if (want !== showing && !(showing === rows.length && want > rows.length)) draw(want);
   });
-  /*
-   * Not torn down explicitly. The library's onTeardown belongs to the library's
-   * router and would fire on a schedule this page does not keep; an observer
-   * whose only target has left the document stops firing and is collected with
-   * it, which is the whole of the cleanup needed here.
-   */
+  /* No explicit teardown: the observer goes with its target. */
   watch.observe(grid);
 
   const node = el('div', { className: 'tracksection' },
@@ -404,18 +303,9 @@ function trackedSection(kind, title, note) {
 }
 
 /*
- * One tracked catalogue as a card.
- *
- * The whole card is the way in to deciding, because that is what this page is
- * for — a wall of cards with three buttons each is three buttons you have to
- * aim at thirty-six times.
- *
- * **Nothing here untracks.** There used to be a × in the corner of every card,
- * and on a wall you scan and click through, one press in the wrong corner took
- * a studio out of the measurements along with the percentage it was driving.
- * Untracking now lives on the catalogue's own page, one press further in and
- * behind a question — you have to be looking at the thing you are about to
- * stop measuring. See subjectBody in cards.js.
+ * One catalogue as a card; the card opens its decide queue. No untrack
+ * here — that's on the catalogue's own page, behind a question (see
+ * subjectBody in cards.js).
  */
 function trackedCard(row) {
   const go = (show) => {
@@ -430,10 +320,8 @@ function trackedCard(row) {
     : el('div', { className: 'trackart noart ' + row.kind }, initial(row.name));
 
   /*
-   * What the card says under the name. A percentage where one is honest — see
-   * coverageSnapshot in discover.mjs — and otherwise the only number that is
-   * true of a catalogue too big to measure: how many of it you have not
-   * answered for.
+   * A percentage where it's meaningful (coverageSnapshot in discover.mjs),
+   * otherwise how many are left to answer.
    */
   const line = row.pending
     ? el('div', { className: 'muted small' }, 'Measuring…')
@@ -444,12 +332,7 @@ function trackedCard(row) {
         el('span', { className: 'trackwhy', title: `${(row.total || 0).toLocaleString()} scenes on StashDB — too many for a percentage, so this counts what is left to answer.` }, ' ?')
       );
 
-  /*
-   * What the rules are holding back, under whichever line this card got. On
-   * both kinds of card, because the question it answers — is that number small
-   * because I am nearly done, or because a rule is doing the work — is the same
-   * question either way.
-   */
+  /* What the rules are holding back, on both kinds of card. */
   const ruled = row.ruled
     ? el('div', { className: 'trackruled muted small' }, `${row.ruled.toLocaleString()} held back by your rules`)
     : null;
@@ -474,26 +357,10 @@ function trackedCard(row) {
   return card;
 }
 
+/* Every scene you've marked, loaded after the page draws. */
 /*
- * Everything you have marked, wherever you marked it.
- *
- * The tracked studios above are a question about catalogues — how much of one
- * do I hold. This is the other list: the individual scenes you said you wanted,
- * gathered from every studio page that made a mark. It fills itself in after
- * the page has drawn, because a want list is not what the page is for and a
- * slow one should not hold up the numbers above it.
- */
-/*
- * The want list, and by default only the part of it this page does not already
- * account for.
- *
- * Most of what is on it was marked while working through a studio or a
- * performer above, and those scenes are already counted, measured and queued
- * up there. What is left over is the interesting part — marked off a search,
- * off the feed, off somebody's say-so — and nothing on this page will ever
- * remind you about them again. So that is the default, and the toggle is how
- * you get the whole list back. See orphaned() in discover.mjs, including what
- * it cannot match on.
+ * The want list; by default only scenes no tracked catalogue covers (see
+ * orphaned() in discover.mjs). A toggle shows all.
  */
 function wantedBand(mine) {
   const holder = el('section', { className: 'feed' });
@@ -512,21 +379,11 @@ function wantedBand(mine) {
   return holder;
 }
 
-/*
- * Missing first, because that is the list you act on. What has arrived since
- * follows it, marked and still untrackable from here — a want list you cannot
- * cross things off is one that only grows.
- */
+/* Missing first, then arrived. Arrived ones can still be untracked here. */
 function wantedBody(list, reload, { loose = true, onToggle = null } = {}) {
   if (!list.count && !list.all) return [];
 
-  /*
-   * Have it, file-wise. Stash is the end of the flow, not the whole of it: a
-   * scene v3 has already downloaded and not yet handed over is one you own,
-   * and calling it missing sends you looking for something on the disk.
-   * Monitored with no file is still missing — the line is the file.
-   * Matches haveFile() in discover.mjs, which counts the same thing.
-   */
+  /* Having a file anywhere counts (same as haveFile() in discover.mjs). */
   const have = (s) => Boolean(s.stash || s.whisparr3?.hasFile);
 
   const missing = list.scenes.filter((s) => !have(s));
@@ -575,16 +432,8 @@ function wantedBody(list, reload, { loose = true, onToggle = null } = {}) {
 }
 
 /*
- * Sending a batch out, on the list it comes off.
- *
- * The schedule that used to sit here — send N a night, from N o'clock — moved
- * to Settings > Sending when this page grew tabs: a control you touch twice a
- * year stopped earning a line halfway down one of them. What is left is the
- * thing you press *while looking at the list*, which is not a schedule and
- * does not belong in Settings.
- *
- * The count still has to be fetched, because the button says how many it is
- * about to send and that number is the schedule's, not this page's.
+ * Send a batch now. The schedule lives in Settings › Sending; the count
+ * comes from it.
  */
 function releaseBar() {
   const bar = el('div', { className: 'releasebar' });

@@ -1,16 +1,6 @@
 /*
- * The tag prompt, and the palette behind it.
- *
- * This was inside the marker builder, where it is the last step of `t` — a
- * marker is not written until somebody has said what it is. It is out here now
- * because the scene players ask the same question: the button on the player
- * bar drops a point at the current second, and the only difference between
- * that and the bench's `t` is which page it was pressed on.
- *
- * The palette is module-level rather than per-page for the same reason it was
- * already held across markers within one bench: the answer is usually the same
- * tag again, and a tag created on a scene page should be on the list the next
- * page offers without a round trip to be told what we just said.
+ * The tag prompt and palette, shared by the bench and the player bars. The
+ * palette is module-level so a tag created on one page is offered on the next.
  */
 
 import { api, el } from './util.js';
@@ -19,11 +9,7 @@ const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
 const two = (n) => String(Math.floor(n)).padStart(2, '0');
 
-/*
- * hh:mm:ss.t — tenths, because a marker placed with the arrow keys is placed
- * more precisely than a scrub bar can show, and a readout that rounds to the
- * second cannot say that it worked.
- */
+/* hh:mm:ss.t */
 export function stamp(seconds, { tenths = true } = {}) {
   const s = Math.max(0, Number(seconds) || 0);
   const h = Math.floor(s / 3600);
@@ -33,11 +19,7 @@ export function stamp(seconds, { tenths = true } = {}) {
   return tenths ? `${whole}.${Math.floor((rest % 1) * 10)}` : whole;
 }
 
-/*
- * A finger rather than a pointer. Asked at the moment it matters rather than
- * once at load, because the answer can change under you — a tablet with a
- * keyboard folded on and off is the ordinary case, not the clever one.
- */
+/* Touch rather than mouse, checked each time (tablets change). */
 export const coarse = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 /* ------------------------------------------------------------- the palette */
@@ -46,12 +28,8 @@ let choices = null;
 let asked = null;
 
 /*
- * -> the tags a marker can wear, most-used first behind the three seeds.
- *
- * One request per page load however many prompts are opened. A failure is
- * answered with an empty palette rather than an error: typing a name still
- * works, and a prompt that refuses to open because a list did not load is a
- * worse answer than one with nothing premade on it.
+ * -> marker tags, most used, behind the three seeds. One request per page
+ * load; a failure gives an empty palette (typing still works).
  */
 export function palette() {
   if (choices) return Promise.resolve(choices);
@@ -74,13 +52,9 @@ export function remember(tag) {
 /* -------------------------------------------------------------- the prompt */
 
 /*
- * -> { tagId, tagName } once something is picked, or null if it was thrown
- * away. Nothing is written here; the caller does that, because what it writes
- * to differs — a new marker on the bench, a new marker from a player bar, a
- * retag of one that already exists.
- *
- * `host` is only what removes the panel when the page goes away: it is
- * positioned against the window rather than against whatever it is inside.
+ * -> { tagId, tagName }, or null if thrown away. The caller writes.
+ * `host` removes the panel when the page goes; the panel is positioned
+ * against the window.
  */
 export async function askTag({ seconds, end = null, host = null } = {}) {
   await palette();
@@ -99,12 +73,7 @@ export async function askTag({ seconds, end = null, host = null } = {}) {
 
     const options = el('div', { className: 'mboptions' });
 
-    /*
-     * Esc throws the marker away, and Esc is a key. Without a button here a
-     * phone has no way out of the prompt at all — the marker is not written
-     * until a tag is picked, so the only exit would be to pick a wrong one and
-     * delete it afterwards.
-     */
+    /* Cancel, since phones have no Esc. */
     const cancel = el('button', { className: 'mbcancel', type: 'button' }, 'Cancel');
 
     const panel = el('div', { className: 'mbprompt' },
@@ -131,9 +100,7 @@ export async function askTag({ seconds, end = null, host = null } = {}) {
       const hits = text ? have.filter((t) => t.name.toLowerCase().includes(lower)) : have.slice(0, 12);
       const exact = have.some((t) => t.name.toLowerCase() === lower);
 
-      // Creating is offered last, not first — the whole reason the palette
-      // exists is that the answer is usually already in it, and an offer to
-      // make a second "Kissing" should never be the highlighted one.
+      // Create is offered last, never highlighted.
       shown = [
         ...hits.slice(0, 9).map((t) => ({ kind: 'have', tag: t, label: t.name, count: t.count })),
         ...(text && !exact ? [{ kind: 'new', label: text }] : []),
@@ -175,10 +142,8 @@ export async function askTag({ seconds, end = null, host = null } = {}) {
     input.oninput = shape;
 
     /*
-     * On the window rather than only on the box, and capturing — the box is
-     * not focused on a touch device (see the foot of this function), and the
-     * page underneath has its own keydown listener that must not see any of
-     * these while the prompt is open.
+     * On the window, capturing: the box isn't focused on touch, and the page's
+     * own keydown listener must not see these.
      */
     function onKey(e) {
       if (e.ctrlKey || e.metaKey) return;
@@ -190,11 +155,7 @@ export async function askTag({ seconds, end = null, host = null } = {}) {
       if (e.key === 'ArrowDown') { stop(); cursor = Math.min(shown.length - 1, cursor + 1); shape(); return; }
       if (e.key === 'ArrowUp') { stop(); cursor = Math.max(0, cursor - 1); shape(); return; }
 
-      /*
-       * A digit picks an option only while the box is empty. Once there is
-       * text in it the digit is part of a name — "69" is a tag somebody will
-       * type — and stealing it would make that tag unnameable.
-       */
+      /* A digit picks an option only while the box is empty ("69" is a tag). */
       if (!input.value && /^[1-9]$/.test(e.key)) {
         stop();
         take(shown[Number(e.key) - 1]);
@@ -208,22 +169,14 @@ export async function askTag({ seconds, end = null, host = null } = {}) {
     shape();
     (host || document.body).append(panel);
 
-    /*
-     * Not on a phone. Focusing the box summons the software keyboard, which
-     * covers a panel pinned to the bottom of the screen — and what it covers
-     * is the list of presets, which is the answer nine times in ten. Tapping
-     * the field is how you say you would rather type.
-     */
+    /* Don't focus on touch: the keyboard would cover the presets. */
     if (!touch) input.focus();
   });
 }
 
 /*
- * The whole of "mark this moment", for a page that has a video and no bench.
- *
- * -> the marker as Stash wrote it, or null if the prompt was thrown away.
- * Throws only on a write that failed, which the caller says out loud in
- * whatever way that page says things.
+ * "Mark this moment" for a page with a video.
+ * -> the marker as written, or null if cancelled. Throws on a failed write.
  */
 export async function markHere(sceneId, seconds, { end = null, host = null } = {}) {
   const chosen = await askTag({ seconds, end, host });

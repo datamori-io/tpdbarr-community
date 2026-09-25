@@ -1,24 +1,6 @@
 /*
- * Marker management — what has been cut, rather than what is left to cut.
- *
- * The bench and its queue are both scene-shaped: pick a scene, mark it, pick
- * the next. That is the right shape for doing the work and the wrong one for
- * everything afterwards, because the questions you ask afterwards are asked of
- * the markers themselves. Which of these did the plugins write. Where is the
- * one that says Orgasm four seconds before it happens. How many Kissing are
- * there, actually. None of those can be answered by a wall of scenes, and
- * Stash's own UI has no page that answers them either.
- *
- * So this is a list of markers, from every scene, with the four things you
- * ever want to do to one: find it, open it where it lives, rename what it
- * says, and throw it away. Retiming is here too — it is one field — but the
- * bench is where a time is properly placed, because placing a time without a
- * picture in front of you is guessing.
- *
- * The filters live in the address and are written without navigating, the same
- * way the library's shelves do it: a list you narrowed is a place you are
- * working, and a hashchange on every keystroke would tear it down and rebuild
- * it as you typed.
+ * Marker management: a list of markers from every scene, to find, open,
+ * retag, retime or delete. Filters live in the address, rewritten in place.
  */
 
 import { api, el } from './util.js';
@@ -34,11 +16,7 @@ const SORTS = [
   ['scene_id', 'By scene'],
 ];
 
-/*
- * mm:ss, mm:ss.t, or hh:mm:ss — whichever was typed. -> seconds, or null if it
- * is not a time at all. A bare number is seconds, because that is what a
- * marker copied out of somewhere else usually looks like.
- */
+/* mm:ss, mm:ss.t or hh:mm:ss -> seconds, or null. A bare number is seconds. */
 function seconds(text) {
   const clean = String(text || '').trim().replace(',', '.');
   if (!clean) return null;
@@ -116,12 +94,7 @@ export async function manage(body, { params, go, back }) {
     more
   );
 
-  /*
-   * The same palette the prompt uses, which is marker tags only — the whole
-   * 985 would bury the dozen that describe a moment. A tag in the address that
-   * is not on the list is still selected: it is a real filter and dropping it
-   * would silently widen the list you came back to.
-   */
+  /* The marker-tag palette. A tag in the address stays selected even if not listed. */
   palette().then((tags) => {
     tagPick.replaceChildren(
       el('option', { value: '' }, 'Any tag'),
@@ -137,12 +110,7 @@ export async function manage(body, { params, go, back }) {
   const shape = (m) => {
     const scene = m.scene || null;
 
-    /*
-     * The time opens the marker where it lives — the bench if the scene is
-     * filed, the library's own scene page if it is not. Two destinations
-     * rather than a disabled button, because a marker on a scene the bench
-     * will not open is still a marker you want to go and look at.
-     */
+    /* The time opens the bench if the scene is filed, else the scene page. */
     const where = el('button', { className: 'link mmtime', type: 'button' },
       stamp(m.seconds) + (m.end ? ` → ${stamp(m.end)}` : ''));
     where.title = scene?.filed
@@ -176,21 +144,14 @@ export async function manage(body, { params, go, back }) {
         sceneName,
         el('span', { className: 'muted small' },
           [scene?.studio?.name, scene?.date].filter(Boolean).join(' · '))),
-      /*
-       * Whose marker it is. The plugins sign their work in the title —
-       * [Timestamp], [TsTrade], [TPDBMarker] — and a hand-cut one has no title
-       * at all, which is the only record of where a marker came from once it
-       * is in Stash. Shown only where it says something the chip does not.
-       */
+      /* Plugin markers are signed in the title; shown only when it differs from the tag. */
       m.title && m.title !== (m.tag?.name || '')
         ? el('span', { className: 'muted small mmtitle' }, m.title)
         : null,
       time,
       drop);
 
-    // el() assigns its props as properties, and a dash makes that a property
-    // nothing reads. The row has to be findable by the marker it draws, so the
-    // attribute is set on the node rather than passed in.
+    // Set as an attribute: el() assigns props, and a dashed name would be ignored.
     row.dataset.marker = m.id;
     return row;
   };
@@ -250,11 +211,7 @@ export async function manage(body, { params, go, back }) {
   // for — a Clear button on an unfiltered list is a button that does nothing.
   const filtered = () => Boolean(state.q.trim() || state.tag || state.sort !== 'created_at');
 
-  /*
-   * Typed, not pressed. Two hundred milliseconds is long enough that a word is
-   * one request rather than five, and short enough that it does not feel like
-   * the box is waiting for you to stop.
-   */
+  /* Search after 200ms of no typing. */
   let typing = null;
   find.oninput = () => {
     state.q = find.value;
@@ -306,14 +263,7 @@ export async function manage(body, { params, go, back }) {
     }
   }
 
-  /*
-   * Retiming, in the row rather than in a dialog.
-   *
-   * Two fields, because a span is two times and turning one back into a point
-   * is emptying the second — which is a real edit and one the write end knows
-   * how to make. The bench is still where a time is *placed*; this is for the
-   * marker you already know is four seconds early.
-   */
+  /* Retime in the row: start and end; empty the end to make it a point. */
   function retime(m, row) {
     if (!row || row.querySelector('.mmretime')) return;
 

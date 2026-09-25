@@ -1,31 +1,13 @@
 /*
- * Our own marker clips.
+ * Our own marker clips at 720p. Stash always renders them at 640x360 and
+ * has no setting for it (`maxTranscodeSize` only affects live streaming).
  *
- * Stash renders one per marker already, and they are 640x360 — for a 1080p
- * scene, for a 4K one, for everything. That number is not a setting: it is not
- * in the config file, it is not in `configureGeneral`, and `GenerateMetadata`
- * takes no size argument at all. `maxTranscodeSize` looks like the answer and
- * is not — it governs live streaming transcodes, not generated files, which is
- * why scene previews come out 640x360 too.
+ *   - `-2:720`: height fixed, width follows, so odd aspect ratios survive.
+ *   - CRF 23, preset slow: much smaller than CRF 20 for no visible loss here.
+ *   - Faststart.
  *
- * So this cuts its own, at 720, from the source file.
- *
- *   - Scaled by height with the width following (`-2:720`), not forced to
- *     1280x720. This library has 2.35:1 scope films and 4096x2160 material,
- *     and forcing a shape either distorts them or encodes black bars.
- *   - CRF 23 and preset slow. Measured on this library: crf 20 gave 11MB and
- *     35s a clip, crf 23 gives 7MB and 26s, and at 720 in a phone-shaped frame
- *     the difference is not what you would spend nine hours and 6GB on.
- *   - Faststart, because these are new files and there is no reason to repeat
- *     the mistake that cost an afternoon of scrubbing.
- *
- * MP4, not animated WebP. WebP is an image: it cannot go in a <video>, and the
- * reel's scrubbing, sound, play/pause and roll-on-first-loop all go with it.
- * WebP is the right output for Stash's own grid hovers, not for this.
- *
- * On the GPU: it cannot help here in the way it looks like it should. NVENC
- * encodes H.264, HEVC and AV1 — there is no WebP encoder on a GPU at all — and
- * this container has no device passed to it in any case. It is CPU work.
+ * MP4, not animated WebP: the reel needs a <video>. CPU only; no GPU in
+ * this container.
  */
 
 import { mkdir, readdir, rename, stat, unlink } from 'node:fs/promises';
@@ -45,12 +27,8 @@ const CRF = 23;
 const PRESET = 'slow';
 
 /*
- * How much of the scene a clip covers.
- *
- * A marker with only an entry point is a moment someone dropped a pin on, and
- * the interesting part is mostly after it — so the clip opens a little before
- * and runs well past. A marker with an in and an out is already a decided
- * span, so it only gets a breath either side.
+ * How much of the scene a clip covers: a point marker gets a little before
+ * and more after; a span gets a breath either side.
  */
 const LEAD_IN = 5;
 const RUN_ON = 35;
@@ -66,11 +44,8 @@ export function windowFor(marker) {
   }
 
   /*
-   * The span is the marker's own point either side, and the length is measured
-   * from wherever the clip actually starts — a marker four seconds into a
-   * scene cannot have five seconds of lead-in, and computing the length from
-   * the nominal window rather than the real one made those clips longer than
-   * asked for instead of shorter.
+   * Length is measured from where the clip actually starts (near the start
+   * of a scene there's less lead-in).
    */
   const from = Math.max(0, at - LEAD_IN);
   return { from, length: at + RUN_ON - from };
@@ -99,11 +74,7 @@ export async function held() {
   }
 }
 
-/*
- * Clips whose marker has gone. Called when a scene is deleted: the markers go
- * with it, so nothing else knows these files exist. Missing is success — the
- * clip may never have been rendered.
- */
+/* Delete clips whose markers are gone (on scene delete). Missing is fine. */
 export async function remove(markerIds) {
   let gone = 0;
 
@@ -133,11 +104,7 @@ function run(args) {
   });
 }
 
-/*
- * One clip. Written to a temporary name and moved into place only once ffmpeg
- * has exited happily, so a killed pass never leaves a half-written file that
- * later looks like a finished one.
- */
+/* One clip, written to a temp name and moved into place on success. */
 export async function render(marker) {
   const path = marker.scene?.files?.[0]?.path;
   if (!path) throw new Error(`marker ${marker.id} has no file`);
@@ -152,10 +119,8 @@ export async function render(marker) {
     '-nostdin',
     '-y',
     /*
-     * Said out loud, because the output is written to a .part name and ffmpeg
-     * picks its muxer off the extension. Without this every render died on
-     * "Error opening output file ... Invalid argument", which reads like a
-     * permissions problem and is not one.
+     * Force the muxer: the output is a .part file, and without `-f mp4` ffmpeg
+     * fails with "Invalid argument".
      */
     // Before -i, so ffmpeg seeks to the point rather than decoding up to it.
     '-ss', String(from),
@@ -170,10 +135,8 @@ export async function render(marker) {
     '-b:a', '128k',
     '-movflags', '+faststart',
     /*
-     * Said out loud, because the output is written to a .part name and ffmpeg
-     * picks its muxer off the extension. Without this every render died on
-     * "Error opening output file ... Invalid argument", which reads like a
-     * permissions problem and is not one.
+     * Force the muxer: the output is a .part file, and without `-f mp4` ffmpeg
+     * fails with "Invalid argument".
      */
     '-f', 'mp4',
     working,
@@ -201,11 +164,7 @@ let progress = { done: 0, total: 0, failed: 0, at: 0 };
 export const busy = () => Boolean(running);
 export const status = () => ({ ...progress, running: busy() });
 
-/*
- * Every marker that has no clip yet. One at a time: this is x264 at preset
- * slow and it will take every core it is given, so running several at once
- * only makes each of them slower and the machine unusable.
- */
+/* Every marker without a clip, one at a time (x264 uses every core). */
 async function pass(config, { force = false } = {}) {
   const list = await markers(config);
   progress = { done: 0, total: list.length, failed: 0, at: Date.now() };

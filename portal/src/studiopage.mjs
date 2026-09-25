@@ -1,16 +1,7 @@
 /*
- * The studio page — the one screen where the two halves of the portal meet.
- *
- * Stash answers the left-hand question: what do I hold from this studio, and
- * who is in it. StashDB answers the right-hand one: what exists at all. They
- * are joined by the studio's stash id and by nothing else, so a studio Stash
- * never identified against StashDB still gets its library half and says plainly
- * why the other half is missing.
- *
- * The percentage is not invented here. It is the tracked coverage the Acquire
- * page shows, read for one studio — measured against StashDB, counted in Stash.
- * Tracking is what turns it on, because a catalogue read per studio on every
- * page load is not a page load. See discover.mjs.
+ * The studio page: Stash says what you hold and who's in it; StashDB says
+ * what exists. Joined on the stash id. The percentage is tracked coverage
+ * for this studio; tracking turns it on. See discover.mjs.
  */
 
 import * as shelf from './stashlib.mjs';
@@ -58,11 +49,7 @@ export async function studioPage(config, id, { page = 1, performer = null, only 
   };
 }
 
-/*
- * Tracked, and how far along. ensureCoverage returns what it has and measures
- * in the background, so a studio tracked a second ago comes back pending rather
- * than blocking the page on a catalogue read.
- */
+/* Tracked coverage. Returns what it has and measures in the background. */
 async function coverageFor(config, stashdbId) {
   const snapshot = await discover.ensureCoverage(config).catch(() => ({ rows: [] }));
   return snapshot.rows.find((row) => row.kind === 'studio' && row.id === stashdbId) || null;

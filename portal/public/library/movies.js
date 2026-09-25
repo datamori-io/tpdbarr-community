@@ -1,7 +1,6 @@
 /*
- * The film wall and everything behind it: the features on the share, and the
- * two editors. A group's own page plays it as one film and lives next door,
- * in group.js.
+ * The film wall, features on the share, and the two editors. A group's own
+ * page is in group.js.
  */
 
 import { api, el, gigabytes } from '../util.js';
@@ -11,17 +10,9 @@ import { shelfPage } from './tiles.js';
 import { blurb } from '../catalogue.js';
 
 /*
- * Filling a group in.
- *
- * Three steps, in the order the uncertainty falls away: pick an address, let
- * Stash read it, then choose what of that to keep. They are separate on purpose
- * — a title match is a guess, a scrape of the wrong cut of a film looks right
- * until you see the cover, and this library has five groups sharing one name.
- * Nothing is written until the last button.
- *
- * The reading is done by Stash, not by this portal, and that is the whole
- * trick: data18 puts a captcha in front of a plain fetch and Adult Empire an
- * age wall, and Stash's own scrapers walk through both.
+ * Fill a group in: pick a URL, let Stash read it, choose what to keep.
+ * Nothing is written until the last button. Stash's scrapers get past
+ * data18's captcha and Adult Empire's age wall.
  */
 async function editGroup(group, onChanged) {
   const dialog = el('dialog', { className: 'galleryedit groupedit' });
@@ -69,11 +60,7 @@ async function editGroup(group, onChanged) {
     );
   };
 
-  /*
-   * The finding pass is slow — it obeys a thirty-second crawl delay — so the
-   * dialog draws whatever has been reached rather than waiting on it, and says
-   * where the pass has got to when this group is not among them yet.
-   */
+  /* The URL-finding pass is slow (30s crawl delay); show what it has so far. */
   api('/api/library/groups/urls')
     .then((data) => {
       const found = data.candidates?.[group.id] || null;
@@ -117,11 +104,7 @@ async function editGroup(group, onChanged) {
       const on = el('input', { type: 'checkbox', checked: true });
       let caveat = null;
 
-      /*
-       * Stash wants a studio id and the scraper only knows a name, so this row
-       * is shown to be read and never sent. Better than hiding it: "Pure Taboo"
-       * is often the thing that tells you the scrape found the right film.
-       */
+      /* Studio is shown but never sent (name, not id). */
       if (key === 'studio') {
         on.disabled = true;
         on.checked = false;
@@ -130,11 +113,7 @@ async function editGroup(group, onChanged) {
         ticks.set(key, on);
       }
 
-      /*
-       * The older catalogue entries print a bare year. Stash wants a full date
-       * and nothing here can honestly supply the rest of one, so the row comes
-       * unticked and says why rather than failing on save.
-       */
+      /* A bare year comes unticked, with the reason. */
       // Stash takes a bare year and stores it verbatim — checked against a real
       // write — so a year is offered like any other value, just labelled.
       if (key === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
@@ -185,14 +164,11 @@ async function editGroup(group, onChanged) {
     if (!scraped) return;
 
     /*
-     * A real modal, in front of the only thing here that writes to Stash.
+     * A real confirm() in front of the only write to Stash here.
      *
-     * On 2026-08-31 a group was written to during testing without the Save
-     * button being clicked, and the cause was never found: scrapeGroupURL takes
-     * no group id and cannot do it, /apply has exactly one caller, and every
-     * button is type="button". Until that is explained, the write goes behind
-     * something a stray programmatic click cannot satisfy — confirm() needs a
-     * person. Remove this only once the mechanism is understood.
+     * On 2026-08-31 a group was written without Save being clicked, cause
+     * unknown. Until that's explained, the write needs a person. Remove this
+     * only once the mechanism is understood.
      */
     if (!window.confirm(`Write these details onto "${group.name}" in Stash?`)) return;
 
@@ -242,10 +218,8 @@ async function editGroup(group, onChanged) {
 }
 
 /*
- * Adult Empire's store and data18's `empirestores` mirror are the same shop at
- * two addresses, and Stash has a scraper for one of them. So a group already
- * pointing at the mirror is one string replacement away from being scrapeable —
- * offered as a suggestion rather than rewritten underneath you.
+ * Suggest Adult Empire's address for a data18 `empirestores` mirror URL
+ * (Stash scrapes the former).
  */
 function rewritten(urls) {
   return (urls || [])
@@ -253,17 +227,9 @@ function rewritten(urls) {
     .map((u) => u.replace(/^https?:\/\/data18\.empirestores\.co/i, 'https://www.adultempire.com'));
 }
 
-/*
- * One film. Same furniture as the scene page — a player at the top and the
- * facts under it — but everything comes off the mount, so there is no resume
- * position and no organised flag: Stash is not involved and has nothing to
- * remember on this one's behalf.
- */
+/* One film off the mount: player and facts. No Stash, so no organised flag. */
 function renderMovie(movie) {
-  /*
-   * Fanart for the still, not the poster: the poster is portrait and a 2:3
-   * image letterboxed into a 16:9 stage looks like a mistake.
-   */
+  /* Fanart for the still; the poster is portrait. */
   const still = movie.fanart
     ? `/media/moviefile/${movie.id}/fanart`
     : movie.hasPoster ? `/media/moviefile/${movie.id}/poster` : null;
@@ -277,12 +243,7 @@ function renderMovie(movie) {
     ...(still ? { poster: still } : {}),
   });
 
-  /*
-   * Resume, the same contract as the scene player — except there is no Stash
-   * behind this one, so the position goes to a small store beside the config
-   * instead. Picking up mid-film matters more here than on a scene: nobody
-   * watches two and a half hours in one sitting.
-   */
+  /* Resume position, stored beside the config. */
   video.addEventListener('loadedmetadata', () => {
     const duration = video.duration || movie.duration || 0;
     const finished = duration && movie.resume > duration - 60;
@@ -326,11 +287,7 @@ function renderMovie(movie) {
     video.removeAttribute('src');
   });
 
-  /*
-   * Containers are not the useful test — this library is mostly hevc in .mkv
-   * and it plays here. What matters is whether *this* browser managed it, so
-   * the warning waits to be earned rather than being guessed up front.
-   */
+  /* Show the warning only if this browser actually fails to play it. */
   const cannotPlay = el('p', { className: 'note', hidden: true },
     'Your browser could not decode this file. Open it in another player.');
   video.addEventListener('error', () => { cannotPlay.hidden = false; });
@@ -346,9 +303,7 @@ function renderMovie(movie) {
   ].filter(Boolean);
 
   return [
-    // No sprite sheet on this side: the film comes off the mount rather than
-    // out of Stash, so there is nothing to have generated one. The bar is the
-    // same otherwise — the thumbnails are the part that goes missing.
+    // No sprite sheet for films off the mount.
     el('div', { className: 'stage' }, withControls(video, { duration: movie.duration || 0 })),
     el('div', { className: 'scenepage' },
       el('h1', {}, movie.title),
@@ -373,13 +328,11 @@ function renderMovie(movie) {
   ];
 }
 
-/* ------------------------------------------------------------- gap-filler
+/*
+ * ------------------------------------------------------------- gap-filler
  *
- * The one place the portal offers to write to the share. It is a panel and not
- * a button because the choice is the point: matching is on a title someone
- * typed into a folder name, so the candidates get shown with their posters and
- * a person decides. Nothing is written until one is picked, and an existing
- * file is never replaced.
+ * Write .nfo and artwork to the share for an unmatched film, after a person
+ * picks a candidate. Never replaces a file.
  */
 
 function gapPanel(movie) {
@@ -392,11 +345,7 @@ function gapPanel(movie) {
   const find = el('button', { className: 'act', type: 'button' }, 'Find metadata');
   const row = el('div', { className: 'sceneactions' }, find);
 
-  /*
-   * The default follows the hierarchy — ThePornDB, then TMDB, then the IMDB id
-   * out of the .nfo. These force one source instead, because a source that
-   * answered is not necessarily the source that was right.
-   */
+  /* Force one source (the default is TPDB, TMDB, then IMDB via the .nfo). */
   const search = async (only, button) => {
     for (const b of row.querySelectorAll('button')) b.disabled = true;
     const was = button.textContent;
@@ -449,10 +398,8 @@ function gapPanel(movie) {
 
 function candidateCard(movie, candidate, status) {
   /*
-   * Through the portal, not straight from the studio's host: these posters sit
-   * behind members areas and hotlink checks, and half of them would be broken
-   * images otherwise. If one still fails, fall back to the backdrop and then to
-   * a placeholder rather than leaving a blank frame.
+   * Posters via the portal proxy (hotlink protection); fall back to the
+   * backdrop, then a placeholder.
    */
   const proxied = (u) => `/media/candidate?url=${encodeURIComponent(u)}`;
   const first = candidate.poster || candidate.background;
@@ -527,21 +474,11 @@ export async function showMovie(movieId) {
   }
 }
 
-/* ============================================================ the film wall
+/*
+ * ============================================================ the film wall
  *
- * One shelf for both kinds of film. A group is a release made of several scene
- * files; a feature is one long file that is the whole release. They are
- * different objects in Stash and the same thing to a person browsing, so they
- * share a card and the card says which it is.
- *
- * Always portrait. Group box art and the posters now sitting on the features
- * are both 2:3, and a poster wall is what a film library looks like — the 16:9
- * still belongs on the Scenes shelf, where the subject is a moment rather than
- * a release.
- *
- * Everything filters in the browser. The whole shelf arrives in one response,
- * so narrowing by tag or performer is instant and costs no round trip; see
- * films.mjs for why that ceiling is deliberate.
+ * Groups and features on one poster wall (2:3), marked by kind. Filtered in
+ * the browser; see films.mjs.
  */
 
 const KIND_ICON = { group: '⛓', film: '▤' };
@@ -561,11 +498,7 @@ function filmCard(film, onChanged) {
     el('img', { src: film.cover, loading: 'lazy', alt: '' })
   );
 
-  /*
-   * Top left, as asked. It is the one thing about a card you cannot work out by
-   * looking at the picture, and it says what you are about to get — a group is
-   * several files played through as one film, a feature is the one file.
-   */
+  /* The kind icon, top left. */
   art.append(el('span', {
     className: 'kindmark ' + film.kind,
     title: KIND_WORD[film.kind] + (film.kind === 'group' ? ` (${film.sceneCount})` : ''),
@@ -586,9 +519,7 @@ function filmCard(film, onChanged) {
         filmRuntime(film.duration),
         film.kind === 'group' ? `${film.sceneCount} scenes` : film.resolution,
       ].filter(Boolean).join(' · ')),
-      // What it is about — a group's synopsis, a feature's scene details. Cut
-      // by the same rule as the scene tile, and to the same length: these
-      // posters sit in the same size grid.
+      // The blurb, cut like the scene tile's.
       about ? el('div', { className: 'facetdesc' }, about) : null
     )
   );
@@ -596,11 +527,7 @@ function filmCard(film, onChanged) {
   node.onclick = () => { location.hash = film.href; };
   node.dataset.name = String(film.title).toLowerCase();
 
-  /*
-   * Both, because both are asked for and they are not the same gesture: the
-   * pencil is for when you have stopped to look at one film, the row underneath
-   * is for working along a shelf doing the same thing to several.
-   */
+  /* Pencil on the card, plus the row underneath for working along a shelf. */
   const edit = el('button', { className: 'facetedit', type: 'button', title: 'Edit this film' }, '✎');
   edit.onclick = (event) => { event.stopPropagation(); editFilm(film, onChanged); };
   art.append(edit);
@@ -621,20 +548,10 @@ function filmCard(film, onChanged) {
   return node;
 }
 
-/* ------------------------------------------------------------ the filters
+/*
+ * ------------------------------------------------------------ the filters
  *
- * The shelf's bar, not one of its own. Movies used to carry an older,
- * film-shaped copy of the same idea — a search, five dropdowns, a sort and a
- * Clear — written before the shelves shared one, and the two had already
- * drifted: its dropdowns counted the whole wall rather than what the other
- * filters left, its state was a module variable rather than the address, and
- * it had no Random. So this is the same furniture the Scenes shelf and a
- * category wear, asked of films.
- *
- * Narrowed by name rather than by Stash id, because that is what a dropdown
- * built out of what is in front of it can count. Two studios sharing a name
- * would fold together, which has never happened here and reads better than an
- * id ever did.
+ * The shelves' shared filter bar. Filtered by name, not id.
  */
 
 const FILM_FACETS = [
@@ -690,12 +607,7 @@ export async function showMovies(query = '') {
 const filtersNow = () => location.hash.split('?')[1] || '';
 
 function drawFilms(mine, data, query) {
-  /*
-   * After a delete or a new cover the shelf is re-read and the page rebuilt
-   * rather than patched: a cover change alters a URL the browser has already
-   * cached, the counts move when something goes, and the bar is built from the
-   * films it is offering.
-   */
+  /* Re-read and rebuild after a delete or cover change. */
   const reload = async () => {
     const fresh = await api('/api/library/films');
     if (!holds(mine)) return;
@@ -717,10 +629,10 @@ function drawFilms(mine, data, query) {
   }));
 }
 
-/* --------------------------------------------------------- editing one film
+/*
+ * --------------------------------------------------------- editing one film
  *
- * Delete and cover live here. Both write, so both sit behind the same native
- * confirm the group dialog uses — see editGroup for why that guard exists.
+ * Delete and cover, behind the same confirm() as the group dialog.
  */
 async function editFilm(film, onChanged, focus = null) {
   const dialog = el('dialog', { className: 'galleryedit filmedit' });
@@ -774,15 +686,10 @@ async function editFilm(film, onChanged, focus = null) {
     } catch (err) { note.textContent = err.message; }
   };
 
-  /* ------------------------------------------------------------- rescanning
+  /*
+   * ------------------------------------------------------------- rescanning
    *
-   * Stash's scrapers rather than TMDB, which barely knows this catalogue. The
-   * film scrapers describe a *release*, which is right for both kinds — a
-   * single-file feature is a release that happens to be one file, so the same
-   * record maps onto it.
-   *
-   * Same three steps as the group dialog and for the same reason: find an
-   * address, let Stash read it, then choose what of it to keep. Nothing is
+   * Stash's group scrapers, three steps as in the group dialog. Nothing
    * written before the last button.
    */
   const urlBox = el('input', {

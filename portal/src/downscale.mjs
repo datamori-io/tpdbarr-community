@@ -1,52 +1,13 @@
 /*
- * Making a file smaller, on purpose.
+ * Re-encode a filed scene smaller and replace the original.
  *
- * Most of this library is 1080p and a fifth of the bulk is 4K — 446 scenes and
- * 1.6TB of it, against 172 scenes at 480p that come to forty gigabytes between
- * them. Some of those big files are things worth keeping and not things worth
- * keeping at that size, and there was no way to say so short of re-encoding
- * them by hand and re-importing.
+ * Refuses:
+ *   - anything outside /organized_scenes (the only rw mount)
+ *   - anything not .mp4 (the output is mp4, and a new path would unlink Stash)
+ *   - anything already at or below the target height
  *
- * So: a button per scene, and what it does is exactly what it says. It
- * re-encodes the file at the height you asked for, checks the result, and then
- * **replaces the original** — which is the point, because a copy alongside
- * reclaims nothing. Everything below exists to make that last step safe enough
- * to do on a press.
- *
- * **Why the portal and not FileFlows.** FileFlows is the encoder in this
- * pipeline and it owns what happens to a file on the way in. This is a
- * different moment — a file that arrived, was filed, was watched, and is now
- * being cut down on a judgement made while looking at it — and routing that
- * back through the thing that files new arrivals would mean a flow, a watched
- * folder, and a round trip out of the library and back into it. One button and
- * one ffmpeg is the smaller arrangement.
- *
- * **What it will not touch**, each for its own reason:
- *
- *   - anything outside /organized_scenes. That folder is the filed library and
- *     the only one this container can write to. Everything else — the import
- *     folder, either Whisparr's, the PC import share — is somebody else's and
- *     is mounted read-only.
- *   - anything that is not .mp4. The output is mp4, and replacing a .mkv with
- *     mp4 bytes under the same name would leave a file lying about what it is;
- *     writing it beside instead would change the path, and a changed path is a
- *     scene Stash has to be re-tied to by hand.
- *   - anything already at or below the height asked for. There is nothing to
- *     win and an encode always loses a little.
- *
- * **The house format is H.264 at 720p**, changed on 2026-09-18 from HEVC for
- * ease rather than for size: h264 plays on everything without a codec argument,
- * and the hvc1/hev1 tagging trap that once made the whole library unplayable on
- * the phone simply does not exist here. The file is bigger for the same picture
- * and that is the trade being made on purpose.
- *
- * Still faststart, so it begins without reading to the end of the file first,
- * and still yuv420p at High profile — the combination every player in the house
- * agrees about.
- *
- * **This changes what the button makes, and nothing else.** FileFlows is still
- * the encoder for arrivals and still writes HEVC; a library-wide conversion is
- * its job and not this button's.
+ * Output is H.264 High, yuv420p, faststart — plays everywhere. FileFlows
+ * still encodes arrivals as HEVC; this button doesn't change that.
  */
 
 import { spawn } from 'node:child_process';
@@ -60,19 +21,8 @@ import { gql } from './stash.mjs';
 export const SIZES = [480, 720, 1080];
 
 /*
- * Quality first, with a ceiling.
- *
- * The house figures are bitrates — 5.0-7.5 Mbps at 720p, 2.5-3.5 at 480p — but
- * encoding *to* a bitrate spends the whole budget on every scene, including the
- * still ones that did not need it, and runs out on the ones that did. CRF
- * spends what the picture actually costs. So the quality number leads and the
- * top of the house range is a cap: a busy scene is allowed up to it, a quiet
- * one comes in well under, and nothing goes over.
- *
- * The CRF values are chosen to land inside that range on this library's
- * material. x264's scale is not linear in the way people expect — the same CRF
- * looks worse the smaller the picture gets, because there are fewer pixels to
- * hide the loss in — so the smaller target gets the tighter number.
+ * CRF with a maxrate ceiling (5.0-7.5 Mbps at 720p, 2.5-3.5 at 480p), so
+ * quiet scenes come in under. Smaller targets get a tighter CRF.
  */
 // 1080's ceiling is FileFlows' own (MaxBitrate 10000 in "H264 Encoding
 // (Fast)"), and its level is 4.2 because 4.0 stops at 1080p30.
@@ -87,9 +37,7 @@ const qualityFor = (height) => QUALITY[height] || QUALITY[480];
 // The only folder this can write to, and the only one it should.
 const FILED = '/organized_scenes/';
 
-// How far the new file's duration may drift from the old one before the
-// replacement is refused. A re-encode is frame-accurate; a second of slack is
-// for a container rounding the last frame, not for a truncated file.
+// Allowed duration drift, in seconds.
 const DRIFT = 1;
 
 /* -------------------------------------------------------------- the state */
@@ -132,11 +80,8 @@ async function fileOf(config, sceneId) {
 }
 
 /*
- * -> what a downscale of this scene would mean, or why it cannot happen.
- *
- * Asked by the page before it draws the buttons, so a scene that cannot be
- * shrunk says so in a sentence rather than offering a control that fails when
- * it is pressed.
+ * -> what a downscale would mean, or why it can't happen. Asked before
+ * drawing the buttons.
  */
 export async function plan(config, sceneId) {
   const { file } = await fileOf(config, sceneId);
@@ -184,14 +129,7 @@ const ffprobe = (path, fields) => new Promise((done, fail) => {
   });
 });
 
-/*
- * The encode itself, reporting as it goes.
- *
- * `-progress pipe:1` is ffmpeg saying where it has got to in the *source*
- * timeline, which against a duration we already know is the only honest
- * percentage available — counting written bytes would say nothing, since the
- * output size is what is being decided.
- */
+/* The encode. Progress comes from `-progress pipe:1` against the known duration. */
 function encode(from, to, height, duration) {
   return new Promise((done, fail) => {
     const child = spawn('ffmpeg', [
@@ -207,27 +145,16 @@ function encode(from, to, height, duration) {
       '-preset', 'medium',
       '-crf', String(qualityFor(height).crf),
 
-      /*
-       * The ceiling, not the target. `maxrate` alone does nothing — x264 needs
-       * a buffer to rate-control against — so bufsize goes with it, at twice
-       * the rate, which is the usual two-second window.
-       */
+      /* maxrate needs a bufsize; twice the rate. */
       '-maxrate', qualityFor(height).maxrate,
       '-bufsize', qualityFor(height).bufsize,
 
-      /*
-       * What everything in the house agrees about. High profile is the ordinary
-       * choice at this resolution, and yuv420p is stated rather than inherited
-       * because a 10-bit or 4:2:2 source would otherwise produce a file that
-       * only this machine can play.
-       */
+      /* High profile, yuv420p stated so 10-bit or 4:2:2 sources stay playable. */
       '-profile:v', 'high',
       '-level', qualityFor(height).level,
       '-pix_fmt', 'yuv420p',
 
-      // Re-encoded rather than copied: the source may be anything, and 128k
-      // stereo aac is both universally playable and small enough not to matter
-      // beside the picture.
+      // Audio re-encoded to 128k stereo AAC.
       '-c:a', 'aac',
       '-b:a', '128k',
       '-ac', '2',
@@ -257,12 +184,8 @@ function encode(from, to, height, duration) {
 }
 
 /*
- * Everything that has to be true before the original is allowed to go.
- *
- * This is the whole safety of the feature. A re-encode that produced a
- * truncated file, or a file that is somehow bigger, or one that is not the
- * height that was asked for, is a re-encode that gets thrown away — and the
- * original is untouched because nothing has been done to it yet.
+ * Checks before the original goes: right height, same duration, smaller.
+ * Otherwise the new file is discarded.
  */
 async function vet(from, to, height, duration) {
   const made = await stat(to).catch(() => null);
@@ -286,14 +209,7 @@ async function vet(from, to, height, duration) {
   return { was: before.size, now: made.size };
 }
 
-/*
- * Tell Stash the file changed.
- *
- * The path is the same, so this is not an import — it is Stash re-reading a
- * file it already has a record of, and picking up the new size, height and
- * hash. Without it every page in here would go on quoting 4K and 3.6GB about
- * a file that is neither.
- */
+/* Rescan the same path so Stash picks up the new size, height and hash. */
 async function rescan(config, path) {
   await gql(
     config,
@@ -344,12 +260,7 @@ async function work(config, sceneId, height) {
   }
 }
 
-/*
- * One at a time, and the same reasoning as the sprite strips and the marker
- * clips: this is a full decode and encode, it will take every core it is
- * given, and two at once only makes both slower and the machine unusable while
- * you are trying to watch something.
- */
+/* One at a time: it uses every core. */
 export function start(config, sceneId, height) {
   if (running) throw refuse(`Already re-encoding scene ${job.sceneId}. One at a time — it takes every core it can get.`);
   if (!SIZES.includes(Number(height))) throw refuse('That is not a size this offers.');

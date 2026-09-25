@@ -1,15 +1,6 @@
 /*
- * Manage (was Settings) — the strip its pages wear, and the one form they share.
- *
- * Everything under #/parameters was a single scroll: connections, the catch-up
- * runner and the feed's defaults stacked in one column, with the gallery
- * builder and the category maker living on the pages they made things for. A
- * page you scroll past to reach the thing you came for is a page you stop
- * reading, so this is the same split the library already uses — a thin strip
- * of sections and one question per page.
- *
- * Nothing here imports from a sibling. Same rule as the other two halves: a
- * page needing something from another page means it belongs in this file.
+ * Manage (was Settings): the section strip and the shared form. No sibling
+ * imports.
  */
 
 import { el } from '../util.js';
@@ -24,11 +15,7 @@ const SECTIONS = [
   ['#/parameters/stash', 'Stash'],
 ];
 
-/*
- * Which strip entry lights is worked out from the page's own address rather
- * than passed in, for the same reason the acquisition side does it: a page
- * that can name its own section is a page that can name the wrong one.
- */
+/* The lit entry comes from the address. */
 function sections(active) {
   return el('nav', { className: 'sections' },
     SECTIONS.map(([href, label]) =>
