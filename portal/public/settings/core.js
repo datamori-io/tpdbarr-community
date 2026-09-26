@@ -12,11 +12,11 @@ const SECTIONS = [
   ['#/parameters/galleries', 'Galleries'],
   ['#/parameters/catalog', 'Catalog'],
   ['#/parameters/sending', 'Sending'],
-  ['#/parameters/stash', 'Stash'],
 ];
 
-/* The lit entry comes from the address. */
+/* The lit entry comes from the address. Stash is its own Manage item: no strip. */
 function sections(active) {
+  if (!SECTIONS.some(([href]) => href === active)) return null;
   return el('nav', { className: 'sections' },
     SECTIONS.map(([href, label]) =>
       el('a', { className: 'section' + (href === active ? ' on' : ''), href }, label))

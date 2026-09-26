@@ -201,6 +201,7 @@ function navFor(hash) {
   if (/^#\/library\/performers?(\/|$)/.test(at)) return 'nav-performers';
   if (/^#\/library\/studios?(\/|$)/.test(at)) return 'nav-studios';
   if (at.startsWith('#/stats')) return 'nav-stats';
+  if (at === '#/parameters/stash') return 'nav-stash';
   if (at.startsWith('#/parameters')) return 'nav-settings';
   if (at.startsWith('#/catalogue')) return 'nav-catalogue';
   if (at.startsWith('#/import')) return 'nav-import';

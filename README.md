@@ -36,7 +36,7 @@ Open it from **Feed** in the top bar, or `#/binge`.
 
 ## What's in it
 
-Two tabs: **Library**, and **Manage**, a menu holding **Performers**, **Studios**, **Stats**, **Find**, **Catalogue** and **Settings**.
+Two tabs: **Library**, and **Manage**, a menu holding **Performers**, **Studios**, **Stats**, **Find**, **Catalogue**, **Stash** and **Settings**.
 Pictures in the screenshots are blurred on purpose.
 
 ### Library — browsing what you have
