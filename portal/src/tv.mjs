@@ -12,6 +12,8 @@
 import { shelf } from './stashlib.mjs';
 import { heldIds, index as categoryIndex } from './categories.mjs';
 import { shuffled } from './shuffle.mjs';
+import { gql } from './stash.mjs';
+import { ordered } from '../public/partorder.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const FILED = '/organized_scenes/';
@@ -33,6 +35,31 @@ async function films(config) {
   return (await shelf(config)).scenes.filter((s) => playable(s, FILMS));
 }
 
+/*
+ * Stash groups (films cut into scene files) with their playable parts in
+ * play order (partorder.js). Only groups with two or more parts.
+ */
+const GROUP_TTL = 5 * 60 * 1000;
+let groupCache = null;
+async function groups(config) {
+  if (groupCache && Date.now() - groupCache.at < GROUP_TTL) return groupCache.list;
+  const [data, { scenes }] = await Promise.all([
+    gql(config, '{ findGroups(filter: {per_page: -1}) { groups { id name scenes { id } } } }'),
+    shelf(config),
+  ]);
+  const byId = new Map(scenes.filter((s) => playable(s, FILED) || playable(s, FILMS)).map((s) => [String(s.id), s]));
+  const list = (data.findGroups.groups || [])
+    .map((g) => ({
+      id: String(g.id),
+      name: g.name,
+      parts: ordered((g.scenes || []).map((s) => byId.get(String(s.id))).filter(Boolean), g.name),
+    }))
+    .filter((g) => g.parts.length >= 2)
+    .sort((a, b) => Number(a.id) - Number(b.id));
+  groupCache = { list, at: Date.now() };
+  return list;
+}
+
 const counted = (scenes, keysOf, min = MIN_SCENES) => {
   const tally = new Map();
   for (const scene of scenes) {
@@ -49,9 +76,10 @@ const counted = (scenes, keysOf, min = MIN_SCENES) => {
 
 /* Every channel worth offering: Random, Movies, then categories, studios, performers, tags. */
 export async function channels(config) {
-  const [scenes, movies, cats] = await Promise.all([
+  const [scenes, movies, parted, cats] = await Promise.all([
     filed(config),
     films(config),
+    groups(config).catch(() => []),
     categoryIndex(config).catch(() => ({ categories: [] })),
   ]);
   const ids = new Set(scenes.map((s) => String(s.id)));
@@ -66,6 +94,7 @@ export async function channels(config) {
   return {
     random: { key: 'random', label: 'Random', count: scenes.length },
     movies: { key: 'movies', label: 'Movies', count: movies.length },
+    groups: { key: 'groups', label: 'Groups', count: parted.length },
     categories,
     studios: counted(scenes, (s) => (s.studio ? [[`studio:${s.studio.id}`, s.studio.name]] : [])),
     performers: counted(scenes, (s) => s.performers.map((p) => [`performer:${p.id}`, p.name])),
@@ -110,6 +139,7 @@ async function members(config, key) {
  * server clock, so the page can correct for its own.
  */
 export async function lineup(config, key) {
+  if (key === 'groups') return groupLineup(config);
   const found = await members(config, key);
   if (!found) {
     const err = new Error('No such channel.');
@@ -124,20 +154,39 @@ export async function lineup(config, key) {
     `${key}:${day}`
   );
 
+  return shaped(key, found.label, now, order.map((scene) => brief(scene)));
+}
+
+const brief = (s, group = null) => ({
+  id: s.id,
+  title: s.title,
+  date: s.date || null,
+  studio: s.studio?.name || null,
+  performers: s.performers.map((p) => p.name),
+  duration: s.duration,
+  group,
+});
+
+// The lineup as the page reads it; `scenes` are already brief().
+function shaped(key, label, now, scenes) {
+  const day = Math.floor(now / DAY);
   return {
     key,
-    label: found.label,
+    label,
     day,
     epoch: day * DAY,
     now,
-    total: order.reduce((sum, s) => sum + s.duration, 0),
-    scenes: order.map((s) => ({
-      id: s.id,
-      title: s.title,
-      date: s.date || null,
-      studio: s.studio?.name || null,
-      performers: s.performers.map((p) => p.name),
-      duration: s.duration,
-    })),
+    total: scenes.reduce((sum, s) => sum + s.duration, 0),
+    scenes,
   };
+}
+
+/* Groups, shuffled for the day; each plays its parts in order. */
+async function groupLineup(config) {
+  const now = Date.now();
+  const day = Math.floor(now / DAY);
+  const order = shuffled(await groups(config), `groups:${day}`);
+  const items = order.flatMap((g) => g.parts.map((s, n) =>
+    brief(s, { id: g.id, name: g.name, part: n + 1, of: g.parts.length })));
+  return shaped('groups', 'Groups', now, items);
 }

@@ -3,7 +3,8 @@ import { claim, holds, loadingIn, onTeardown, shell } from './core.js';
 import { castStrip } from './scene.js';
 
 /*
- * TV: pick a channel and filed scenes (or films) play back to back, live.
+ * TV: pick a channel and filed scenes (or films, or groups part by part)
+ * play back to back, live.
  *
  * The server hands over the day's lineup and when it started (see tv.mjs);
  * what is on is worked out from the clock, so tuning in joins a scene
@@ -52,7 +53,7 @@ export async function showTv(query = '') {
     ['performers', 'Performers', list.performers],
     ['tags', 'Tags', list.tags],
   ].filter(([, , g]) => g.length);
-  const tops = [list.random, list.movies].filter((c) => c && c.count);
+  const tops = [list.random, list.movies, list.groups].filter((c) => c && c.count);
 
   // One flat order for channel up/down, in guide order.
   const order = [...tops, ...GROUPS.flatMap(([, , g]) => g)];
@@ -132,6 +133,10 @@ export async function showTv(query = '') {
     const head = (scene) => el('div', { className: 'tvinfohead' },
       el('div', { className: 'tvinfotext' },
         el('a', { className: 'tvinfotitle', href: `#/library/scene/${brief.id}` }, brief.title),
+        brief.group
+          ? el('a', { className: 'tvgroup', href: `#/library/group/${brief.group.id}` },
+              `${brief.group.name} · part ${brief.group.part} of ${brief.group.of}`)
+          : null,
         el('div', { className: 'muted' },
           [brief.studio, brief.date, clock(brief.duration)].filter(Boolean).join(' · '))),
       scene ? castStrip(scene.performers || []) : null
@@ -160,7 +165,8 @@ export async function showTv(query = '') {
         el('img', { src: `/media/scene/${scene.id}/thumb`, loading: 'lazy', alt: '' }),
         el('div', { className: 'tvnexttime' }, hhmm(starts)),
         el('div', { className: 'tvnexttitle' }, scene.title),
-        el('div', { className: 'muted small' }, scene.studio || ''));
+        el('div', { className: 'muted small' },
+          scene.group ? `${scene.group.name} · ${scene.group.part}/${scene.group.of}` : scene.studio || ''));
       card.onclick = () => jumpTo(n);
       cards.push(card);
       starts += scene.duration * 1000;
@@ -234,6 +240,7 @@ export async function showTv(query = '') {
   }
 
   // --------------------------------------------------------------- the guide
+  // Random, Movies and Groups on top; the rest by kind, with a filter.
 
   let group = store.get(LAST_GROUP);
   if (!GROUPS.some(([k]) => k === group)) group = GROUPS[0]?.[0];

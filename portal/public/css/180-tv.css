@@ -75,6 +75,7 @@
   align-items: start;
 }
 .tvinfotitle { display: block; font-size: 18px; font-weight: 600; color: var(--text); }
+.tvgroup { display: block; color: var(--accent-hi); font-size: 13px; margin: 2px 0; }
 .tvdetails {
   margin: 8px 0 0;
   color: var(--muted);

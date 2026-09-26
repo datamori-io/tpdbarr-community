@@ -128,9 +128,9 @@ this and offers one button to fix it.
 
 ### TV
 
-`#/library/tv`. Pick a channel from the guide — Random, Movies, or a
-category, studio, performer or tag — and filed scenes (or films) play back to
-back, live: each channel has a daily lineup, so tuning in joins part-way, and
+`#/library/tv`. Pick a channel from the guide — Random, Movies, Groups, or a
+category, studio, performer or tag — and filed scenes (or films, or a group's
+parts in order) play back to back, live: each channel has a daily lineup, so tuning in joins part-way, and
 every device shows the same thing. Under the player: what's on, with its cast,
 and the next five with their start times (tap one to jump to it). **Skip**
 (`→`) moves on a scene; **● Live** rejoins the schedule. `↑`/`↓` change
