@@ -263,11 +263,11 @@ const LIBRARY_SECTIONS = [
   ['#/library/categories', 'Categories'],
   ['#/library/movies', 'Movies'],
   ['#/library/galleries', 'Galleries'],
-  ['#/library/performers', 'Performers'],
-  ['#/library/studios', 'Studios'],
 ];
 
+// Performers and studios live under the Manage menu, so their pages get no strip.
 function sections(active) {
+  if (!LIBRARY_SECTIONS.some(([href]) => href === active)) return null;
   return el('nav', { className: 'sections' },
     LIBRARY_SECTIONS.map(([href, label]) =>
       el('a', { className: 'section' + (href === active ? ' on' : ''), href }, label))

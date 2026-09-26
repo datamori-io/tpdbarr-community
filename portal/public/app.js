@@ -198,6 +198,8 @@ document.getElementById('search-form').onsubmit = (e) => {
 function navFor(hash) {
   const at = String(hash || '').split('?')[0];
 
+  if (/^#\/library\/performers?(\/|$)/.test(at)) return 'nav-performers';
+  if (/^#\/library\/studios?(\/|$)/.test(at)) return 'nav-studios';
   if (at.startsWith('#/stats')) return 'nav-stats';
   if (at.startsWith('#/parameters')) return 'nav-settings';
   if (at.startsWith('#/catalogue')) return 'nav-catalogue';
