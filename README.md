@@ -36,7 +36,7 @@ Open it from **Feed** in the top bar, or `#/binge`.
 
 ## What's in it
 
-Five tabs: **Library**, **Stats**, **Find**, **Catalogue** and **Manage**.
+Two tabs: **Library**, and **Manage**, a menu holding **Stats**, **Find**, **Catalogue** and **Settings**.
 Pictures in the screenshots are blurred on purpose.
 
 ### Library — browsing what you have
@@ -96,7 +96,7 @@ Pictures in the screenshots are blurred on purpose.
   - *Sharpen strip* cuts a picture a second so the timeline is exact.
   - Works on a phone. Fetches markers from timestamp.trade and ThePornDB.
 
-### Manage — settings and long jobs
+### Settings — connections and long jobs
 
 ![Manage › Stash](docs/screenshots/manage-stash.jpg)
 

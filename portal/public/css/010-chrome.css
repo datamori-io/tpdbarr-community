@@ -105,6 +105,41 @@
 }
 .topnav a.on:hover { background: var(--panel-2); color: var(--accent-hi); }
 
+/* Manage: a click-open menu holding Stats, Find, Catalogue and Settings. */
+.navmenu { position: relative; }
+.navmenu > summary {
+  list-style: none;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.navmenu > summary::-webkit-details-marker { display: none; }
+.navmenu > summary::after { content: ' ▾'; font-size: 0.8em; }
+.navmenu > summary:hover, .navmenu[open] > summary {
+  background: var(--panel-2);
+  border-color: var(--accent-hi);
+  color: var(--text);
+}
+.navmenu.on > summary { color: var(--accent-hi); border-color: var(--accent-hi); }
+.navmenulist {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  display: grid;
+  gap: 2px;
+  min-width: 160px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.topnav .navmenulist a { display: block; white-space: nowrap; }
+
 .statusbar {
   display: flex;
   gap: 14px;

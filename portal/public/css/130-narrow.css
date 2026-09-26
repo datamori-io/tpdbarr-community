@@ -22,15 +22,11 @@
   .topnav {
     order: 2;
     gap: 2px;
-    /* Scrolls rather than wraps: a nav that reflows moves the thing you were
-       reaching for between one glance and the next. */
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    /* Two items now, so no scrolling — and a scroller would clip the menu. */
+    margin-left: auto;
   }
-  .topnav::-webkit-scrollbar { display: none; }
 
-  .topnav a, .topnav button {
+  .topnav a, .topnav button, .navmenu > summary {
     padding: 7px 9px;
     font-size: 13px;
     white-space: nowrap;

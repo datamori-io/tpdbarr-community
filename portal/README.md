@@ -23,7 +23,7 @@ cp .env.example .env    # then set your NAS, SMB login and host paths
 docker compose up -d
 ```
 
-Open <http://localhost:6980> and fill in Manage.
+Open <http://localhost:6980> and fill in Manage › Settings.
 
 Every host path comes from `.env`. Drop any mount for a feature you don't use.
 A Whisparr v2 service is included, commented out. No database, no npm
@@ -39,7 +39,7 @@ Everything is set in the UI and stored in `/config/config.json`, except:
 | `HOST` | `0.0.0.0` | bind address |
 | `CONFIG_DIR` | `/config` | where `config.json` lives |
 
-**Test connections** in Manage reports the Whisparr version (and warns if it
+**Test connections** in Manage › Settings reports the Whisparr version (and warns if it
 isn't v2), the Stash version, and whether Stash has a TPDB stash-box endpoint.
 
 The StashDB and ThePornDB tokens are read from Stash. None are stored here.
@@ -122,7 +122,7 @@ because Stash galleries have no group field.
   performer, or your own files or a zip. Choose, then write. Nothing downloads
   until you've chosen.
 
-**Setup:** Manage has two paths for the galleries folder — the portal's and
+**Setup:** Manage › Settings has two paths for the galleries folder — the portal's and
 Stash's. Stash's library path must not exclude images. The Galleries page checks
 this and offers one button to fix it.
 

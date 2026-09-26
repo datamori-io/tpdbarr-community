@@ -221,10 +221,24 @@ function markNav() {
     if (mine) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
+
+  // Manage lights when you're on any page inside it, and closes after a pick.
+  const menu = document.getElementById('nav-manage');
+  menu.classList.toggle('on', Boolean(menu.querySelector('a.on')));
+  menu.open = false;
 }
 
 window.addEventListener('hashchange', markNav);
 markNav();
+
+// Close the Manage menu on a click outside it or on Esc.
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('nav-manage');
+  if (menu.open && !menu.contains(e.target)) menu.open = false;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.getElementById('nav-manage').open = false;
+});
 
 window.addEventListener('hashchange', () => routeTo(location.hash));
 
