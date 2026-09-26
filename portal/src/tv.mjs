@@ -1,5 +1,6 @@
 /*
- * TV: channels that play filed scenes back to back, live.
+ * TV: channels that play filed scenes (or films, on the Movies channel)
+ * back to back, live.
  *
  * A channel's lineup is its scenes shuffled with a seed of the channel and
  * the day (UTC), starting at that day's midnight and looping. The page works
@@ -14,17 +15,22 @@ import { shuffled } from './shuffle.mjs';
 
 const DAY = 24 * 60 * 60 * 1000;
 const FILED = '/organized_scenes/';
+const FILMS = '/movies/';
 
 // A channel needs this many scenes to be offered in the picker; tags more,
 // since there are hundreds of them.
 const MIN_SCENES = 3;
 const MIN_TAG_SCENES = 10;
 
-const watchable = (scene) =>
-  String(scene.path || '').includes(FILED) && scene.duration > 0 && !scene.immersive;
+const playable = (scene, root) =>
+  String(scene.path || '').includes(root) && scene.duration > 0 && !scene.immersive;
 
 async function filed(config) {
-  return (await shelf(config)).scenes.filter(watchable);
+  return (await shelf(config)).scenes.filter((s) => playable(s, FILED));
+}
+
+async function films(config) {
+  return (await shelf(config)).scenes.filter((s) => playable(s, FILMS));
 }
 
 const counted = (scenes, keysOf, min = MIN_SCENES) => {
@@ -41,10 +47,11 @@ const counted = (scenes, keysOf, min = MIN_SCENES) => {
     .sort((a, b) => a.label.localeCompare(b.label));
 };
 
-/* Every channel worth offering: Random, then categories, studios, performers, tags. */
+/* Every channel worth offering: Random, Movies, then categories, studios, performers, tags. */
 export async function channels(config) {
-  const [scenes, cats] = await Promise.all([
+  const [scenes, movies, cats] = await Promise.all([
     filed(config),
+    films(config),
     categoryIndex(config).catch(() => ({ categories: [] })),
   ]);
   const ids = new Set(scenes.map((s) => String(s.id)));
@@ -58,6 +65,7 @@ export async function channels(config) {
 
   return {
     random: { key: 'random', label: 'Random', count: scenes.length },
+    movies: { key: 'movies', label: 'Movies', count: movies.length },
     categories,
     studios: counted(scenes, (s) => (s.studio ? [[`studio:${s.studio.id}`, s.studio.name]] : [])),
     performers: counted(scenes, (s) => s.performers.map((p) => [`performer:${p.id}`, p.name])),
@@ -72,6 +80,7 @@ async function members(config, key) {
   const value = rest.join(':');
 
   if (kind === 'random') return { label: 'Random', scenes };
+  if (kind === 'movies') return { label: 'Movies', scenes: await films(config) };
   if (kind === 'studio') {
     const list = scenes.filter((s) => String(s.studio?.id) === value);
     return { label: list[0]?.studio?.name || 'Studio', scenes: list };
@@ -125,6 +134,7 @@ export async function lineup(config, key) {
     scenes: order.map((s) => ({
       id: s.id,
       title: s.title,
+      date: s.date || null,
       studio: s.studio?.name || null,
       performers: s.performers.map((p) => p.name),
       duration: s.duration,

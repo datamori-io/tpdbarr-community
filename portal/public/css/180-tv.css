@@ -65,9 +65,61 @@
 
 .tvbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tvbar .spacer { flex: 1; }
-.tvpick { max-width: min(420px, 60vw); }
+.tvchanname { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* What is on: title and facts left, cast faces right (the scene page's cast strip). */
+.tvinfohead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 20px;
+  align-items: start;
+}
+.tvinfotitle { display: block; font-size: 18px; font-weight: 600; color: var(--text); }
+.tvdetails {
+  margin: 8px 0 0;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tv h3 { margin: 6px 0 8px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+/* Up next: five cards across; scrolls sideways on a phone. */
+.tvnextrow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+}
+.tvnextcard {
+  display: grid;
+  gap: 3px;
+  padding: 0 0 6px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.tvnextcard:hover { border-color: var(--accent-hi); }
+.tvnextcard img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--radius); background: var(--panel-2); }
+.tvnexttime { color: var(--accent-hi); font-size: 12px; font-weight: 600; padding: 0 4px; }
+.tvnexttitle, .tvnextcard .small { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The channel guide: Random and Movies, then a tab per kind with a filter. */
+.tvguidebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.tvfilter { flex: 1 1 200px; max-width: 320px; }
+.tvchips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 280px; overflow-y: auto; }
+.tvtop { max-height: none; }
+.tvchip.on { color: var(--accent-hi); border-color: var(--accent-hi); }
 
 @media (max-width: 620px) {
   .tvstage { max-height: none; }
   .tvnow { font-size: 15px; }
+  .tvinfohead { grid-template-columns: 1fr; }
+  .tvnextrow { grid-template-columns: repeat(5, 150px); }
 }
