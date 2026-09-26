@@ -6,7 +6,7 @@
 docker run --rm -v "$PWD:/app" -w /app tpdbarr-portal:latest node docs/make-map.mjs
 ```
 
-Written 2026-09-26 from 65 files.
+Written 2026-09-26 from 67 files.
 
 ## Addresses
 
@@ -44,251 +44,254 @@ served by `shelf.js` and claimed before `app.js` sees the address.
 | `'^#/performer/' + UUID + '$'` | `showPerformer` | public/app.js:68 |
 | `'^#/movie/' + UUID + '$'` | `showMovie` | public/app.js:71 |
 | `^#\/search\/(.+)$` | `showSearch` | public/app.js:76 |
-| `#/stats` | `showStats` | public/shelf.js:26 |
-| `#/library/categories` | `showCategories` | public/shelf.js:55 |
-| `#/library` | `showOverview` | public/shelf.js:75 |
-| `^#\/library\/scene\/(\d+)$` | `showScene` | public/shelf.js:28 |
-| `^#\/library\/movie\/([0-9a-f]{12})$` | `showMovie` | public/shelf.js:33 |
-| `^#\/library\/group\/(\d+)$` | `showGroup` | public/shelf.js:37 |
-| `^#\/library\/performer\/(\d+)$` | `showPerformer` | public/shelf.js:40 |
-| `^#\/library\/studio\/(\d+)$` | `showStudio` | public/shelf.js:43 |
-| `^#\/library\/gallery\/(\d+)$` | `showGallery` | public/shelf.js:46 |
-| `^#\/library\/list\/([a-z]+)$` | `showList` | public/shelf.js:49 |
-| `^#\/library\/category\/([a-z0-9-]+)(?:\?(.*))?$` | `showCategory` | public/shelf.js:53 |
-| `^#\/library\/(scenes|performers|studios|galleries)(?:\?(.*))?$` | `—` | public/shelf.js:59 |
-| `^#\/library\/movies(?:\?(.*))?$` | `showMovies` | public/shelf.js:70 |
-| `^#\/library\/stage\/([a-z]+)$` | `showStage` | public/shelf.js:72 |
+| `#/stats` | `showStats` | public/shelf.js:27 |
+| `#/library/categories` | `showCategories` | public/shelf.js:56 |
+| `#/library` | `showOverview` | public/shelf.js:79 |
+| `^#\/library\/scene\/(\d+)$` | `showScene` | public/shelf.js:29 |
+| `^#\/library\/movie\/([0-9a-f]{12})$` | `showMovie` | public/shelf.js:34 |
+| `^#\/library\/group\/(\d+)$` | `showGroup` | public/shelf.js:38 |
+| `^#\/library\/performer\/(\d+)$` | `showPerformer` | public/shelf.js:41 |
+| `^#\/library\/studio\/(\d+)$` | `showStudio` | public/shelf.js:44 |
+| `^#\/library\/gallery\/(\d+)$` | `showGallery` | public/shelf.js:47 |
+| `^#\/library\/list\/([a-z]+)$` | `showList` | public/shelf.js:50 |
+| `^#\/library\/category\/([a-z0-9-]+)(?:\?(.*))?$` | `showCategory` | public/shelf.js:54 |
+| `^#\/library\/tv(?:\?(.*))?$` | `showTv` | public/shelf.js:58 |
+| `^#\/library\/(scenes|performers|studios|galleries)(?:\?(.*))?$` | `—` | public/shelf.js:63 |
+| `^#\/library\/movies(?:\?(.*))?$` | `showMovies` | public/shelf.js:74 |
+| `^#\/library\/stage\/([a-z]+)$` | `showStage` | public/shelf.js:76 |
 
 ## API
 
 |  | Path | Where |
 |---|---|---|
-| `GET` | `\/api\/state` | src/server.mjs:129 |
-| `GET` | `\/api\/home` | src/server.mjs:181 |
-| `GET` | `\/api\/options` | src/server.mjs:191 |
-| `POST` | `\/api\/config` | src/server.mjs:205 |
-| `POST` | `\/api\/tilescale` | src/server.mjs:220 |
-| `GET` | `\/api\/sites` | src/server.mjs:236 |
-| `GET` | `\/api\/sites\/(\d+)` | src/server.mjs:241 |
-| `GET` | `\/api\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:247 |
-| `GET` | `\/api\/performers\/([0-9a-fA-F-]{36})` | src/server.mjs:249 |
-| `GET` | `\/api\/movies` | src/server.mjs:252 |
-| `GET` | `\/api\/movies\/([0-9a-fA-F-]{36})` | src/server.mjs:259 |
-| `GET` | `\/api\/creators` | src/server.mjs:261 |
-| `GET` | `\/api\/sites\/(\d+)\/art` | src/server.mjs:264 |
-| `POST` | `\/api\/add` | src/server.mjs:286 |
-| `GET` | `\/api\/queue` | src/server.mjs:306 |
-| `GET` | `\/api\/stashdb\/search` | src/server.mjs:330 |
-| `GET` | `\/api\/stashdb\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:341 |
-| `GET` | `\/api\/stashdb\/bridge\/([0-9a-fA-F-]{36})` | src/server.mjs:354 |
-| `GET` | `\/api\/import\/overview` | src/server.mjs:375 |
-| `GET` | `\/api\/import\/integrations` | src/server.mjs:383 |
-| `GET` | `\/api\/import\/backups` | src/server.mjs:386 |
-| `POST` | `\/api\/import\/backups` | src/server.mjs:389 |
-| `GET` | `\/api\/import\/images\/places` | src/server.mjs:392 |
-| `GET` | `\/api\/import\/match\/sources` | src/server.mjs:403 |
-| `GET` | `\/api\/import\/match\/sites` | src/server.mjs:408 |
-| `GET` | `\/api\/import\/match` | src/server.mjs:411 |
-| `GET` | `\/api\/catalogue\/overview` | src/server.mjs:437 |
-| `GET` | `\/api\/catalogue\/scan` | src/server.mjs:441 |
-| `POST` | `\/api\/catalogue\/scan` | src/server.mjs:444 |
-| `GET` | `\/api\/catalogue\/scan\/(\d+)` | src/server.mjs:447 |
-| `GET` | `\/api\/catalogue\/generate` | src/server.mjs:454 |
-| `POST` | `\/api\/catalogue\/generate` | src/server.mjs:457 |
-| `GET` | `\/api\/catalogue\/generate\/(\d+)` | src/server.mjs:460 |
-| `GET` | `\/api\/manage\/scan` | src/server.mjs:464 |
-| `POST` | `\/api\/manage\/scan` | src/server.mjs:467 |
-| `GET` | `\/api\/manage\/scan\/(\d+)` | src/server.mjs:470 |
-| `GET` | `\/api\/manage\/duplicates` | src/server.mjs:473 |
-| `GET` | `\/api\/manage\/chores` | src/server.mjs:476 |
-| `POST` | `\/api\/manage\/chores\/stop` | src/server.mjs:478 |
-| `GET` | `\/api\/manage\/reshelve` | src/server.mjs:480 |
-| `POST` | `\/api\/manage\/reshelve` | src/server.mjs:483 |
-| `POST` | `\/api\/manage\/copies\/keep-better` | src/server.mjs:486 |
-| `POST` | `\/api\/manage\/nfo\/(missing|all)` | src/server.mjs:489 |
-| `POST` | `\/api\/manage\/thumbs\/(missing|all)` | src/server.mjs:492 |
-| `GET` | `\/api\/import\/match\/phash` | src/server.mjs:496 |
-| `POST` | `\/api\/import\/match\/phash` | src/server.mjs:499 |
-| `GET` | `\/api\/import\/match\/phash\/(\d+)` | src/server.mjs:502 |
-| `POST` | `\/api\/scenes\/(\d+)\/generate` | src/server.mjs:506 |
-| `GET` | `\/api\/scenes\/(\d+)\/generate\/(\d+)` | src/server.mjs:509 |
-| `GET` | `\/api\/import\/match\/(\d+)` | src/server.mjs:512 |
-| `POST` | `\/api\/import\/match\/(\d+)` | src/server.mjs:518 |
-| `POST` | `\/api\/import\/match\/(\d+)\/page` | src/server.mjs:537 |
-| `POST` | `\/api\/import\/match\/(\d+)\/rename\/plan` | src/server.mjs:541 |
-| `GET` | `\/api\/import\/wildcard\/sources` | src/server.mjs:555 |
-| `GET` | `\/api\/import\/wildcard\/find` | src/server.mjs:558 |
-| `GET` | `\/api\/import\/wildcard\/names` | src/server.mjs:565 |
-| `POST` | `\/api\/import\/wildcard\/names` | src/server.mjs:573 |
-| `GET` | `\/api\/import\/wildcard\/scene\/(\d+)` | src/server.mjs:580 |
-| `GET` | `\/api\/(?:catalogue|import\/wildcard)\/frames\/(\d+)` | src/server.mjs:585 |
-| `POST` | `\/api\/(?:catalogue|import\/wildcard)\/frames\/(\d+)` | src/server.mjs:588 |
-| `POST` | `\/api\/import\/wildcard\/urls` | src/server.mjs:591 |
-| `POST` | `\/api\/import\/wildcard\/ask` | src/server.mjs:594 |
-| `POST` | `\/api\/import\/wildcard\/scene\/(\d+)` | src/server.mjs:597 |
-| `POST` | `\/api\/import\/wildcard\/scene\/(\d+)\/rename\/plan` | src/server.mjs:603 |
-| `POST` | `\/api\/import\/match\/(\d+)\/aside` | src/server.mjs:608 |
-| `GET` | `\/api\/import\/match\/(\d+)\/rename` | src/server.mjs:612 |
-| `POST` | `\/api\/import\/match\/(\d+)\/rename` | src/server.mjs:615 |
-| `GET` | `\/api\/import\/tags` | src/server.mjs:618 |
-| `POST` | `\/api\/import\/tags` | src/server.mjs:621 |
-| `GET` | `\/api\/import\/groups` | src/server.mjs:633 |
-| `POST` | `\/api\/import\/groups\/scan` | src/server.mjs:636 |
-| `POST` | `\/api\/import\/groups\/titles` | src/server.mjs:642 |
-| `GET` | `\/api\/import\/groups\/proposals` | src/server.mjs:645 |
-| `POST` | `\/api\/import\/groups\/([^/]+)\/approve` | src/server.mjs:649 |
-| `POST` | `\/api\/import\/groups\/([^/]+)\/decline` | src/server.mjs:654 |
-| `POST` | `\/api\/import\/groups\/([^/]+)\/reconsider` | src/server.mjs:657 |
-| `POST` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)` | src/server.mjs:661 |
-| `DELETE` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)` | src/server.mjs:664 |
-| `GET` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)\/find` | src/server.mjs:668 |
-| `POST` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)\/find` | src/server.mjs:672 |
-| `GET` | `\/api\/import\/markers` | src/server.mjs:680 |
-| `GET` | `\/api\/import\/markers\/queue` | src/server.mjs:688 |
-| `GET` | `\/api\/import\/markers\/all` | src/server.mjs:692 |
-| `GET` | `\/api\/import\/markers\/tags` | src/server.mjs:702 |
-| `GET` | `\/api\/import\/markers\/tags\/search` | src/server.mjs:705 |
-| `GET` | `\/api\/import\/markers\/scene\/(\d+)` | src/server.mjs:708 |
-| `POST` | `\/api\/import\/markers\/scene\/(\d+)` | src/server.mjs:711 |
-| `POST` | `\/api\/import\/markers\/marker\/(\d+)` | src/server.mjs:721 |
-| `DELETE` | `\/api\/import\/markers\/marker\/(\d+)` | src/server.mjs:732 |
-| `GET` | `\/api\/import\/markers\/scene\/(\d+)\/sources` | src/server.mjs:736 |
-| `GET` | `\/api\/import\/markers\/scene\/(\d+)\/strip` | src/server.mjs:740 |
-| `POST` | `\/api\/import\/markers\/scene\/(\d+)\/strip` | src/server.mjs:742 |
-| `DELETE` | `\/api\/import\/markers\/scene\/(\d+)\/strip` | src/server.mjs:755 |
-| `GET` | `\/api\/import\/images\/galleries` | src/server.mjs:760 |
-| `GET` | `\/api\/import\/images\/performers` | src/server.mjs:766 |
-| `GET` | `\/api\/acquire\/search` | src/server.mjs:771 |
-| `GET` | `\/api\/acquire\/lookup` | src/server.mjs:775 |
-| `GET` | `\/api\/acquire\/chips` | src/server.mjs:782 |
-| `GET` | `\/api\/acquire\/wildcard` | src/server.mjs:792 |
-| `GET` | `\/api\/acquire\/prowlarr` | src/server.mjs:798 |
-| `GET` | `\/api\/acquire\/monitored` | src/server.mjs:810 |
-| `GET` | `\/api\/acquire\/manualdrop` | src/server.mjs:819 |
-| `POST` | `\/api\/acquire\/manualdrop` | src/server.mjs:820 |
-| `POST` | `\/api\/acquire\/prowlarr\/grab` | src/server.mjs:824 |
-| `GET` | `\/api\/acquire\/rules` | src/server.mjs:840 |
-| `POST` | `\/api\/acquire\/rules` | src/server.mjs:843 |
-| `GET` | `\/api\/acquire\/tracked` | src/server.mjs:846 |
-| `POST` | `\/api\/acquire\/tracked` | src/server.mjs:851 |
-| `DELETE` | `\/api\/acquire\/tracked\/(performer|studio|tag)\/([0-9a-fA-F-]{36})` | src/server.mjs:859 |
-| `GET` | `\/api\/acquire\/release` | src/server.mjs:870 |
-| `POST` | `\/api\/acquire\/release` | src/server.mjs:872 |
-| `POST` | `\/api\/acquire\/release\/now` | src/server.mjs:876 |
-| `GET` | `\/api\/acquire\/tracked\/scenes` | src/server.mjs:879 |
-| `POST` | `\/api\/acquire\/tracked\/scenes` | src/server.mjs:887 |
-| `POST` | `\/api\/acquire\/tracked\/scenes\/backfill` | src/server.mjs:891 |
-| `POST` | `\/api\/acquire\/ignored` | src/server.mjs:895 |
-| `POST` | `\/api\/acquire\/ignored\/batch` | src/server.mjs:902 |
-| `POST` | `\/api\/acquire\/skiprest` | src/server.mjs:906 |
-| `GET` | `\/api\/acquire\/skiprest` | src/server.mjs:912 |
-| `DELETE` | `\/api\/acquire\/ignored\/([0-9a-fA-F-]{36})` | src/server.mjs:914 |
-| `DELETE` | `\/api\/acquire\/tracked\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:919 |
-| `GET` | `\/api\/library\/rails` | src/server.mjs:936 |
-| `GET` | `\/api\/library\/feeds` | src/server.mjs:940 |
-| `GET` | `\/api\/library\/overview` | src/server.mjs:944 |
-| `GET` | `\/api\/library\/films` | src/server.mjs:947 |
-| `GET` | `\/api\/library\/films\/lookup` | src/server.mjs:950 |
-| `POST` | `\/api\/library\/films\/(group|film)\/(\d+)\/scrape` | src/server.mjs:956 |
-| `POST` | `\/api\/library\/films\/(group|film)\/(\d+)\/apply` | src/server.mjs:963 |
-| `POST` | `\/api\/library\/films\/(group|film)\/(\d+)\/delete` | src/server.mjs:967 |
-| `GET` | `\/api\/library\/performers` | src/server.mjs:970 |
-| `GET` | `\/api\/library\/studios` | src/server.mjs:972 |
-| `GET` | `\/api\/library\/identify\/movies` | src/server.mjs:979 |
-| `POST` | `\/api\/library\/identify\/covers` | src/server.mjs:983 |
-| `POST` | `\/api\/library\/identify\/movies` | src/server.mjs:990 |
-| `GET` | `\/api\/library\/groups\/urls` | src/server.mjs:993 |
-| `POST` | `\/api\/library\/groups\/(\d+)\/scrape` | src/server.mjs:1002 |
-| `POST` | `\/api\/library\/groups\/(\d+)\/apply` | src/server.mjs:1009 |
-| `POST` | `\/api\/library\/groups\/(\d+)\/url` | src/server.mjs:1015 |
-| `GET` | `\/api\/library\/in-flight` | src/server.mjs:1022 |
-| `GET` | `\/api\/library\/stage\/([a-z]+)` | src/server.mjs:1025 |
-| `GET` | `\/api\/tidy` | src/server.mjs:1035 |
-| `POST` | `\/api\/tidy\/unmonitor` | src/server.mjs:1038 |
-| `POST` | `\/api\/tidy\/remove` | src/server.mjs:1040 |
-| `GET` | `\/api\/library\/gaps` | src/server.mjs:1046 |
-| `GET` | `\/api\/library\/shelf` | src/server.mjs:1066 |
-| `GET` | `\/api\/library\/list\/([a-z]+)` | src/server.mjs:1068 |
-| `GET` | `\/api\/library\/categories` | src/server.mjs:1075 |
-| `GET` | `\/api\/library\/categories\/terms` | src/server.mjs:1076 |
-| `POST` | `\/api\/library\/categories\/preview` | src/server.mjs:1077 |
-| `POST` | `\/api\/library\/categories` | src/server.mjs:1081 |
-| `GET` | `\/api\/library\/categories\/([a-z0-9-]+)` | src/server.mjs:1086 |
-| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)` | src/server.mjs:1091 |
-| `DELETE` | `\/api\/library\/categories\/([a-z0-9-]+)` | src/server.mjs:1093 |
-| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)\/refresh` | src/server.mjs:1097 |
-| `DELETE` | `\/api\/library\/categories\/([a-z0-9-]+)\/art` | src/server.mjs:1100 |
-| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)\/scenes` | src/server.mjs:1103 |
-| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)\/order` | src/server.mjs:1105 |
-| `GET` | `\/api\/library\/scenes\/(\d+)\/categories` | src/server.mjs:1109 |
-| `GET` | `\/api\/library\/reel` | src/server.mjs:1113 |
-| `GET` | `\/api\/library\/reel\/settings` | src/server.mjs:1180 |
-| `POST` | `\/api\/library\/reel\/settings` | src/server.mjs:1182 |
-| `GET` | `\/api\/library\/reel\/tags` | src/server.mjs:1194 |
-| `GET` | `\/api\/reddit` | src/server.mjs:1197 |
-| `GET` | `\/api\/markerclips` | src/server.mjs:1201 |
-| `POST` | `\/api\/markerclips\/generate` | src/server.mjs:1203 |
-| `GET` | `\/api\/redgifs` | src/server.mjs:1209 |
-| `POST` | `\/api\/redgifs\/refresh` | src/server.mjs:1211 |
-| `POST` | `\/api\/redgifs\/follow` | src/server.mjs:1216 |
-| `POST` | `\/api\/redgifs\/unfollow` | src/server.mjs:1224 |
-| `POST` | `\/api\/redgifs\/tags` | src/server.mjs:1229 |
-| `POST` | `\/api\/redgifs\/tags\/remove` | src/server.mjs:1235 |
-| `POST` | `\/api\/reddit\/follow` | src/server.mjs:1240 |
-| `POST` | `\/api\/reddit\/unfollow` | src/server.mjs:1248 |
-| `POST` | `\/api\/reddit\/refresh` | src/server.mjs:1253 |
-| `GET` | `\/api\/library\/scenes\/(\d+)` | src/server.mjs:1259 |
-| `GET` | `\/api\/library\/performers\/(\d+)` | src/server.mjs:1265 |
-| `GET` | `\/api\/library\/performers\/(\d+)\/iafd` | src/server.mjs:1272 |
-| `POST` | `\/api\/library\/performers\/(\d+)\/iafd` | src/server.mjs:1276 |
-| `GET` | `\/api\/library\/studios\/(\d+)` | src/server.mjs:1280 |
-| `GET` | `\/api\/library\/studios\/(\d+)\/facts` | src/server.mjs:1290 |
-| `POST` | `\/api\/library\/studios\/(\d+)\/facts` | src/server.mjs:1293 |
-| `GET` | `\/api\/library\/groups\/(\d+)` | src/server.mjs:1296 |
-| `GET` | `\/api\/library\/galleries` | src/server.mjs:1305 |
-| `GET` | `\/api\/library\/galleries\/gaps` | src/server.mjs:1316 |
-| `GET` | `\/api\/library\/galleries\/(\d+)` | src/server.mjs:1319 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/organized` | src/server.mjs:1322 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/rating` | src/server.mjs:1325 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/title` | src/server.mjs:1329 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/cover` | src/server.mjs:1332 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/focus` | src/server.mjs:1335 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/ties` | src/server.mjs:1344 |
-| `GET` | `\/api\/library\/lookup` | src/server.mjs:1352 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/rescan` | src/server.mjs:1364 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/images\/delete` | src/server.mjs:1375 |
-| `POST` | `\/api\/library\/galleries\/(\d+)\/delete` | src/server.mjs:1379 |
-| `GET` | `\/api\/galleries\/setup` | src/server.mjs:1389 |
-| `POST` | `\/api\/galleries\/setup` | src/server.mjs:1392 |
-| `POST` | `\/api\/galleries\/find` | src/server.mjs:1394 |
-| `POST` | `\/api\/galleries\/build` | src/server.mjs:1408 |
-| `GET` | `\/api\/galleries\/jobs\/(\d+)` | src/server.mjs:1441 |
-| `GET` | `\/api\/library\/search` | src/server.mjs:1447 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/activity` | src/server.mjs:1454 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/play` | src/server.mjs:1460 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/organized` | src/server.mjs:1468 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/rating` | src/server.mjs:1492 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/o` | src/server.mjs:1495 |
-| `GET` | `\/api\/library\/scenes\/(\d+)\/downscale` | src/server.mjs:1502 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/downscale` | src/server.mjs:1505 |
-| `GET` | `\/api\/library\/scenes\/(\d+)\/resolution` | src/server.mjs:1509 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/resolution` | src/server.mjs:1511 |
-| `GET` | `\/api\/library\/catchup` | src/server.mjs:1521 |
-| `POST` | `\/api\/library\/catchup` | src/server.mjs:1526 |
-| `GET` | `\/api\/library\/downscale` | src/server.mjs:1530 |
-| `GET` | `\/api\/library\/scenes\/(\d+)\/removal` | src/server.mjs:1532 |
-| `POST` | `\/api\/library\/scenes\/(\d+)\/delete` | src/server.mjs:1535 |
-| `GET` | `\/api\/moviefiles` | src/server.mjs:1549 |
-| `GET` | `\/api\/moviefiles\/([0-9a-f]{12})` | src/server.mjs:1552 |
-| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/activity` | src/server.mjs:1559 |
-| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/play` | src/server.mjs:1565 |
-| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/forget` | src/server.mjs:1567 |
-| `GET` | `\/api\/moviefiles\/([0-9a-f]{12})\/candidates` | src/server.mjs:1570 |
-| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/metadata` | src/server.mjs:1576 |
-| `GET` | `\/api\/whisparr3\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:1599 |
-| `POST` | `\/api\/whisparr3\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:1602 |
-| `POST` | `\/api\/whisparr3\/scenes\/([0-9a-fA-F-]{36})\/again` | src/server.mjs:1617 |
-| `GET` | `\/api\/whisparr3\/queue` | src/server.mjs:1625 |
+| `GET` | `\/api\/state` | src/server.mjs:130 |
+| `GET` | `\/api\/home` | src/server.mjs:182 |
+| `GET` | `\/api\/options` | src/server.mjs:192 |
+| `POST` | `\/api\/config` | src/server.mjs:206 |
+| `POST` | `\/api\/tilescale` | src/server.mjs:221 |
+| `GET` | `\/api\/sites` | src/server.mjs:237 |
+| `GET` | `\/api\/sites\/(\d+)` | src/server.mjs:242 |
+| `GET` | `\/api\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:248 |
+| `GET` | `\/api\/performers\/([0-9a-fA-F-]{36})` | src/server.mjs:250 |
+| `GET` | `\/api\/movies` | src/server.mjs:253 |
+| `GET` | `\/api\/movies\/([0-9a-fA-F-]{36})` | src/server.mjs:260 |
+| `GET` | `\/api\/creators` | src/server.mjs:262 |
+| `GET` | `\/api\/sites\/(\d+)\/art` | src/server.mjs:265 |
+| `POST` | `\/api\/add` | src/server.mjs:287 |
+| `GET` | `\/api\/queue` | src/server.mjs:307 |
+| `GET` | `\/api\/stashdb\/search` | src/server.mjs:331 |
+| `GET` | `\/api\/stashdb\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:342 |
+| `GET` | `\/api\/stashdb\/bridge\/([0-9a-fA-F-]{36})` | src/server.mjs:355 |
+| `GET` | `\/api\/import\/overview` | src/server.mjs:376 |
+| `GET` | `\/api\/import\/integrations` | src/server.mjs:384 |
+| `GET` | `\/api\/import\/backups` | src/server.mjs:387 |
+| `POST` | `\/api\/import\/backups` | src/server.mjs:390 |
+| `GET` | `\/api\/import\/images\/places` | src/server.mjs:393 |
+| `GET` | `\/api\/import\/match\/sources` | src/server.mjs:404 |
+| `GET` | `\/api\/import\/match\/sites` | src/server.mjs:409 |
+| `GET` | `\/api\/import\/match` | src/server.mjs:412 |
+| `GET` | `\/api\/catalogue\/overview` | src/server.mjs:438 |
+| `GET` | `\/api\/catalogue\/scan` | src/server.mjs:442 |
+| `POST` | `\/api\/catalogue\/scan` | src/server.mjs:445 |
+| `GET` | `\/api\/catalogue\/scan\/(\d+)` | src/server.mjs:448 |
+| `GET` | `\/api\/catalogue\/generate` | src/server.mjs:455 |
+| `POST` | `\/api\/catalogue\/generate` | src/server.mjs:458 |
+| `GET` | `\/api\/catalogue\/generate\/(\d+)` | src/server.mjs:461 |
+| `GET` | `\/api\/manage\/scan` | src/server.mjs:465 |
+| `POST` | `\/api\/manage\/scan` | src/server.mjs:468 |
+| `GET` | `\/api\/manage\/scan\/(\d+)` | src/server.mjs:471 |
+| `GET` | `\/api\/manage\/duplicates` | src/server.mjs:474 |
+| `GET` | `\/api\/manage\/chores` | src/server.mjs:477 |
+| `POST` | `\/api\/manage\/chores\/stop` | src/server.mjs:479 |
+| `GET` | `\/api\/manage\/reshelve` | src/server.mjs:481 |
+| `POST` | `\/api\/manage\/reshelve` | src/server.mjs:484 |
+| `POST` | `\/api\/manage\/copies\/keep-better` | src/server.mjs:487 |
+| `POST` | `\/api\/manage\/nfo\/(missing|all)` | src/server.mjs:490 |
+| `POST` | `\/api\/manage\/thumbs\/(missing|all)` | src/server.mjs:493 |
+| `GET` | `\/api\/import\/match\/phash` | src/server.mjs:497 |
+| `POST` | `\/api\/import\/match\/phash` | src/server.mjs:500 |
+| `GET` | `\/api\/import\/match\/phash\/(\d+)` | src/server.mjs:503 |
+| `POST` | `\/api\/scenes\/(\d+)\/generate` | src/server.mjs:507 |
+| `GET` | `\/api\/scenes\/(\d+)\/generate\/(\d+)` | src/server.mjs:510 |
+| `GET` | `\/api\/import\/match\/(\d+)` | src/server.mjs:513 |
+| `POST` | `\/api\/import\/match\/(\d+)` | src/server.mjs:519 |
+| `POST` | `\/api\/import\/match\/(\d+)\/page` | src/server.mjs:538 |
+| `POST` | `\/api\/import\/match\/(\d+)\/rename\/plan` | src/server.mjs:542 |
+| `GET` | `\/api\/import\/wildcard\/sources` | src/server.mjs:556 |
+| `GET` | `\/api\/import\/wildcard\/find` | src/server.mjs:559 |
+| `GET` | `\/api\/import\/wildcard\/names` | src/server.mjs:566 |
+| `POST` | `\/api\/import\/wildcard\/names` | src/server.mjs:574 |
+| `GET` | `\/api\/import\/wildcard\/scene\/(\d+)` | src/server.mjs:581 |
+| `GET` | `\/api\/(?:catalogue|import\/wildcard)\/frames\/(\d+)` | src/server.mjs:586 |
+| `POST` | `\/api\/(?:catalogue|import\/wildcard)\/frames\/(\d+)` | src/server.mjs:589 |
+| `POST` | `\/api\/import\/wildcard\/urls` | src/server.mjs:592 |
+| `POST` | `\/api\/import\/wildcard\/ask` | src/server.mjs:595 |
+| `POST` | `\/api\/import\/wildcard\/scene\/(\d+)` | src/server.mjs:598 |
+| `POST` | `\/api\/import\/wildcard\/scene\/(\d+)\/rename\/plan` | src/server.mjs:604 |
+| `POST` | `\/api\/import\/match\/(\d+)\/aside` | src/server.mjs:609 |
+| `GET` | `\/api\/import\/match\/(\d+)\/rename` | src/server.mjs:613 |
+| `POST` | `\/api\/import\/match\/(\d+)\/rename` | src/server.mjs:616 |
+| `GET` | `\/api\/import\/tags` | src/server.mjs:619 |
+| `POST` | `\/api\/import\/tags` | src/server.mjs:622 |
+| `GET` | `\/api\/import\/groups` | src/server.mjs:634 |
+| `POST` | `\/api\/import\/groups\/scan` | src/server.mjs:637 |
+| `POST` | `\/api\/import\/groups\/titles` | src/server.mjs:643 |
+| `GET` | `\/api\/import\/groups\/proposals` | src/server.mjs:646 |
+| `POST` | `\/api\/import\/groups\/([^/]+)\/approve` | src/server.mjs:650 |
+| `POST` | `\/api\/import\/groups\/([^/]+)\/decline` | src/server.mjs:655 |
+| `POST` | `\/api\/import\/groups\/([^/]+)\/reconsider` | src/server.mjs:658 |
+| `POST` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)` | src/server.mjs:662 |
+| `DELETE` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)` | src/server.mjs:665 |
+| `GET` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)\/find` | src/server.mjs:669 |
+| `POST` | `\/api\/import\/groups\/([^/]+)\/scenes\/([^/]+)\/find` | src/server.mjs:673 |
+| `GET` | `\/api\/import\/markers` | src/server.mjs:681 |
+| `GET` | `\/api\/import\/markers\/queue` | src/server.mjs:689 |
+| `GET` | `\/api\/import\/markers\/all` | src/server.mjs:693 |
+| `GET` | `\/api\/import\/markers\/tags` | src/server.mjs:703 |
+| `GET` | `\/api\/import\/markers\/tags\/search` | src/server.mjs:706 |
+| `GET` | `\/api\/import\/markers\/scene\/(\d+)` | src/server.mjs:709 |
+| `POST` | `\/api\/import\/markers\/scene\/(\d+)` | src/server.mjs:712 |
+| `POST` | `\/api\/import\/markers\/marker\/(\d+)` | src/server.mjs:722 |
+| `DELETE` | `\/api\/import\/markers\/marker\/(\d+)` | src/server.mjs:733 |
+| `GET` | `\/api\/import\/markers\/scene\/(\d+)\/sources` | src/server.mjs:737 |
+| `GET` | `\/api\/import\/markers\/scene\/(\d+)\/strip` | src/server.mjs:741 |
+| `POST` | `\/api\/import\/markers\/scene\/(\d+)\/strip` | src/server.mjs:743 |
+| `DELETE` | `\/api\/import\/markers\/scene\/(\d+)\/strip` | src/server.mjs:756 |
+| `GET` | `\/api\/import\/images\/galleries` | src/server.mjs:761 |
+| `GET` | `\/api\/import\/images\/performers` | src/server.mjs:767 |
+| `GET` | `\/api\/acquire\/search` | src/server.mjs:772 |
+| `GET` | `\/api\/acquire\/lookup` | src/server.mjs:776 |
+| `GET` | `\/api\/acquire\/chips` | src/server.mjs:783 |
+| `GET` | `\/api\/acquire\/wildcard` | src/server.mjs:793 |
+| `GET` | `\/api\/acquire\/prowlarr` | src/server.mjs:799 |
+| `GET` | `\/api\/acquire\/monitored` | src/server.mjs:811 |
+| `GET` | `\/api\/acquire\/manualdrop` | src/server.mjs:820 |
+| `POST` | `\/api\/acquire\/manualdrop` | src/server.mjs:821 |
+| `POST` | `\/api\/acquire\/prowlarr\/grab` | src/server.mjs:825 |
+| `GET` | `\/api\/acquire\/rules` | src/server.mjs:841 |
+| `POST` | `\/api\/acquire\/rules` | src/server.mjs:844 |
+| `GET` | `\/api\/acquire\/tracked` | src/server.mjs:847 |
+| `POST` | `\/api\/acquire\/tracked` | src/server.mjs:852 |
+| `DELETE` | `\/api\/acquire\/tracked\/(performer|studio|tag)\/([0-9a-fA-F-]{36})` | src/server.mjs:860 |
+| `GET` | `\/api\/acquire\/release` | src/server.mjs:871 |
+| `POST` | `\/api\/acquire\/release` | src/server.mjs:873 |
+| `POST` | `\/api\/acquire\/release\/now` | src/server.mjs:877 |
+| `GET` | `\/api\/acquire\/tracked\/scenes` | src/server.mjs:880 |
+| `POST` | `\/api\/acquire\/tracked\/scenes` | src/server.mjs:888 |
+| `POST` | `\/api\/acquire\/tracked\/scenes\/backfill` | src/server.mjs:892 |
+| `POST` | `\/api\/acquire\/ignored` | src/server.mjs:896 |
+| `POST` | `\/api\/acquire\/ignored\/batch` | src/server.mjs:903 |
+| `POST` | `\/api\/acquire\/skiprest` | src/server.mjs:907 |
+| `GET` | `\/api\/acquire\/skiprest` | src/server.mjs:913 |
+| `DELETE` | `\/api\/acquire\/ignored\/([0-9a-fA-F-]{36})` | src/server.mjs:915 |
+| `DELETE` | `\/api\/acquire\/tracked\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:920 |
+| `GET` | `\/api\/library\/rails` | src/server.mjs:937 |
+| `GET` | `\/api\/library\/feeds` | src/server.mjs:941 |
+| `GET` | `\/api\/library\/overview` | src/server.mjs:945 |
+| `GET` | `\/api\/library\/films` | src/server.mjs:948 |
+| `GET` | `\/api\/library\/films\/lookup` | src/server.mjs:951 |
+| `POST` | `\/api\/library\/films\/(group|film)\/(\d+)\/scrape` | src/server.mjs:957 |
+| `POST` | `\/api\/library\/films\/(group|film)\/(\d+)\/apply` | src/server.mjs:964 |
+| `POST` | `\/api\/library\/films\/(group|film)\/(\d+)\/delete` | src/server.mjs:968 |
+| `GET` | `\/api\/library\/performers` | src/server.mjs:971 |
+| `GET` | `\/api\/library\/studios` | src/server.mjs:973 |
+| `GET` | `\/api\/library\/identify\/movies` | src/server.mjs:980 |
+| `POST` | `\/api\/library\/identify\/covers` | src/server.mjs:984 |
+| `POST` | `\/api\/library\/identify\/movies` | src/server.mjs:991 |
+| `GET` | `\/api\/library\/groups\/urls` | src/server.mjs:994 |
+| `POST` | `\/api\/library\/groups\/(\d+)\/scrape` | src/server.mjs:1003 |
+| `POST` | `\/api\/library\/groups\/(\d+)\/apply` | src/server.mjs:1010 |
+| `POST` | `\/api\/library\/groups\/(\d+)\/url` | src/server.mjs:1016 |
+| `GET` | `\/api\/library\/in-flight` | src/server.mjs:1023 |
+| `GET` | `\/api\/library\/stage\/([a-z]+)` | src/server.mjs:1026 |
+| `GET` | `\/api\/tidy` | src/server.mjs:1036 |
+| `POST` | `\/api\/tidy\/unmonitor` | src/server.mjs:1039 |
+| `POST` | `\/api\/tidy\/remove` | src/server.mjs:1041 |
+| `GET` | `\/api\/library\/gaps` | src/server.mjs:1047 |
+| `GET` | `\/api\/library\/shelf` | src/server.mjs:1067 |
+| `GET` | `\/api\/library\/tv\/channels` | src/server.mjs:1069 |
+| `GET` | `\/api\/library\/tv` | src/server.mjs:1070 |
+| `GET` | `\/api\/library\/list\/([a-z]+)` | src/server.mjs:1072 |
+| `GET` | `\/api\/library\/categories` | src/server.mjs:1079 |
+| `GET` | `\/api\/library\/categories\/terms` | src/server.mjs:1080 |
+| `POST` | `\/api\/library\/categories\/preview` | src/server.mjs:1081 |
+| `POST` | `\/api\/library\/categories` | src/server.mjs:1085 |
+| `GET` | `\/api\/library\/categories\/([a-z0-9-]+)` | src/server.mjs:1090 |
+| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)` | src/server.mjs:1095 |
+| `DELETE` | `\/api\/library\/categories\/([a-z0-9-]+)` | src/server.mjs:1097 |
+| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)\/refresh` | src/server.mjs:1101 |
+| `DELETE` | `\/api\/library\/categories\/([a-z0-9-]+)\/art` | src/server.mjs:1104 |
+| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)\/scenes` | src/server.mjs:1107 |
+| `POST` | `\/api\/library\/categories\/([a-z0-9-]+)\/order` | src/server.mjs:1109 |
+| `GET` | `\/api\/library\/scenes\/(\d+)\/categories` | src/server.mjs:1113 |
+| `GET` | `\/api\/library\/reel` | src/server.mjs:1117 |
+| `GET` | `\/api\/library\/reel\/settings` | src/server.mjs:1184 |
+| `POST` | `\/api\/library\/reel\/settings` | src/server.mjs:1186 |
+| `GET` | `\/api\/library\/reel\/tags` | src/server.mjs:1198 |
+| `GET` | `\/api\/reddit` | src/server.mjs:1201 |
+| `GET` | `\/api\/markerclips` | src/server.mjs:1205 |
+| `POST` | `\/api\/markerclips\/generate` | src/server.mjs:1207 |
+| `GET` | `\/api\/redgifs` | src/server.mjs:1213 |
+| `POST` | `\/api\/redgifs\/refresh` | src/server.mjs:1215 |
+| `POST` | `\/api\/redgifs\/follow` | src/server.mjs:1220 |
+| `POST` | `\/api\/redgifs\/unfollow` | src/server.mjs:1228 |
+| `POST` | `\/api\/redgifs\/tags` | src/server.mjs:1233 |
+| `POST` | `\/api\/redgifs\/tags\/remove` | src/server.mjs:1239 |
+| `POST` | `\/api\/reddit\/follow` | src/server.mjs:1244 |
+| `POST` | `\/api\/reddit\/unfollow` | src/server.mjs:1252 |
+| `POST` | `\/api\/reddit\/refresh` | src/server.mjs:1257 |
+| `GET` | `\/api\/library\/scenes\/(\d+)` | src/server.mjs:1263 |
+| `GET` | `\/api\/library\/performers\/(\d+)` | src/server.mjs:1269 |
+| `GET` | `\/api\/library\/performers\/(\d+)\/iafd` | src/server.mjs:1276 |
+| `POST` | `\/api\/library\/performers\/(\d+)\/iafd` | src/server.mjs:1280 |
+| `GET` | `\/api\/library\/studios\/(\d+)` | src/server.mjs:1284 |
+| `GET` | `\/api\/library\/studios\/(\d+)\/facts` | src/server.mjs:1294 |
+| `POST` | `\/api\/library\/studios\/(\d+)\/facts` | src/server.mjs:1297 |
+| `GET` | `\/api\/library\/groups\/(\d+)` | src/server.mjs:1300 |
+| `GET` | `\/api\/library\/galleries` | src/server.mjs:1309 |
+| `GET` | `\/api\/library\/galleries\/gaps` | src/server.mjs:1320 |
+| `GET` | `\/api\/library\/galleries\/(\d+)` | src/server.mjs:1323 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/organized` | src/server.mjs:1326 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/rating` | src/server.mjs:1329 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/title` | src/server.mjs:1333 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/cover` | src/server.mjs:1336 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/focus` | src/server.mjs:1339 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/ties` | src/server.mjs:1348 |
+| `GET` | `\/api\/library\/lookup` | src/server.mjs:1356 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/rescan` | src/server.mjs:1368 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/images\/delete` | src/server.mjs:1379 |
+| `POST` | `\/api\/library\/galleries\/(\d+)\/delete` | src/server.mjs:1383 |
+| `GET` | `\/api\/galleries\/setup` | src/server.mjs:1393 |
+| `POST` | `\/api\/galleries\/setup` | src/server.mjs:1396 |
+| `POST` | `\/api\/galleries\/find` | src/server.mjs:1398 |
+| `POST` | `\/api\/galleries\/build` | src/server.mjs:1412 |
+| `GET` | `\/api\/galleries\/jobs\/(\d+)` | src/server.mjs:1445 |
+| `GET` | `\/api\/library\/search` | src/server.mjs:1451 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/activity` | src/server.mjs:1458 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/play` | src/server.mjs:1464 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/organized` | src/server.mjs:1472 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/rating` | src/server.mjs:1496 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/o` | src/server.mjs:1499 |
+| `GET` | `\/api\/library\/scenes\/(\d+)\/downscale` | src/server.mjs:1506 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/downscale` | src/server.mjs:1509 |
+| `GET` | `\/api\/library\/scenes\/(\d+)\/resolution` | src/server.mjs:1513 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/resolution` | src/server.mjs:1515 |
+| `GET` | `\/api\/library\/catchup` | src/server.mjs:1525 |
+| `POST` | `\/api\/library\/catchup` | src/server.mjs:1530 |
+| `GET` | `\/api\/library\/downscale` | src/server.mjs:1534 |
+| `GET` | `\/api\/library\/scenes\/(\d+)\/removal` | src/server.mjs:1536 |
+| `POST` | `\/api\/library\/scenes\/(\d+)\/delete` | src/server.mjs:1539 |
+| `GET` | `\/api\/moviefiles` | src/server.mjs:1553 |
+| `GET` | `\/api\/moviefiles\/([0-9a-f]{12})` | src/server.mjs:1556 |
+| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/activity` | src/server.mjs:1563 |
+| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/play` | src/server.mjs:1569 |
+| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/forget` | src/server.mjs:1571 |
+| `GET` | `\/api\/moviefiles\/([0-9a-f]{12})\/candidates` | src/server.mjs:1574 |
+| `POST` | `\/api\/moviefiles\/([0-9a-f]{12})\/metadata` | src/server.mjs:1580 |
+| `GET` | `\/api\/whisparr3\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:1603 |
+| `POST` | `\/api\/whisparr3\/scenes\/([0-9a-fA-F-]{36})` | src/server.mjs:1606 |
+| `POST` | `\/api\/whisparr3\/scenes\/([0-9a-fA-F-]{36})\/again` | src/server.mjs:1621 |
+| `GET` | `\/api\/whisparr3\/queue` | src/server.mjs:1629 |
 
 ## Inside what is still large
 
@@ -302,7 +305,7 @@ comments, so jump to a line rather than searching the file.
 
 | File | Lines |
 |---|---|
-| src/server.mjs | 2324 |
+| src/server.mjs | 2328 |
 | public/markerbuilder.js | 1411 |
 | public/library/categories.js | 1164 |
 | public/library/galleries.js | 1127 |
@@ -314,13 +317,13 @@ comments, so jump to a line rather than searching the file.
 | public/library/overview.js | 711 |
 | public/player.js | 680 |
 | public/css/120-binge.css | 646 |
-| public/css/010-chrome.css | 499 |
+| public/css/010-chrome.css | 534 |
 | public/css/090-overview.css | 491 |
 | public/library/tiles.js | 478 |
 | public/import/tracked.js | 478 |
 | public/import/cards.js | 472 |
 | public/library/shelves.js | 459 |
-| public/library/core.js | 432 |
+| public/library/core.js | 433 |
 | public/library/group.js | 420 |
 | public/css/110-search.css | 412 |
 | public/css/100-galleries.css | 377 |
@@ -333,9 +336,10 @@ comments, so jump to a line rather than searching the file.
 | public/css/080-films.css | 307 |
 | public/reel/slides.js | 303 |
 | public/library/tracked.js | 300 |
+| public/app.js | 279 |
 | public/import/site.js | 270 |
 | public/css/040-player.css | 269 |
-| public/app.js | 263 |
+| public/library/tv.js | 261 |
 | public/import/movies.js | 257 |
 | public/catalogue.js | 256 |
 | public/import/images.js | 247 |
@@ -362,8 +366,9 @@ comments, so jump to a line rather than searching the file.
 | public/css/000-base.css | 95 |
 | public/reel/core.js | 92 |
 | public/css/070-facets.css | 91 |
-| public/css/130-narrow.css | 90 |
+| public/css/130-narrow.css | 86 |
 | public/import/scene.js | 85 |
-| public/shelf.js | 78 |
+| public/shelf.js | 82 |
+| public/css/180-tv.css | 74 |
 | public/reel/keeps.js | 47 |
 | public/css/170-picture.css | 14 |

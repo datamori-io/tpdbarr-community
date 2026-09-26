@@ -7,6 +7,7 @@ import { showPerformer } from './library/performer.js';
 import { showScene } from './library/scene.js';
 import { showList, showPerformers, showScenes, showStudios } from './library/shelves.js';
 import { showStudio } from './library/studio.js';
+import { showTv } from './library/tv.js';
 
 export { leave } from './library/core.js';
 export { tiles } from './library/tiles.js';
@@ -53,6 +54,9 @@ export function route(hash) {
   const category = hash.match(/^#\/library\/category\/([a-z0-9-]+)(?:\?(.*))?$/);
   if (category) { showCategory(category[1], category[2] || ''); return true; }
   if (hash === '#/library/categories') { showCategories(); return true; }
+
+  const tv = hash.match(/^#\/library\/tv(?:\?(.*))?$/);
+  if (tv) { showTv(tv[1] || ''); return true; }
 
 
   // The five sections; the four with filter bars carry a query string.

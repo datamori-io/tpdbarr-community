@@ -33,6 +33,7 @@ import * as filer from './filer.mjs';
 import * as catalogue from './catalogue.mjs';
 import * as chores from './chores.mjs';
 import * as categories from './categories.mjs';
+import * as tv from './tv.mjs';
 import * as artwork from './artwork.mjs';
 import * as groupbuilder from './groupbuilder.mjs';
 import * as backup from './backup.mjs';
@@ -1064,6 +1065,9 @@ const routes = [
 
   /* The whole shelf with tags, filtered in the browser. */
   ['GET', /^\/api\/library\/shelf$/, async () => shelf.shelf(await stashLibrary())],
+  // TV: the channel list, and one channel's lineup for today. See tv.mjs.
+  ['GET', /^\/api\/library\/tv\/channels$/, async () => tv.channels(await stashLibrary())],
+  ['GET', /^\/api\/library\/tv$/, async (_m, _b, url) => tv.lineup(await stashLibrary(), url.searchParams.get('ch') || 'random')],
 
   ['GET', /^\/api\/library\/list\/([a-z]+)$/, async (m, _b, url) =>
     shelf.list(await stashLibrary(), m[1], { page: Number(url.searchParams.get('page')) || 1 })],

@@ -126,6 +126,14 @@ because Stash galleries have no group field.
 Stash's. Stash's library path must not exclude images. The Galleries page checks
 this and offers one button to fix it.
 
+### TV
+
+`#/library/tv`. Pick a channel — Random, a category, studio, performer or
+tag — and filed scenes play back to back, live: each channel has a daily
+lineup, so tuning in joins a scene part-way, and every device shows the same
+thing. `↑`/`↓` change channel, `f` is fullscreen, `i` shows what's on. Sound
+starts off; the first tap or key turns it on. Plays aren't recorded.
+
 ## Stats
 
 - **The pipeline** as one bar, in the order files move. Each segment opens that

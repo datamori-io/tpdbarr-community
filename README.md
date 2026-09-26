@@ -58,6 +58,8 @@ Pictures in the screenshots are blurred on purpose.
   filmography category tracks a director's work, owned or missing.
 - **Movies**: full-length features read from Emby's .nfo files.
 - **Galleries**: build Stash galleries from pictures found on the web.
+- **TV**: channels (random, category, studio, performer, tag) that play
+  scenes back to back, live, so you join part-way through.
 
 ### Stats — how the collection is doing
 

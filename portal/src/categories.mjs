@@ -511,6 +511,20 @@ export async function read(config, slug, { page = 1, all: whole = false } = {}) 
   };
 }
 
+/* The held scene ids in a category, either kind. For TV channels. */
+export async function heldIds(config, slug) {
+  const [store, { scenes }, endpoint] = await Promise.all([
+    load(), shelf(config), stashdb.endpointFor(config).catch(() => null),
+  ]);
+  const row = store.categories.find((c) => c.slug === slug);
+  if (!row) return null;
+  if (row.kind === 'filmography') {
+    return decorateFilm(filmMembers(row), scenes, endpoint, ignoredIds(config))
+      .filter((e) => e.owned).map((e) => e.sceneId);
+  }
+  return membersOf(row, scenes).all.map((s) => String(s.id));
+}
+
 /* Every category a scene is in, for the scene page. */
 export async function forScene(config, sceneId) {
   const [store, { scenes }] = await Promise.all([load(), shelf(config)]);

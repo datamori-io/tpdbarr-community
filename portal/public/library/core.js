@@ -263,6 +263,7 @@ const LIBRARY_SECTIONS = [
   ['#/library/categories', 'Categories'],
   ['#/library/movies', 'Movies'],
   ['#/library/galleries', 'Galleries'],
+  ['#/library/tv', 'TV'],
 ];
 
 // Performers and studios live under the Manage menu, so their pages get no strip.

@@ -1,0 +1,73 @@
+/* ------------------------------------------------------------------- TV
+ *
+ * The live channel page: a black 16:9 stage with two stacked videos (one
+ * showing, one loading the next), an overlay, and the channel bar below.
+ */
+
+.tv { display: grid; gap: 12px; }
+
+.tvstage {
+  position: relative;
+  width: 100%;
+  max-height: calc(100vh - 230px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+}
+.tvstage:fullscreen, .tvstage:-webkit-full-screen { max-height: none; border-radius: 0; }
+
+.tvvideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.tvvideo.on { opacity: 1; }
+
+.tvoverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: 4px;
+  padding: 40px 20px 16px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  color: #fff;
+  pointer-events: none;
+}
+.tvchannel {
+  color: var(--accent-hi);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tvnow { font-size: 18px; font-weight: 600; }
+
+.tvhint {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.tvbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tvbar .spacer { flex: 1; }
+.tvpick { max-width: min(420px, 60vw); }
+
+@media (max-width: 620px) {
+  .tvstage { max-height: none; }
+  .tvnow { font-size: 15px; }
+}
