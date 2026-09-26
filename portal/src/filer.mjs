@@ -1,32 +1,16 @@
 /*
- * Filing a scene: the move that "Mark filed" always implied.
+ * Filing a scene: marking it organized moves the file to
  *
- * Marking a scene organized in Stash sets a flag and nothing else. The file
- * stays wherever it landed — in /Import Folder waiting on FileFlows, in
- * /pc-import where it was dropped by hand — and the library on disk drifts
- * further from the library Stash describes. The filing was done in a plugin
- * afterwards, one folder at a time, and it was slow enough to be put off.
+ *   /organized_scenes/<Studio>/<YYYY>/<Studio>.<date>.<Title>/<Studio>.<date>.<Title>.<ext>
  *
- * So the flag does the move. Mark it filed and the file goes to where filed
- * scenes live, under the shape the rest of the library already uses:
+ * (renamer.mjs's stem as both folder and file). The Manage page's "rename
+ * all in organized" moves older layouts.
  *
- *   /organized_scenes/<Studio>/<YYYY-MM-DD>.<Title>/<Studio>.<date>.<Title>.<ext>
+ * /Import Folder, /movies and /organized_scenes are one SMB share, so most
+ * moves are a rename on the file server (see share.mjs). /pc-import is local,
+ * so leaving it is a real copy. The result says which and how long.
  *
- * which is renamer.mjs's stem twice over — once as the folder and once as the
- * file. Read off the library as it stands on 2026-09-20: 471 studio folders
- * built exactly this way.
- *
- * **Most of it does not cross the network.** /Import Folder, /movies and
- * /organized_scenes are three subfolders of one SMB share on the file server, so
- * the move is a rename the Mac does internally — see share.mjs. /pc-import is
- * the exception: it is a folder on the Windows machine, and a file leaving it
- * is a real transfer whatever anybody does. The answer says which it was and
- * how long it took, because forty seconds and no seconds are different enough
- * to want telling apart.
- *
- * **Nothing is overwritten, ever.** A destination that already exists stops the
- * move; it does not get a "(2)" and it does not win. Two files that think they
- * are the same scene is a thing to look at, not a thing to resolve by guessing.
+ * Nothing is overwritten: a taken destination stops the move.
  */
 
 import { copyFile, mkdir, rename as renameFile, rm, stat } from 'node:fs/promises';
@@ -106,15 +90,13 @@ export function shelfFor(scene, from) {
   if (!date) return { why: 'No date, and both the folder and the filename start with one.' };
 
   /*
-   * The shape, twice: `<date>.<Title>` names the folder and
-   * `<Studio>.<date>.<Title>` names the file inside it. That is not a
-   * redundancy to tidy up — a scene folder carries artwork and sidecars
-   * beside the video, and the studio in the filename is what lets one of
-   * those files be identified on its own, away from its folder.
+   * The whole stem is fitted, since it's one path component. The year level
+   * keeps big studios' folders manageable.
    */
-  const stem = `${date}.${fit(title)}`;
-  const dir = join(HOME, fit(studio, 120), stem);
-  const to = join(dir, `${fit(studio, 120)}.${stem}${extname(from) || '.mp4'}`);
+  const shelf = fit(studio, 120);
+  const stem = fit(`${shelf}.${date}.${title}`, 240);
+  const dir = join(HOME, shelf, date.slice(0, 4), stem);
+  const to = join(dir, `${stem}${extname(from) || '.mp4'}`);
   return { dir, to };
 }
 
@@ -132,6 +114,9 @@ export async function plan(config, sceneId) {
 
   if (!from) return no('Stash has no file for that scene.');
   if (inside(from, HOME)) return no('Already filed — the file is in ' + HOME + '.', { already: true });
+  // A film in /movies is filed where it is — Emby's library, see SOURCES —
+  // so organised is just the flag, and nobody is told it could not move.
+  if (inside(from, '/movies')) return no('Already filed — films live in /movies.', { already: true });
 
   const source = SOURCES.find((root) => inside(from, root));
   if (!source) {
@@ -144,7 +129,7 @@ export async function plan(config, sceneId) {
   const { dir, to } = shelf;
 
   const taken = await stat(to).catch(() => null);
-  if (taken) return no(`There is already a file at ${to}.`);
+  if (taken) return no(`There is already a file at ${to}.`, { taken: to });
 
   const { sameDevice } = await share.route(from, to);
 

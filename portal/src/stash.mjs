@@ -15,6 +15,36 @@ export class StashError extends Error {}
 const LOCKED = /database is locked/i;
 const RETRIES = 2;
 
+/*
+ * Every portal write to Stash goes through gql(), so caches built from
+ * Stash are invalidated here (these indexes plus whatever registers).
+ * Play position, count and O writes are skipped. Scans and generates are
+ * jobs, so they clear again a little later.
+ */
+const listeners = new Set();
+export const onStashChange = (fn) => { listeners.add(fn); };
+
+const QUIET = /^\s*mutation\b[^{]*\{\s*scene(SaveActivity|AddPlay|AddO)\b/;
+const JOB = /\bmetadata(Scan|Generate|Identify|AutoTag|Clean)\b/;
+const JOB_SETTLE = [30_000, 120_000];
+
+export function stashChanged() {
+  titleCache = null;
+  fingerprintCache = null;
+  groupCache = null;
+  for (const fn of listeners) {
+    try { fn(); } catch { /* a listener failing must not fail the write */ }
+  }
+}
+
+function afterWrite(query) {
+  if (!/^\s*mutation\b/.test(query) || QUIET.test(query)) return;
+  stashChanged();
+  if (JOB.test(query)) {
+    for (const ms of JOB_SETTLE) setTimeout(stashChanged, ms).unref?.();
+  }
+}
+
 export async function gql(config, query, variables = {}) {
   const base = config.stashUrl.replace(/\/+$/, '');
 
@@ -43,6 +73,7 @@ export async function gql(config, query, variables = {}) {
       throw new StashError(message);
     }
 
+    afterWrite(query);
     return payload.data;
   }
 }

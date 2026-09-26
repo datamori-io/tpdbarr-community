@@ -6,7 +6,7 @@
  * (same rule as filer.mjs); only the sidecar "overwrite all" presses overwrite.
  */
 
-import { mkdir, readdir, rename as renameFile, rmdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rename as renameFile, rm, rmdir, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
 
 import { gql } from './stash.mjs';
@@ -139,12 +139,11 @@ async function sort(scenes) {
     const other = holder.get(p.to.toLowerCase());
     const mine = scene.files[0];
     const theirs = other?.files?.find((f) => f.path.toLowerCase() === p.to.toLowerCase()) || null;
-    const alike = theirs ? sameLength(mine, theirs) : false;
-    const verdict = alike ? better(mine, theirs) : 0;
+    const verdict = theirs ? decide(mine, theirs) : 0;
     copies.push({
       quality: quality(mine),
       filedQuality: theirs ? quality(theirs) : '',
-      keep: !theirs ? 'unknown' : !alike ? 'length' : verdict > 0 ? 'loose' : verdict < 0 ? 'filed' : 'tie',
+      keep: !theirs ? 'unknown' : verdict > 0 ? 'loose' : verdict < 0 ? 'filed' : 'tie',
       duration: mine.duration || 0,
       filedDuration: theirs?.duration || 0,
       id: scene.id,
@@ -176,62 +175,62 @@ export async function reshelvePlan(config) {
   };
 }
 
-/*
- * The sidecars that travel with a video: anything in its folder named after
- * it — `<stem>.nfo`, `<stem>-thumb.jpg`, `<stem>.en.srt`. Other files in the
- * folder belong to the folder, not to the video, and stay.
- */
-async function sidecars(from) {
-  const dir = dirname(from);
-  const stem = stemOf(from);
-  const names = await readdir(dir).catch(() => []);
-  return names.filter((name) => name !== basename(from)
-    && (name.startsWith(stem + '.') || name.startsWith(stem + '-')));
-}
+/* Duplicates go here instead of stopping; FileFlows picks them up again. */
+const ASIDE = '/Import Folder';
 
 async function moveOne(config, scene) {
   const p = place(scene);
   if (!p) return false;
   if (p.why) throw new Error(p.why);
 
-  // Re-read from disk at the moment of the move: the plan the page showed may
-  // be minutes old, and a second scene may have claimed the name since.
-  if (await stat(p.to).catch(() => null)) throw new Error(`There is already a file at ${p.to}.`);
+  // Re-check at move time; a taken name is a duplicate and goes aside.
+  if (await stat(p.to).catch(() => null)) return setAside(p.from);
 
+  /* Move only the video. Sidecars, covers and .fileflows-ignore stay. */
   const routed = await share.route(p.from, p.to);
-  const extras = await sidecars(p.from);
 
   await mkdir(dirname(routed.to), { recursive: true });
   await renameFile(routed.from, routed.to);
 
-  const oldStem = stemOf(p.from);
-  const newStem = stemOf(p.to);
-  for (const name of extras) {
-    const src = join(dirname(routed.from), name);
-    const dst = join(dirname(routed.to), newStem + name.slice(oldStem.length));
-    if (await stat(dst).catch(() => null)) continue;
-    await renameFile(src, dst).catch(() => {});
-  }
-
-  // Only a folder that is now truly empty goes. rmdir refuses anything else,
-  // which is the point — a .DS_Store or a stray file keeps it.
-  if (dirname(p.from) !== HOME) await rmdir(dirname(routed.from)).catch(() => {});
+  if (dirname(p.from) !== HOME) await leave(dirname(routed.from));
 
   return true;
 }
 
+/* Remove the old folder if only the video (or a .DS_Store) was in it. */
+async function leave(dir) {
+  const names = await readdir(dir).catch(() => null);
+  if (!names || !names.every((n) => n === '.DS_Store')) return;
+  await rm(join(dir, '.DS_Store'), { force: true }).catch(() => {});
+  await rmdir(dir).catch(() => {});
+}
+
+async function setAside(from) {
+  const to = join(ASIDE, basename(from));
+  if (await stat(to).catch(() => null)) throw new Error(`Duplicate, and ${to} is taken too.`);
+  const routed = await share.route(from, to);
+  await renameFile(routed.from, routed.to);
+  if (dirname(from) !== HOME) await leave(dirname(routed.from));
+  aside.push(to);
+  return true;
+}
+
+let aside = [];
+
 export async function reshelve(config) {
-  // Only the ones that can actually move. Copies and the can't-place pile are
-  // in the plan for you to look at; attempting them only fills the run with
-  // failures that were known before it started.
-  const { moves } = await sort(await filed(config));
-  const scenes = moves.map((m) => m.scene);
+  // Only movable ones; copies go to /Import Folder via moveOne.
+  const all = await filed(config);
+  const { moves, copies } = await sort(all);
+  const byId = new Map(all.map((s) => [s.id, s]));
+  const scenes = [...moves.map((m) => m.scene), ...copies.map((c) => byId.get(c.id)).filter(Boolean)];
+  aside = [];
 
   return start('reshelve', 'Renaming in organized', scenes, (scene) => moveOne(config, scene), async (mine) => {
     if (!mine.changed) return '';
     /* One scan fixes every moved record (Stash follows fingerprints). */
-    await gql(config, 'mutation($p: [String!]) { metadataScan(input: {paths: $p}) }', { p: [HOME] });
-    return 'Asked Stash to rescan /organized_scenes so it follows the moves.';
+    await gql(config, 'mutation($p: [String!]) { metadataScan(input: {paths: $p}) }', { p: aside.length ? [HOME, ASIDE] : [HOME] });
+    return 'Asked Stash to rescan /organized_scenes so it follows the moves.'
+      + (aside.length ? ` ${aside.length} duplicate${aside.length === 1 ? '' : 's'} went to ${ASIDE}.` : '');
   });
 }
 
@@ -261,13 +260,7 @@ const CODEC = (codec) => {
   return 1;
 };
 
-/*
- * Two files of different lengths are not two copies of one thing — one is cut
- * short, or it is a different scene that happens to share a title and a date.
- * Seen on the first plan: 0.19 GB against 0.46 GB at the same bitrate. Those
- * are left alone; ten seconds or 2% either way is the same scene with a
- * different intro card.
- */
+/* Within 10s or 2% counts as the same length. */
 export const sameLength = (a, b) => {
   if (!a.duration || !b.duration) return false;
   const gap = Math.abs(a.duration - b.duration);
@@ -285,9 +278,30 @@ export function better(a, b) {
   return Math.abs(rate) > 0.05 * Math.max(a.bit_rate || 0, b.bit_rate || 0) ? rate : 0;
 }
 
+/*
+ * -> positive keep a, negative keep b, 0 leave both.
+ * Quality decides; on a tie the longer wins (the short one is truncated);
+ * tied on both, leave them.
+ */
+export function decide(a, b) {
+  const verdict = better(a, b);
+  if (verdict) return verdict;
+  if (!a.duration || !b.duration || sameLength(a, b)) return 0;
+  return a.duration - b.duration;
+}
+
 export const quality = (f) =>
   [f.height ? `${f.height}p` : '', String(f.video_codec || '').toUpperCase(),
     f.bit_rate ? `${(f.bit_rate / 1e6).toFixed(1)} Mbps` : ''].filter(Boolean).join(' ');
+
+/*
+ * Two records can be one file: the share ignores case. Same path ignoring
+ * case, or same inode, is one file. (Deleting the "other copy" of such a
+ * pair once took the only one.)
+ */
+export const sameFile = (p, q, a, b) =>
+  p.toLowerCase() === q.toLowerCase()
+  || Boolean(a && b && a.ino && a.dev === b.dev && a.ino === b.ino);
 
 async function sceneFiles(config, id) {
   const data = await gql(config, `query($id: ID!) { findScene(id: $id) { id ${FILES} } }`, { id: String(id) });
@@ -295,7 +309,7 @@ async function sceneFiles(config, id) {
   return data.findScene.files || [];
 }
 
-async function keepOne(config, copy) {
+export async function keepOne(config, copy) {
   if (!copy.filedId) throw new Error('Stash has not caught up with the filed copy yet — scan organized, then try again.');
 
   const [looseFiles, filedFiles] = await Promise.all([sceneFiles(config, copy.id), sceneFiles(config, copy.filedId)]);
@@ -306,9 +320,9 @@ async function keepOne(config, copy) {
 
   const [a, b] = await Promise.all([stat(loose.path).catch(() => null), stat(filed.path).catch(() => null)]);
   if (!a || !b) throw new Error('One of the two files is not on the disk any more.');
+  if (sameFile(loose.path, filed.path, a, b)) throw new Error('These are one file under two names — nothing deleted.');
 
-  if (!sameLength(loose, filed)) return false;
-  const verdict = better(loose, filed);
+  const verdict = decide(loose, filed);
   if (!verdict) return false;
 
   await gql(
@@ -318,14 +332,22 @@ async function keepOne(config, copy) {
   );
 
   const looseWins = verdict > 0;
+  // Stash won't delete a primary file while there are others, so make the winner primary first.
+  if (looseWins) {
+    await gql(config, 'mutation($i: SceneUpdateInput!) { sceneUpdate(input: $i) { id } }',
+      { i: { id: String(copy.filedId), primary_file_id: String(loose.id) } });
+  }
   await gql(config, 'mutation($ids: [ID!]!) { deleteFiles(ids: $ids) }', { ids: [looseWins ? filed.id : loose.id] });
 
+  /*
+   * The portal moves it: Stash's moveFiles copied across mounts and timed out.
+   * On the share it's a rename; Stash follows by fingerprint.
+   */
   if (looseWins) {
-    await gql(
-      config,
-      'mutation($i: MoveFilesInput!) { moveFiles(input: $i) }',
-      { i: { ids: [loose.id], destination_folder: dirname(filed.path), destination_basename: basename(filed.path) } }
-    );
+    const routed = await share.route(loose.path, filed.path);
+    await renameFile(routed.from, routed.to);
+    await gql(config, 'mutation($p: [String!]) { metadataScan(input: {paths: $p}) }',
+      { p: [dirname(loose.path), dirname(filed.path)] }).catch(() => {});
   }
 
   return true;

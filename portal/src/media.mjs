@@ -8,7 +8,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, resolve as resolvePath } from 'node:path';
 
-import { gql } from './stash.mjs';
+import { gql, onStashChange } from './stash.mjs';
 
 /*
  * ------------------------------------------------- straight off the mount
@@ -46,6 +46,7 @@ const PATH_TTL = 5 * 60 * 1000; // the same five minutes the shelf is cached for
 const pathCache = new Map();
 
 export const forgetPaths = () => pathCache.clear();
+onStashChange(forgetPaths); // any write to Stash (see stash.mjs)
 
 /*
  * The shelf hands over every path it read, so a filed scene can play with

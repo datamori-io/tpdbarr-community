@@ -1,92 +1,28 @@
 /*
- * Group Builder — the films your loose scenes already add up to.
+ * Group Builder: films your loose scenes already add up to.
  *
- * Two thousand three hundred and eighty-seven scenes in this library sit in no
- * group at all, and six groups exist. Some of those scenes are not loose at
- * all: they are two, three, four parts of a release somebody sold as one thing,
- * filed separately because that is how they arrived. This finds those, shows
- * you the case for each, and builds the group only once you have said yes.
- *
- * **Nothing here writes to Stash without a decision.** A pass produces
- * proposals and stops. That is not caution for its own sake — every proposal
- * below the exact tier is a guess, and a group built on a wrong guess is a
- * wrong fact about your library that then has to be found and undone.
+ * Proposes groups and builds one only when you approve.
  *
  * ------------------------------------------------------------------ sources
  *
- * Asked in this order, and the proposal says which one answered.
+ * Asked in this order; the proposal says which answered.
  *
- * 1. **ThePornDB's own scene list.** A movie record can carry the scenes it is
- *    made of, each with the id the rest of this portal already matches on. When
- *    it does, membership is a fact rather than a guess and the proposal says
- *    *exact*. Measured on 2026-09-03: of four hundred ungrouped scenes sampled,
- *    three were in a TPDB movie, and all 291 Pure Taboo movies TPDB knows about
- *    come back with an empty scene list. So this tier is right and rare.
+ * 1. ThePornDB's scene list for a movie. Matched on id: *exact*. Rare.
+ * 2. Bang's DVD pages. Scene titles: *likely*. Cast only breaks ties.
+ *    DVD releases only; nothing for web-only studios. See bang.mjs.
+ * 3. GameLink's movie pages (the AdultEmpire catalogue). Cast per scene, no
+ *    titles: *probable*. One page instead of IAFD's two. See gamelink.mjs.
+ * 4. IAFD's Scene Breakdowns. Cast only: *probable* when the cast is exactly
+ *    equal. Not limited to the scanned studio — DVDs mix sibling labels.
  *
- * 2. **Bang's DVD pages.** One row per scene *with its title*, which is the
- *    thing neither source either side of this one has. A scene is matched when
- *    its title and the row's title are the same title once the punctuation is
- *    out of the way, and the proposal says *likely*. Cast is a tie-break for
- *    two of your scenes sharing a title and is never the match itself.
- *
- *    Bang carries DVD releases and nothing web-only, so it answers for the
- *    catalogue studios and has nothing whatever for Pure Taboo. It is asked
- *    first because it is the same two pages IAFD costs and the better answer
- *    when it lands — see bang.mjs, which also carries why reading it is fine
- *    where reading AdultEmpire is not.
- *
- * 3. **GameLink's movie pages.** The AdultEmpire catalogue reached at the one
- *    address of theirs that is open. One row per scene with its cast and a set
- *    of attributes, and **no titles** — so it is the same class of evidence as
- *    IAFD below, matched the same way and labelled *probable* the same way.
- *
- *    It is here for reach rather than for strength: 150,000-odd films, and it
- *    answers for studios the other legs do not — Pure Taboo's "The Family
- *    Tradition" comes back with its scenes from GameLink and with nothing at
- *    all from Bang. Asked before IAFD only because it costs one page instead
- *    of two. Its search is not crawled at all; Stash's own GameLink scraper is
- *    asked which film this is, and this module then fetches that one page. See
- *    gamelink.mjs for why reading it is fine where AdultEmpire is not.
- *
- * 4. **IAFD's Scene Breakdowns.** One row per scene, listing its performers and
- *    nothing else — no titles, no ids. A scene is matched to a row when its
- *    cast is exactly that row's cast. That is how a person would do it and it
- *    is still a guess, so the proposal says *probable* and shows the cast it
- *    matched on.
- *
- *    Deliberately **not** restricted to scenes filed under the studio being
- *    scanned. A DVD gathers scenes from sibling labels — the one New Sensations
- *    release this library holds a piece of has that piece filed under FamilyXXX —
- *    so a studio-scoped match finds nothing and looks like an empty catalogue.
- *    Where a matched scene is filed somewhere else, the row says so.
- *
- * **AdultEmpire and data18 are absent, and it is not an oversight.** Both say
- * this better than either source above. Every AdultEmpire page redirects to
- * /AgeConfirmation and every one of its search paths is disallowed in
- * robots.txt; data18 answers a plain fetch with a 403. Reading either means
- * forging a consent that was not given or getting around a wall that was put
- * there on purpose — the same line groupurl.mjs drew when it chose
- * adultfilmdatabase over both. What AdultEmpire *is* used for is its address:
- * TPDB hands one over on the movie record, and a built group carries it so that
- * Stash's own scraper — which does walk through that gate, with your consent,
- * from your machine — can fill the group in afterwards.
- *
- * timestamp.trade is absent for a duller reason: its robots.txt disallows
- * /scene/ and /movie/ outright.
+ * AdultEmpire and data18 are not read directly (age gate, robots.txt, 403).
+ * A built group carries the AdultEmpire URL so Stash's own scraper can fill
+ * it later. timestamp.trade's robots.txt disallows /scene/ and /movie/.
  *
  * -------------------------------------------------------------- the answers
  *
- * A proposal ends in one of two places and both are remembered.
- *
- *   approved — the group is created, the scenes you hold are filed into it, and
- *              what the film is missing becomes a short list of decisions.
- *   declined — not a film, or not one worth having. It goes quiet.
- *
- * A decline is not forever, and the rule is narrow on purpose: the proposal
- * comes back **only if you later hold a scene of that film you did not hold
- * when you declined it**. Not when the scan reruns, not when TPDB changes its
- * mind about the cover. The thing that made you say no was the shape of the
- * evidence, and the only event that genuinely changes it is new evidence.
+ *   approved — group created, held scenes filed, missing scenes listed.
+ *   declined — hidden, until you hold a new scene of that film.
  */
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
@@ -96,6 +32,7 @@ import * as tpdb from './tpdb.mjs';
 import * as iafd from './iafd.mjs';
 import * as bang from './bang.mjs';
 import * as gamelink from './gamelink.mjs';
+import * as newsensations from './newsensations.mjs';
 import * as stashdb from './stashdb.mjs';
 import * as whisparr from './whisparr.mjs';
 import * as whisparr3 from './whisparr3.mjs';
@@ -190,6 +127,7 @@ async function ungrouped(config) {
         performers { id name }
         stash_ids { endpoint stash_id }
         paths { screenshot }
+        urls
       }
     }
   }`);
@@ -205,6 +143,8 @@ async function ungrouped(config) {
     tpdbId: idAt(scene, TPDB_ENDPOINT),
     stashdbId: idAt(scene, STASHDB_ENDPOINT),
     screenshot: scene.paths?.screenshot || null,
+    // New Sensations network scene addresses, as the slug their DVD pages link.
+    nsSlugs: (scene.urls || []).map(newsensations.slugOf).filter(Boolean),
   }));
 }
 
@@ -347,15 +287,7 @@ async function runScan(config, studioId) {
   const byTpdb = new Map();
   for (const scene of all) if (scene.tpdbId) byTpdb.set(scene.tpdbId, scene);
 
-  /*
-   * The cast index, and the one place this got badly wrong the first time.
-   *
-   * It is built from **every** loose scene, not from this studio's — because a
-   * DVD gathers scenes from sibling labels by design. "I Want My Stepdad #2" is
-   * a New Sensations release and the scene of it this library holds is filed
-   * under FamilyXXX, so an index scoped to the studio being scanned threw the
-   * one real match away and the pass came back empty. Measured, not imagined.
-   */
+  /* Built from every loose scene, not just this studio's: DVDs mix sibling labels. */
   const byCast = new Map();
   for (const scene of all) {
     if (!scene.cast.size) continue;
@@ -365,6 +297,11 @@ async function runScan(config, studioId) {
   }
 
   /* Title index for the Bang tier. Every loose scene, multimap, same as the cast index. */
+  // The New Sensations tier's basis: the scene's own address, as the slug
+  // their DVD pages link. Every loose scene, for the sibling-label reason.
+  const bySlug = new Map();
+  for (const scene of all) for (const slug of scene.nsSlugs) bySlug.set(slug, scene);
+
   const byTitle = new Map();
   for (const scene of all) {
     const key = bang.flatten(scene.title);
@@ -441,9 +378,30 @@ async function runScan(config, studioId) {
    * Phase two: IAFD, for films TPDB couldn't answer, a batch per pass, best
    * fits first. Remembers what it asked.
    */
+  /*
+   * New Sensations' own DVD pages, for every unresolved film. Kept apart from
+   * IAFD's `asked` record.
+   */
+  const nsAsked = held.ns || (held.ns = {});
+  const settled = new Set();
+  let viaNs = 0;
+  progress.phase = 'reading New Sensations DVD pages';
+  for (const movie of unresolved) {
+    if (Date.now() > until) { ranOut = true; break; }
+    if (nsAsked[movie.guid]) continue;
+    try {
+      const proposal = await fromNewSensations(movie, bySlug, byTitle, studioId, studioName);
+      nsAsked[movie.guid] = { at: new Date().toISOString(), found: Boolean(proposal) };
+      if (proposal) { found.push(proposal); settled.add(movie.guid); viaNs++; }
+    } catch (err) {
+      console.warn(`[tpdbarr] group builder New Sensations: ${movie.title} -`, err.message);
+    }
+  }
+
   const asked = held.iafd || (held.iafd = {});
 
   const queue = unresolved
+    .filter((movie) => !settled.has(movie.guid))
     .filter((movie) => !asked[movie.guid])
     .sort((a, b) => (b.fits || 0) - (a.fits || 0));
 
@@ -515,7 +473,7 @@ async function runScan(config, studioId) {
   console.log(
     `[tpdbarr] group builder: ${studioName} — ${read} films read, ${plausible.length} asked about, ` +
     `${batch.length} checked against Bang, GameLink and IAFD ` +
-    `(${viaBang} by Bang, ${viaGameLink} by GameLink), ${found.length} proposals` +
+    `(${viaBang} by Bang, ${viaGameLink} by GameLink), ${viaNs} by New Sensations, ${found.length} proposals` +
     (leftOver ? `, ${leftOver} still to check` : '') + (ranOut ? ' (ran out of time)' : '')
   );
 }
@@ -680,6 +638,71 @@ async function fromBang(movie, byTitle, studioId, studioName) {
       studio: page.studio,
       date: page.date,
     },
+    held,
+    missing,
+  };
+}
+
+/*
+ * New Sensations' DVD page. A scene whose URL has the disc's slug is *exact*;
+ * falling back to title makes the proposal *likely*.
+ */
+async function fromNewSensations(movie, bySlug, byTitle, studioId, studioName) {
+  const page = await newsensations.findDisc(movie.title);
+  if (!page || !page.scenes.length) return null;
+
+  const held = [];
+  const missing = [];
+  const claimed = new Set();
+  let byTitleOnly = 0;
+
+  for (const row of page.scenes) {
+    let mine = bySlug.get(row.slug);
+    if (mine && claimed.has(mine.id)) mine = null;
+    if (!mine) {
+      const candidates = (byTitle.get(bang.flatten(row.title)) || []).filter((s) => !claimed.has(s.id));
+      if (candidates.length === 1) { mine = candidates[0]; byTitleOnly++; }
+    }
+
+    if (mine) {
+      claimed.add(mine.id);
+      held.push({
+        sceneId: mine.id,
+        title: mine.title,
+        date: mine.date,
+        index: row.no,
+        screenshot: mine.screenshot,
+        cast: mine.performers,
+        studio: mine.studioName,
+        ambiguous: null,
+      });
+      continue;
+    }
+
+    missing.push({
+      key: `${movie.guid}:${row.no}`,
+      index: row.no,
+      title: row.title,
+      date: null,
+      image: null,
+      tpdbGuid: null,
+      tpdbId: null,
+      siteId: movie.siteId ?? null,
+      performers: [],
+      url: row.url,
+      // Named and linked, but not an id Whisparr can fetch by.
+      addressable: false,
+    });
+  }
+
+  if (!held.length) return null;
+
+  return {
+    ...shell(movie, studioId, studioName),
+    match: byTitleOnly ? 'likely' : 'exact',
+    via: 'New Sensations DVD page',
+    total: page.scenes.length,
+    newSensations: { url: page.url, title: page.title, date: page.date },
     held,
     missing,
   };

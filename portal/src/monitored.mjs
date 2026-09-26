@@ -16,6 +16,8 @@ import * as whisparr3 from './whisparr3.mjs';
 
 const TTL = 10 * 60 * 1000;
 const cache = { v3: null, v2: null };
+// Something was just sent to a Whisparr, so its wanted list has changed.
+export const forget = () => { cache.v3 = null; cache.v2 = null; };
 
 const CONFIG_DIR = process.env.CONFIG_DIR || './config';
 const GRABBED_PATH = join(CONFIG_DIR, 'monitored-grabs.json');

@@ -299,6 +299,7 @@ const routes = [
     if (!rest.length) throw refusal(held);
 
     const out = await whisparr.addScenes(config, siteId, rest);
+    monitored.forget();
     return held.length ? { ...out, heldSkipped: held } : out;
   }],
 
@@ -1607,7 +1608,9 @@ const routes = [
       const held = await heldForV3(config, m[1]);
       if (held) throw refusal(held);
     }
-    return whisparr3.addScene(config, m[1]);
+    const out = await whisparr3.addScene(config, m[1]);
+    monitored.forget();
+    return out;
   }],
 
   /* "Get me another file": add and monitor if needed, then search. Deletes nothing. */

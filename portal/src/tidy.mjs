@@ -15,7 +15,7 @@
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { gql } from './stash.mjs';
+import { gql, onStashChange } from './stash.mjs';
 import * as whisparr from './whisparr.mjs';
 import * as whisparr3 from './whisparr3.mjs';
 
@@ -89,6 +89,7 @@ const INDEX_TTL = 5 * 60 * 1000;
 let filedCache = null;
 
 export const forgetFiled = () => { filedCache = null; };
+onStashChange(forgetFiled); // any write to Stash (see stash.mjs)
 
 /*
  * Filed scenes, indexed for joining to Whisparr. v3 joins exactly on the

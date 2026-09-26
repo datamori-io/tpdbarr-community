@@ -15,6 +15,7 @@ import { gql } from './stash.mjs';
 import * as renamer from './renamer.mjs';
 import * as filer from './filer.mjs';
 import * as scenethumb from './scenethumb.mjs';
+import { keepOne } from './chores.mjs';
 
 const PAGE = 24;
 
@@ -260,33 +261,12 @@ export async function queue(config, { mode = 'unmatched', page = 1, perPage = PA
   };
 }
 
-/* ------------------------------------------------------- the missing phash
+/*
+ * ------------------------------------------------------- the missing phash
  *
- * The one number that explains why this page was so hard to use.
- *
- * **Measured 2026-09-12.** Of the 291 scenes with no stash-box id, 232 have no
- * phash — only an oshash. Broken down by folder it is not a scatter, it is a
- * line:
- *
- *   /pc-import        226 scenes    0 with a phash
- *   /organized_scenes  60 scenes   59 with a phash
- *   /Whisparr-v3        5 scenes    0 with a phash
- *
- * An oshash is a hash of the file's bytes, so it only matches somebody holding
- * the byte-identical file. That is not nothing — plenty of pc-import arrived
- * as an untouched download and its oshash is known to StashDB, which is why
- * some of these rows do answer on a fingerprint today. But it is brittle in
- * exactly the way this library breaks it: anything re-encoded through FileFlows,
- * or trimmed, or remuxed, has a different oshash and nothing else to offer.
- *
- * A phash is the frames, and it survives all of that. Every scene without one
- * has a single brittle chance at a certainty and then falls to a keyword
- * guess, and generation has simply never been run over the folder the work
- * lives in.
- *
- * Stash does the generating; this only asks, and only ever for scenes that are
- * missing one. `overwrite` is deliberately not offered — re-hashing files that
- * already have one is hours of somebody's CPU for no new information.
+ * Most unmatched scenes have only an oshash, which only matches a
+ * byte-identical file. A phash survives re-encodes. This asks Stash to
+ * generate the missing ones. No overwrite.
  */
 
 // Just enough to know whether a scene needs one. The full SCENE shape over a
@@ -1535,6 +1515,9 @@ export async function addTags(config, sceneIds, tagIds, { organized = null } = {
   if (!wanted.length && organized === null) throw new Error('Nothing to save — no tags, and organised was not asked for.');
 
   let changed = 0;
+  let filed = 0;
+  let kept = 0;
+  const notFiled = [];
 
   for (const id of ids) {
     const data = await gql(config, `query($id: ID!) { findScene(id: $id) { id tags { id } organized } }`, { id });
@@ -1547,7 +1530,52 @@ export async function addTags(config, sceneIds, tagIds, { organized = null } = {
 
     await gql(config, `mutation($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`, { input });
     changed++;
+
+    /* Organised moves the file here too. A file that can't move is reported, not an error. */
+    if (organized === true) {
+      await filer.file(config, id)
+        .then(() => { filed++; })
+        .catch(async (err) => {
+          const plan = await filer.plan(config, id).catch(() => null);
+          if (plan?.already) return;
+          if (!plan?.taken) { notFiled.push({ id, why: plan?.why || err.message }); return; }
+          const why = await keepBetter(config, id, plan, wanted).catch((e) => e.message);
+          if (!why) { kept++; return; }
+          /* Not kept: usually two scenes matched to one record. Needs a re-match. */
+          await gql(config, `mutation($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`,
+            { input: { id, organized: false } }).catch(() => {});
+          notFiled.push({ id, why: why + ' Left unorganised.' });
+        });
+    }
   }
 
-  return { changed };
+  return { changed, filed, kept, notFiled };
+}
+
+/*
+ * The destination is taken by a filed copy. Keep the better one, using
+ * Manage's keepOne: same length or it's not a copy, then pixels, codec,
+ * bitrate; a tie is left alone; the filed record is kept.
+ *
+ * -> '' when one was kept, or the reason both were left.
+ */
+async function keepBetter(config, id, plan, tagIds) {
+  const data = await gql(
+    config,
+    `query($p: String!) { findScenes(scene_filter: {path: {value: $p, modifier: EQUALS}}) { scenes { id tags { id } } } }`,
+    { p: plan.taken }
+  );
+  const holder = data.findScenes?.scenes?.[0];
+  if (!holder) return `There is already a file at ${plan.taken}, and Stash has not caught up with it yet — scan organized, then try again.`;
+  if (String(holder.id) === String(id)) return `This scene already holds the file at ${plan.taken} as well — look at it rather than delete half of it.`;
+
+  const done = await keepOne(config, { id, path: plan.from, filedId: holder.id, filedPath: plan.taken });
+  if (!done) return `A copy is already filed at ${plan.taken}, and the two are the same quality and the same length — both left.`;
+
+  // The merge keeps the filed scene's fields, so what was just said about
+  // this one is said again about the one that survives.
+  const input = { id: holder.id, organized: true };
+  if (tagIds.length) input.tag_ids = [...new Set([...holder.tags.map((t) => t.id), ...tagIds])];
+  await gql(config, `mutation($input: SceneUpdateInput!) { sceneUpdate(input: $input) { id } }`, { input });
+  return '';
 }

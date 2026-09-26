@@ -2135,7 +2135,7 @@ function tagBar(scenes, body, params, cards = []) {
     apply.textContent = 'Saving…';
 
     try {
-      const { changed } = await api('/api/import/tags', {
+      const { changed, filed = 0, kept = 0, notFiled = [] } = await api('/api/import/tags', {
         method: 'POST',
         body: JSON.stringify({
           scenes: [...picked],
@@ -2143,7 +2143,13 @@ function tagBar(scenes, body, params, cards = []) {
           organized: done.checked ? true : null,
         }),
       });
-      apply.textContent = `Saved ${changed}`;
+      apply.textContent = done.checked
+        ? `Saved ${changed}, filed ${filed}` + (kept ? `, kept better ${kept}` : '')
+        : `Saved ${changed}`;
+      if (notFiled.length) {
+        alert(`Saved, but ${notFiled.length} not moved:\n\n`
+          + notFiled.map((n) => `#${n.id}: ${n.why}`).join('\n'));
+      }
       // The scenes just saved are no longer in this pile, so the pile is reread.
       setTimeout(() => goMatch(new URLSearchParams(params)), 900);
     } catch (err) {

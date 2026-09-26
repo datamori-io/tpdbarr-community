@@ -3,7 +3,7 @@
  * record; TPDB and StashDB ids hang off a scene.
  */
 
-import { gql } from './stash.mjs';
+import { gql, onStashChange } from './stash.mjs';
 import * as stashdb from './stashdb.mjs';
 import { rememberPaths } from './media.mjs';
 import { iafdUrlOf, lookup as iafdLookup, proposal as iafdProposal } from './iafd.mjs';
@@ -34,6 +34,7 @@ const RAIL_SIZE = 24;
 
 let railCache = null;
 export const forgetRails = () => { railCache = null; indexCache = null; shelfCache = null; };
+onStashChange(forgetRails); // any write to Stash (see stash.mjs)
 
 // ------------------------------------------------------------------ shaping
 
